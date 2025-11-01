@@ -25,7 +25,7 @@ VertexOut main( VertexIn vi)
     VertexOut vo;
 
     // Construct camera matrix
-    matrix wvp = mul(viewProjection, world);
+    matrix wvp = mul(viewProj, world);
 
     // Transform position by camera matrix
     vo.position = mul(wvp, float4(vi.position, 1.0f));

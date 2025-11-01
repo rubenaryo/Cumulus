@@ -20,15 +20,15 @@ namespace Muon
 class PipelineState
 {
 public:	
-	virtual void SetRootSignature(ID3D12RootSignature* pRootSig) { mpRootSignature = pRootSig; }
-	const ID3D12RootSignature* GetRootSignature() const { return mpRootSignature; }
+	virtual void SetRootSignature(ID3D12RootSignature** ppRootSig) { mppRootSignature = ppRootSig; }
+	ID3D12RootSignature* GetRootSignature() const { return *mppRootSignature; }
 	ID3D12PipelineState* GetPipelineState() const { return mpPipelineState; }
 
 	bool Bind() const;
 	void Destroy();
 
 protected:
-	const ID3D12RootSignature* mpRootSignature = nullptr;
+	ID3D12RootSignature*const* mppRootSignature = nullptr;
 	ID3D12PipelineState* mpPipelineState = nullptr;
 };
 
@@ -38,7 +38,7 @@ public:
 	GraphicsPipelineState();
 
 public:
-	virtual void SetRootSignature(ID3D12RootSignature* pRootSig) override;
+	virtual void SetRootSignature(ID3D12RootSignature** ppRootSig) override;
 	void SetVertexShader(const Muon::VertexShader& vs);
 	void SetPixelShader(const Muon::PixelShader& ps);
 

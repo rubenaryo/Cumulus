@@ -7,7 +7,6 @@ Description : Master Resource Distributor
 
 #include <Core/PathMacros.h>
 #include <Utils/Utils.h>
-
 #include "Factories.h"
 #include "Material.h"
 #include "Mesh.h"
@@ -57,10 +56,16 @@ void ResourceCodex::Init()
 
     gCodexInstance = new ResourceCodex();
     gCodexInstance->mMeshStagingBuffer.Create(L"Mesh Staging Buffer", 64 * 1024 * 1024);
-    ShaderFactory::LoadAllShaders(*gCodexInstance);
+    gCodexInstance->mMaterialParamsStagingBuffer.Create(L"material params staging buffer", sizeof(cbMaterialParams));
+    gCodexInstance->mSRVDescriptorHeap.Init(GetDevice(), 64);
 
-    //TextureFactory::LoadAllTextures(codexInstance);
-    //MaterialFactory::CreateAllMaterials(codexInstance);
+    //gCodexInstance->mTextureUploadBatch = std::make_unique<DirectX::ResourceUploadBatch>(GetDevice());
+
+    ShaderFactory::LoadAllShaders(*gCodexInstance);
+    TextureFactory::LoadAllTextures(GetDevice(), GetCommandList(), *gCodexInstance);
+    MaterialFactory::CreateAllMaterials(*gCodexInstance);
+
+    //gCodexInstance->mTextureUploadBatch.reset();
 }
 
 void ResourceCodex::Destroy()
@@ -72,7 +77,16 @@ void ResourceCodex::Destroy()
     }
     gCodexInstance->mMeshMap.clear();
 
-    gCodexInstance->mMeshStagingBuffer.TryDestroy();
+    gCodexInstance->mMeshStagingBuffer.Destroy();
+
+    for (auto& m : gCodexInstance->mMaterialTypeMap)
+    {
+        MaterialType& mat = m.second;
+        mat.Destroy();
+    }
+    gCodexInstance->mMaterialTypeMap.clear();
+
+    gCodexInstance->mMaterialParamsStagingBuffer.Destroy();
 
     for (auto& s : gCodexInstance->mVertexShaders)
     {
@@ -88,15 +102,16 @@ void ResourceCodex::Destroy()
     }
     gCodexInstance->mPixelShaders.clear();
 
-    gCodexInstance->mMaterialTypeMap.clear();
+    for (auto& t : gCodexInstance->mTextureMap)
+    {
+        Texture& tex = t.second;
+        tex.Destroy();
+    }
+    gCodexInstance->mTextureMap.clear();
+    gCodexInstance->mSRVDescriptorHeap.Destroy();
 
     delete gCodexInstance;
     gCodexInstance = nullptr;
-
-    // TODO: DX12-ify this.
-    //for (auto const& t : codexInstance.mTextureMap)
-    //    for(ID3D11ShaderResourceView* srv : t.second.SRVs)
-    //        if(srv) srv->Release();
 }
 
 const Mesh* ResourceCodex::GetMesh(MeshID UID) const
@@ -106,22 +121,6 @@ const Mesh* ResourceCodex::GetMesh(MeshID UID) const
     else
         return nullptr;
 }
-
-//const Material* ResourceCodex::GetMaterial(uint8_t materialIndex) const
-//{
-//    if (materialIndex > mMaterials.size())
-//        return nullptr;
-//
-//    return &mMaterials.at(materialIndex);
-//}
-//
-//const ResourceBindChord* ResourceCodex::GetTexture(TextureID UID) const
-//{
-//    if(mTextureMap.find(UID) != mTextureMap.end())
-//        return &mTextureMap.at(UID);
-//    else
-//        return nullptr;
-//}
 
 const VertexShader* ResourceCodex::GetVertexShader(ShaderID UID) const
 {
@@ -139,6 +138,22 @@ const PixelShader* ResourceCodex::GetPixelShader(ShaderID UID) const
         return nullptr;
 }
 
+const MaterialType* ResourceCodex::GetMaterialType(MaterialTypeID UID) const
+{
+    if (mMaterialTypeMap.find(UID) != mMaterialTypeMap.end())
+        return &mMaterialTypeMap.at(UID);
+    else
+        return nullptr;
+}
+
+const Texture* ResourceCodex::GetTexture(TextureID UID) const
+{
+    if (mTextureMap.find(UID) != mTextureMap.end())
+        return &mTextureMap.at(UID);
+    else
+        return nullptr;
+}
+
 void ResourceCodex::AddVertexShader(ShaderID hash, const wchar_t* path)
 {   
     mVertexShaders.emplace(hash, path);
@@ -149,33 +164,17 @@ void ResourceCodex::AddPixelShader(ShaderID hash, const wchar_t* path)
     mPixelShaders.emplace(hash, path);
 }
 
-//void ResourceCodex::InsertTexture(TextureID UID, UINT slot, ID3D11ShaderResourceView* pSRV)
-//{
-//    auto itFind = mTextureMap.find(UID);
-//    if (itFind != mTextureMap.end())
-//    {
-//        ResourceBindChord& chord = itFind->second;
-//        if(chord.SRVs[slot])
-//            chord.SRVs[slot]->Release();
-//
-//        mTextureMap[UID].SRVs[slot] = pSRV;
-//    }
-//    else
-//    {
-//        // TODO: This could probably avoid creating a temp variable
-//        ResourceBindChord rbc = {0};
-//        rbc.SRVs[slot] = pSRV;
-//        mTextureMap.insert(std::pair<TextureID, ResourceBindChord>(UID, rbc));
-//    }
-//}
+Texture& ResourceCodex::InsertTexture(TextureID hash)
+{
+    if (mTextureMap.find(hash) != mTextureMap.end())
+    {
+        Muon::Printf(L"Warninr: Attempted to insert duplicate textureID: 0x%08x!\n", hash);
+    }
 
-//MaterialIndex ResourceCodex::PushMaterial(const Material& material)
-//{
-//    mMaterials.push_back(material);
-//    return (MaterialIndex)(mMaterials.size() - 1);
-//}
+    return mTextureMap[hash];
+}
 
-MaterialType* ResourceCodex::InsertMaterialType(const char* name)
+MaterialType* ResourceCodex::InsertMaterialType(const wchar_t* name)
 {
     if (!name)
         return nullptr;

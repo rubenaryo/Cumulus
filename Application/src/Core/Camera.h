@@ -8,7 +8,7 @@ Description : Interface for Quaternion-Based Camera functionality
 
 #include "CBufferStructs.h"
 #include "DXCore.h"
-#include <Core/UploadBuffer.h>
+#include <Core/Buffers.h>
 
 //namespace DirectX
 //{
@@ -43,6 +43,8 @@ public:
 
     void UpdateView();
     void UpdateProjection(float aspectRatio);
+
+    void Bind(int32_t rootParamIndex, ID3D12GraphicsCommandList* pCommandList) const;
 
     DirectX::XMMATRIX   GetView()           const  { return mView;         }
     DirectX::XMMATRIX   GetProjection()     const  { return mProjection;   }
@@ -84,7 +86,7 @@ private: // For GameInput only
     void MoveAlongAxis(float dist, DirectX::XMVECTOR axis); // Assumes normalized axis
     void Rotate(DirectX::XMVECTOR quatRotation);
     
-    void UpdateConstantBuffer(); // DX12
+    void UpdateConstantBuffer();
 };
 }
 

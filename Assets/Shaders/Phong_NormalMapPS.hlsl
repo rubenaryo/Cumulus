@@ -11,7 +11,7 @@ struct VertexOut
     float3 binormal : BINORMAL;
 };
 
-cbuffer PSPerFrame : register(b10)
+cbuffer PSLights : register(b10)
 {
     float3 ambientColor;
     DirectionalLight directionalLight;

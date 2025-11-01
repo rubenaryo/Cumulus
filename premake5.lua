@@ -40,13 +40,13 @@ project (APP_NAME)
     libdirs
     {
         "external/assimp/",
-        "external/dxtk/%{cfg.buildcfg}/"
+        "external/dxtk12/%{cfg.buildcfg}/"
     }
 
     links
     {
         "external/assimp/assimp",
-        "external/dxtk/DirectXTK"
+        "external/dxtk12/%{cfg.buildcfg}/DirectXTK12"
     }
 
     prebuildcommands

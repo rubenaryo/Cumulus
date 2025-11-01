@@ -9,7 +9,7 @@ struct VertexIn
 
 float4 main( VertexIn vi ) : SV_POSITION
 {
-    float4x4 wvp = mul(viewProjection, vi.world);
+    float4x4 wvp = mul(viewProj, vi.world);
 
     return mul(wvp, float4(vi.position, 1.0f));
 }

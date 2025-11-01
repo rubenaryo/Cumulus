@@ -16,7 +16,7 @@ struct Mesh
     bool Init(void* vertexData, UINT vertexDataSize, UINT vertexStride, void* indexData, UINT indexDataSize, UINT indexCount, DXGI_FORMAT indexFormat);
     bool Release();
     bool PopulateBuffers(void* vertexData, UINT vertexDataSize, UINT vertexStride, void* indexData, UINT indexDataSize, UINT indexCount);
-    bool Draw(ID3D12GraphicsCommandList* pCommandList);
+    bool Draw(ID3D12GraphicsCommandList* pCommandList) const;
 
     ID3D12Resource* VertexBuffer = nullptr;
     ID3D12Resource* IndexBuffer = nullptr;

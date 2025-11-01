@@ -9,6 +9,7 @@ or "Introduction to 3D Game Programming with DirectX 12" by Frank Luna
 #include <Utils/Utils.h>
 #include <Core/DXCore.h>
 #include <Core/ThrowMacros.h>
+#include <Core/CBufferStructs.h>
 
 #include <d3dx12.h>
 #include <d3d12.h>
@@ -64,15 +65,11 @@ namespace Muon
     D3D_FEATURE_LEVEL gFeatureLevel;
     const wchar_t* gFeatureLevelStr = nullptr;
 
-    // TODO: Move these to the main application and generalize them. 
-    Microsoft::WRL::ComPtr<ID3D12RootSignature> gRootSig;
-
     /////////////////////////////////////////////////////////////////////
     // Accessors
 
     ID3D12Device* GetDevice() { return gDevice.Get(); }
     ID3D12Fence* GetFence() { return gFence.Get(); }
-    ID3D12RootSignature* GetRootSignature() { return gRootSig.Get(); }
     UINT GetRTVDescriptorSize() { return gRTVSize; }
     UINT GetDSVDescriptorSize() { return gDSVSize; }
     UINT GetCBVDescriptorSize() { return gCBVSize; }
@@ -454,72 +451,16 @@ namespace Muon
         return true;
     }
 
-    bool CreateRootSig(ID3D12Device* pDevice, Microsoft::WRL::ComPtr<ID3D12RootSignature>& out_sig)
-    {
-        CD3DX12_ROOT_SIGNATURE_DESC rootSignatureDesc;
-        rootSignatureDesc.Init(0, nullptr, 0, nullptr, D3D12_ROOT_SIGNATURE_FLAG_ALLOW_INPUT_ASSEMBLER_INPUT_LAYOUT);
-
-        Microsoft::WRL::ComPtr<ID3DBlob> signature;
-        Microsoft::WRL::ComPtr<ID3DBlob> error;
-        HRESULT hr = D3D12SerializeRootSignature(&rootSignatureDesc, D3D_ROOT_SIGNATURE_VERSION_1, &signature, &error);
-        COM_EXCEPT(hr);
-
-        hr = pDevice->CreateRootSignature(0, signature->GetBufferPointer(), signature->GetBufferSize(), IID_PPV_ARGS(out_sig.GetAddressOf()));
-        COM_EXCEPT(hr);
-
-        return SUCCEEDED(hr);
-    }
-
-    bool LoadShaders(ID3D12Device* pDevice, ID3D12GraphicsCommandList* pCommandList, ID3D12RootSignature* pRootSignature, ID3D12PipelineState** out_state)
-    {
-        // Load simple shaders from file
-        const wchar_t* VS_PATH = SHADERPATHW "SimpleVS.cso";
-        const wchar_t* PS_PATH = SHADERPATHW "SimplePS.cso";
-        Microsoft::WRL::ComPtr<ID3DBlob> pVSBlob;
-        Microsoft::WRL::ComPtr<ID3DBlob> pPSBlob;
-        HRESULT hr = D3DReadFileToBlob(VS_PATH, pVSBlob.GetAddressOf());
-        COM_EXCEPT(hr);
-
-        hr = D3DReadFileToBlob(PS_PATH, pPSBlob.GetAddressOf());
-        COM_EXCEPT(hr);
-
-        D3D12_INPUT_ELEMENT_DESC inputElementDescs[] =
-        {
-            { "POSITION", 0, DXGI_FORMAT_R32G32B32_FLOAT, 0, 0, D3D12_INPUT_CLASSIFICATION_PER_VERTEX_DATA, 0 },
-            { "COLOR", 0, DXGI_FORMAT_R32G32B32A32_FLOAT, 0, 12, D3D12_INPUT_CLASSIFICATION_PER_VERTEX_DATA, 0 }
-        };
-
-        // Describe and create the graphics pipeline state object (PSO).
-        D3D12_GRAPHICS_PIPELINE_STATE_DESC psoDesc = {};
-        psoDesc.InputLayout = { inputElementDescs, _countof(inputElementDescs) };
-        psoDesc.pRootSignature = pRootSignature;
-        psoDesc.VS = CD3DX12_SHADER_BYTECODE(pVSBlob.Get());
-        psoDesc.PS = CD3DX12_SHADER_BYTECODE(pPSBlob.Get());
-        psoDesc.RasterizerState = CD3DX12_RASTERIZER_DESC(D3D12_DEFAULT);
-        psoDesc.BlendState = CD3DX12_BLEND_DESC(D3D12_DEFAULT);
-        psoDesc.DepthStencilState.DepthEnable = FALSE;
-        psoDesc.DepthStencilState.StencilEnable = FALSE;
-        psoDesc.SampleMask = UINT_MAX;
-        psoDesc.PrimitiveTopologyType = D3D12_PRIMITIVE_TOPOLOGY_TYPE_TRIANGLE;
-        psoDesc.NumRenderTargets = 1;
-        psoDesc.RTVFormats[0] = DXGI_FORMAT_R8G8B8A8_UNORM;
-        psoDesc.SampleDesc.Count = 1;
-
-        hr = pDevice->CreateGraphicsPipelineState(&psoDesc, IID_PPV_ARGS(out_state));
-        COM_EXCEPT(hr);
-
-        return SUCCEEDED(hr);
-    }
-
     /////////////////////////////////////////////////////////////////////
 
     bool ResetCommandList(ID3D12PipelineState* pInitialPipelineState)
     {
         ID3D12CommandAllocator* pAllocator = GetCommandAllocator();
         ID3D12GraphicsCommandList* pCommandList = GetCommandList();
-
         if (!pAllocator || !pCommandList)
             return false;
+
+        FlushCommandQueue();
 
         HRESULT hr = pAllocator->Reset();
         COM_EXCEPT(hr);
@@ -540,7 +481,7 @@ namespace Muon
     {
         ID3D12GraphicsCommandList* pCommandList = GetCommandList();
 
-        pCommandList->SetGraphicsRootSignature(gRootSig.Get());
+        //pCommandList->SetGraphicsRootSignature(gRootSig.Get());
         pCommandList->RSSetViewports(1, &gViewport);
         pCommandList->RSSetScissorRects(1, &gScissorRect);
 
@@ -729,10 +670,6 @@ namespace Muon
         success &= SetScissorRects(GetCommandList(), 0, 0, width, height);
         CHECK_SUCCESS(success, "Error: Failed to set scissor rects!\n");
 
-        // TODO: Move this to the application and generalize it.
-        success &= CreateRootSig(GetDevice(), gRootSig);
-        CHECK_SUCCESS(success, "Error: Failed to create root signature.\n");
-
         // We've written a bunch of commands, close the list and execute it.
         hr = GetCommandList()->Close();
         COM_EXCEPT(hr);
@@ -783,7 +720,6 @@ namespace Muon
         gDepthStencilBuffer.Reset();
         gRTVHeap.Reset();
         gDSVHeap.Reset();
-        gRootSig.Reset();
         gCommandList.Reset();
         gCommandAllocator.Reset();
         gCommandQueue.Reset();

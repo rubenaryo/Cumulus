@@ -26,9 +26,11 @@ namespace Input {
         MoveLeft,
         MoveRight,
         MoveUp,
+        MoveDown,
         RollLeft,
         RollRight,
-        CameraRotation
+        MouseRotation,
+        MouseMovement
     };
 
     // Enum to emphasize the different states of a key

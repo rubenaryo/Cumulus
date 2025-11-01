@@ -18,6 +18,7 @@ bool PipelineState::Bind() const
     if (!pCommandList || !this->GetPipelineState())
         return false;
 
+    pCommandList->SetGraphicsRootSignature(this->GetRootSignature());
     pCommandList->SetPipelineState(this->GetPipelineState());
     return true;
 }
@@ -43,10 +44,10 @@ GraphicsPipelineState::GraphicsPipelineState()
     mDesc.SampleDesc.Count = 1;
 }
 
-void GraphicsPipelineState::SetRootSignature(ID3D12RootSignature* pRootSig)
+void GraphicsPipelineState::SetRootSignature(ID3D12RootSignature** ppRootSig)
 {
-    PipelineState::SetRootSignature(pRootSig);
-    mDesc.pRootSignature = pRootSig;
+    PipelineState::SetRootSignature(ppRootSig);
+    mDesc.pRootSignature = this->GetRootSignature();
 }
 
 void GraphicsPipelineState::SetVertexShader(const Muon::VertexShader& vs)
@@ -64,6 +65,13 @@ bool GraphicsPipelineState::Generate()
 {
 	if (!GetDevice())
 		return false;
+
+    D3D12_RASTERIZER_DESC rasterDesc = {};
+    rasterDesc.FillMode = D3D12_FILL_MODE_WIREFRAME;
+    rasterDesc.CullMode = D3D12_CULL_MODE_NONE;
+    rasterDesc.DepthClipEnable = TRUE;
+
+    mDesc.RasterizerState = rasterDesc;
 
 	HRESULT hr = GetDevice()->CreateGraphicsPipelineState(&mDesc, IID_PPV_ARGS(&mpPipelineState));
 	COM_EXCEPT(hr);

@@ -9,7 +9,10 @@ Description : Material class for shader information
 #include <Core/DXCore.h>
 #include "CBufferStructs.h"
 
+#include <Core/Buffers.h>
+#include <Core/CommonTypes.h>
 #include <Core/PipelineState.h>
+#include <Core/Shader.h>
 #include <unordered_map>
 #include <string>
 
@@ -58,29 +61,6 @@ enum TextureSlotFlags : UINT
 //    cbMaterialParams            Description;
 //};
 
-// Note: When adding to this enum, make sure to add to the sParamSizes array below in GetParamTypeSize.
-enum class ParameterType
-{
-    Int = 0,
-    Float,
-    Float2,
-    Float3,
-    Float4,
-    Count,
-    Invalid
-};
-
-size_t GetParamTypeSize(ParameterType type);
-
-struct ParameterDesc
-{
-    ParameterDesc(const char* name, ParameterType type);
-
-    std::string Name;
-    ParameterType Type = ParameterType::Invalid;
-    UINT Index = 0;
-    UINT Offset = 0;
-};
 
 struct ParameterValue
 {
@@ -93,30 +73,62 @@ struct ParameterValue
     };
 };
 
+static const int32_t ROOTIDX_INVALID = -1;
+
 // Material types define the required parameters, shaders, and hold the underlying pipeline state.
 class MaterialType
 {
 public:
-    MaterialType(const char* name);
+    MaterialType(const wchar_t* name);
+    void Destroy();
 
-    const std::string& GetName() const { return mName; }
-    void SetVertexShader(const VertexShader& vs);
-    void SetPixelShader(const PixelShader& ps);
-    void SetRootSignature(ID3D12RootSignature* pRootSig);
-    void AddParameter(const char* paramName, ParameterType type);
+    bool Bind(ID3D12GraphicsCommandList* pCommandList) const;
+
+    const std::wstring& GetName() const { return mName; }
+    void SetVertexShader(const VertexShader* vs);
+    void SetPixelShader(const PixelShader* ps);
+    
+    const std::vector<ParameterDesc>& GetAllParameters() const { return mParameters; }
     const ParameterDesc* GetParameter(const char* paramName) const;
 
-    bool Generate();
+    void SetMaterialParams(cbMaterialParams& params) { mMaterialParams = params; }
+    bool PopulateMaterialParams(UploadBuffer& stagingBuffer, ID3D12GraphicsCommandList* pCommandList);
+
+    bool SetTextureParam(const char* paramName, TextureID texId);
+
+    const std::vector<ConstantBufferReflection>& GetConstantBuffers() const { return mConstantBuffers; }
+    int GetResourceRootIndex(const char* name) const;
+
+    bool Generate(DXGI_FORMAT rtvFormat = DXGI_FORMAT_R8G8B8A8_UNORM,
+        DXGI_FORMAT dsvFormat = DXGI_FORMAT_D24_UNORM_S8_UINT);
 
 protected:
+    bool MergeShaderResources();
+    bool GenerateRootSignature();
+    bool GeneratePipelineState(DXGI_FORMAT rtvFormat, DXGI_FORMAT dsvFormat);
+
     const VertexShader* mpVS = nullptr;
     const PixelShader* mpPS = nullptr;
+
+    std::vector<ShaderResourceBinding> mResources;
+    std::vector<ConstantBufferReflection> mConstantBuffers;
     std::vector<ParameterDesc> mParameters;
-    std::unordered_map<const char*, size_t> mParamNameToIndex;
-    Muon::GraphicsPipelineState mPipelineState;
-    std::string mName;
-    size_t mSize = 0;
-    TextureSlotFlags mFlags = TSF_NONE; // Used for validating that the right textures have been properly specified by the material instance
+
+    std::unordered_map<std::string, size_t> mParamNameToIndex;
+    std::unordered_map<std::string, int32_t> mResourceNameToRootIndex;
+    std::unordered_map<std::string, TextureID> mTextureParams;
+
+    Microsoft::WRL::ComPtr<ID3D12RootSignature> mpRootSignature;
+    Microsoft::WRL::ComPtr<ID3D12PipelineState> mpPipelineState;
+
+    std::wstring mName;
+
+    DefaultBuffer mMaterialParamsBuffer;
+    cbMaterialParams mMaterialParams;
+
+    bool mInitialized = false;
+
+    //TextureSlotFlags mFlags = TSF_NONE; // Used for validating that the right textures have been properly specified by the material instance
 };
 
 // MaterialInstances are immutably tied to their parent type at creation. 

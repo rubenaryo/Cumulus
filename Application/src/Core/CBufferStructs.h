@@ -14,12 +14,27 @@ namespace Muon
 
 struct alignas(16) cbCamera
 {
-    DirectX::XMFLOAT4X4 viewProjection;
+    DirectX::XMFLOAT4X4 view;
+    DirectX::XMFLOAT4X4 proj;
+    DirectX::XMFLOAT4X4 viewProj;
 };
 
 struct alignas(16) cbPerEntity
 {
     DirectX::XMFLOAT4X4 world;
+};
+
+struct alignas(16) DirectionalLight
+{
+    DirectX::XMFLOAT3 diffuseColor;
+    DirectX::XMFLOAT3 dir;
+};
+
+struct alignas(16) cbLights
+{
+    DirectX::XMFLOAT3A ambientColor;
+    DirectionalLight directionalLight;
+    DirectX::XMFLOAT3A cameraWorldPos;
 };
 
 struct alignas(16) cbMaterialParams

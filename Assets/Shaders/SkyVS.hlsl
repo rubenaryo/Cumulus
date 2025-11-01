@@ -15,7 +15,7 @@ VertexOut main( VertexIn input )
 {
     VertexOut output;
 
-    output.position = mul(viewProjection, float4(input.position, 1.0f));
+    output.position = mul(viewProj, float4(input.position, 1.0f));
 
     // Prepare for perspective divide = 1
     output.position.z = output.position.w;

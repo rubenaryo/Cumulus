@@ -7,13 +7,15 @@ Description : Common Functions and Constant Buffers shared across ALL vertex sha
 #define VS_COMMON_HLSLI
 
 // Basic camera matrix passed in every frame
-cbuffer VSPerPass : register(b10)
+cbuffer VSCamera : register(b10)
 {
-    float4x4 viewProjection;
+    float4x4 view;
+    float4x4 proj;
+    float4x4 viewProj;
 }
 
 // Values changed for every entity
-cbuffer VSPerStaticEntity : register(b11)
+cbuffer VSWorld: register(b11)
 {
     float4x4 world;
 }
