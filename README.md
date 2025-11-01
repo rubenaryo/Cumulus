@@ -1,4 +1,4 @@
-# Nubis3 Final Project (Name Pending)
+# Cumulus
 A DirectX 12 project for real-time enabled cloud simulation and interactivity.
 
 ## Building
