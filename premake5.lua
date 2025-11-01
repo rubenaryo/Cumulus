@@ -1,4 +1,4 @@
-APP_NAME = "Application"
+APP_NAME = "Cumulus"
 
 workspace (APP_NAME)
     architecture "x64"
