@@ -34,10 +34,10 @@ bool Game::Init(HWND window, int width, int height)
     ResourceCodex::Init();
 
     ResourceCodex& codex = ResourceCodex::GetSingleton();
-    const ShaderID kSimpleVSID = fnv1a(L"SimpleVS.cso");
-    const ShaderID kSimplePSID = fnv1a(L"SimplePS.cso");
-    const ShaderID kPhongVSID = fnv1a(L"PhongVS.cso");
-    const ShaderID kPhongPSID = fnv1a(L"PhongPS.cso");
+    const ShaderID kSimpleVSID = fnv1a(L"Simple.vs");
+    const ShaderID kSimplePSID = fnv1a(L"Simple.ps");
+    const ShaderID kPhongVSID = fnv1a(L"Phong.vs");
+    const ShaderID kPhongPSID = fnv1a(L"Phong.ps");
     const VertexShader* pVS = codex.GetVertexShader(kSimpleVSID);
     const PixelShader* pPS = codex.GetPixelShader(kSimplePSID);
     

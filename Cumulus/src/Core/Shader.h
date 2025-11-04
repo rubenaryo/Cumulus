@@ -10,6 +10,7 @@ Description : Wrapper for Vertex/Pixel/other shader code
 
 #include <vector>
 #include <wrl/client.h>
+#include <dxcapi.h>
 #include <Core/DXCore.h>
 
 namespace Muon
@@ -100,6 +101,7 @@ struct VertexBufferDescription
 };
 #pragma endregion
 
+// TODO: Make this a proper class hierarchy
 
 struct VertexShader
 {
@@ -110,7 +112,7 @@ struct VertexShader
     bool Release();
 
     std::vector<D3D12_INPUT_ELEMENT_DESC> InputElements;
-    Microsoft::WRL::ComPtr<ID3DBlob> ShaderBlob;
+    Microsoft::WRL::ComPtr<IDxcBlobEncoding> ShaderBlob;
     VertexBufferDescription VertexDesc;
     VertexBufferDescription InstanceDesc; // Note: The allocated memory inside this one is contiguous with VertexDesc, so no additional free's are required.
 
@@ -127,7 +129,20 @@ struct PixelShader
     bool Init(const wchar_t* path);
     bool Release();
 
-    Microsoft::WRL::ComPtr<ID3DBlob> ShaderBlob;
+    Microsoft::WRL::ComPtr<IDxcBlobEncoding> ShaderBlob;
+    ShaderReflectionData ReflectionData;
+    BOOL Initialized = false;
+};
+
+struct ComputeShader
+{
+    ComputeShader() = default;
+    ComputeShader(const wchar_t* path);
+
+    bool Init(const wchar_t* path);
+    bool Release();
+
+    Microsoft::WRL::ComPtr<IDxcBlobEncoding> ShaderBlob;
     ShaderReflectionData ReflectionData;
     BOOL Initialized = false;
 };

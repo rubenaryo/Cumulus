@@ -53,12 +53,12 @@ void GraphicsPipelineState::SetRootSignature(ID3D12RootSignature** ppRootSig)
 void GraphicsPipelineState::SetVertexShader(const Muon::VertexShader& vs)
 {
     mDesc.InputLayout = { vs.InputElements.data(), (unsigned int) vs.InputElements.size()};
-    mDesc.VS = CD3DX12_SHADER_BYTECODE(vs.ShaderBlob.Get());
+    mDesc.VS = CD3DX12_SHADER_BYTECODE(vs.ShaderBlob->GetBufferPointer(), vs.ShaderBlob->GetBufferSize());
 }
 
 void GraphicsPipelineState::SetPixelShader(const Muon::PixelShader& ps)
 {
-    mDesc.PS = CD3DX12_SHADER_BYTECODE(ps.ShaderBlob.Get());
+    mDesc.PS = CD3DX12_SHADER_BYTECODE(ps.ShaderBlob->GetBufferPointer(), ps.ShaderBlob->GetBufferSize());
 }
 
 bool GraphicsPipelineState::Generate()

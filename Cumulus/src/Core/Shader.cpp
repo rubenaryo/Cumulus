@@ -27,24 +27,16 @@ bool VertexShader::Init(const wchar_t* path)
         return false;
     }
 
-    HRESULT hr = D3DReadFileToBlob(path, this->ShaderBlob.GetAddressOf());
-    COM_EXCEPT(hr);
-
-    if (FAILED(hr))
+    if (!LoadBlob(path, this->ShaderBlob.GetAddressOf()))
         return false;
 
     Microsoft::WRL::ComPtr<ID3D12ShaderReflection> pReflection;
-    hr = D3DReflect(ShaderBlob->GetBufferPointer(), ShaderBlob->GetBufferSize(),
-        IID_ID3D12ShaderReflection, (void**)pReflection.GetAddressOf());
+    Initialized = ReflectAndParse(this->ShaderBlob.Get(), pReflection.GetAddressOf(), this->ReflectionData);
 
-    if (FAILED(hr))
+    if (!BuildInputLayout(pReflection.Get(), this))
         return false;
 
-    if (!BuildInputLayout(pReflection.Get(), ShaderBlob.Get(), this))
-        return false;
-
-    Initialized = ParseReflectedResources(pReflection.Get(), this->ReflectionData);
-    return SUCCEEDED(hr);
+    return Initialized;
 }
 
 bool VertexShader::Release()
@@ -89,26 +81,38 @@ PixelShader::PixelShader(const wchar_t* path)
 
 bool PixelShader::Init(const wchar_t* path)
 {
-    HRESULT hr = D3DReadFileToBlob(path, this->ShaderBlob.GetAddressOf());
-    COM_EXCEPT(hr);
-
-    if (FAILED(hr))
+    if (!LoadBlob(path, this->ShaderBlob.GetAddressOf()))
         return false;
 
     Microsoft::WRL::ComPtr<ID3D12ShaderReflection> pReflection;
-    hr = D3DReflect(ShaderBlob->GetBufferPointer(), ShaderBlob->GetBufferSize(),
-        IID_ID3D12ShaderReflection, (void**)pReflection.GetAddressOf());
-
-    if (FAILED(hr))
-        return false;
-
-    Initialized = ParseReflectedResources(pReflection.Get(), this->ReflectionData);
-    return SUCCEEDED(hr);
+    Initialized = ReflectAndParse(this->ShaderBlob.Get(), pReflection.GetAddressOf(), this->ReflectionData);
+    return Initialized;
 }
 
 bool PixelShader::Release()
 {
     // This will get filled out once we're dealing with samplers and such
+    return true;
+}
+
+//////////////////////////////////////////////////////////////////////////////////
+
+ComputeShader::ComputeShader(const wchar_t* path)
+{
+}
+
+bool ComputeShader::Init(const wchar_t* path)
+{
+    if (!LoadBlob(path, this->ShaderBlob.GetAddressOf()))
+        return false;
+
+    Microsoft::WRL::ComPtr<ID3D12ShaderReflection> pReflection;
+    Initialized = ReflectAndParse(this->ShaderBlob.Get(), pReflection.GetAddressOf(), this->ReflectionData);
+    return Initialized;
+}
+
+bool ComputeShader::Release()
+{
     return true;
 }
 

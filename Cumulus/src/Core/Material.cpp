@@ -54,7 +54,7 @@ bool MaterialType::Bind(ID3D12GraphicsCommandList* pCommandList) const
         if (texRootParamIndex == ROOTIDX_INVALID)
             continue;
 
-        pCommandList->SetDescriptorHeaps(1, codex.GetSRVDescriptorHeap().GetHeapAddr());
+        pCommandList->SetDescriptorHeaps(1, codex.GetSRVDescriptorHeap().GetHeapAddr()); // TODO: This should be done more globally and only once. 
         pCommandList->SetGraphicsRootDescriptorTable(texRootParamIndex, pTex->GPUHandle);
     }
 
@@ -254,10 +254,10 @@ bool MaterialType::GeneratePipelineState(DXGI_FORMAT rtvFormat, DXGI_FORMAT dsvF
     psoDesc.pRootSignature = mpRootSignature.Get();
 
     // Vertex Shader 
-    psoDesc.VS = CD3DX12_SHADER_BYTECODE(mpVS->ShaderBlob.Get());
+    psoDesc.VS = CD3DX12_SHADER_BYTECODE(mpVS->ShaderBlob->GetBufferPointer(), mpVS->ShaderBlob->GetBufferSize());
     
     // Pixel Shader
-    psoDesc.PS = CD3DX12_SHADER_BYTECODE(mpPS->ShaderBlob.Get());
+    psoDesc.PS = CD3DX12_SHADER_BYTECODE(mpPS->ShaderBlob->GetBufferPointer(), mpPS->ShaderBlob->GetBufferSize());
 
     // Input layout
     psoDesc.InputLayout.pInputElementDescs = mpVS->InputElements.data();

@@ -166,7 +166,7 @@ void MeshFactory::LoadAllMeshes(ResourceCodex& codex)
 #endif
 
     // PhongVS will be comprehensive enough for now..
-    const ShaderID kPhongVSID = fnv1a(L"PhongVS.cso");
+    const ShaderID kPhongVSID = fnv1a(L"Phong.vs");
     const VertexShader* pVS = codex.GetVertexShader(kPhongVSID);
     if (!pVS)
         return;
@@ -195,18 +195,25 @@ void ShaderFactory::LoadAllShaders(ResourceCodex& codex)
     for (const auto& entry : fs::directory_iterator(shaderPath))
     {
         std::wstring path = entry.path();
-        std::wstring name = entry.path().filename();
+        std::wstring stem = entry.path().stem().wstring();
+        size_t pos = stem.find(L'.') + 1;
+        std::wstring ext = stem.substr(pos);
 
-        ShaderID hash = fnv1a(name.c_str());
+        ShaderID hash = fnv1a(stem.c_str());
 
         // Parse file name to decide how to create this resource
-        if (name.find(L"VS") != std::wstring::npos)
+        // TODO: This is stupid, maybe just put them all in the same map?
+        if (ext == L"vs")
         {
             codex.AddVertexShader(hash, path.c_str());
         }
-        else if (name.find(L"PS") != std::wstring::npos)
+        else if (ext == L"ps")
         {
             codex.AddPixelShader(hash, path.c_str());
+        }
+        else if (ext == L"cs")
+        {
+            codex.AddComputeShader(hash, path.c_str());
         }
     }
 }
@@ -303,9 +310,9 @@ bool MaterialFactory::CreateAllMaterials(ResourceCodex& codex)
     const TextureID kRockDiffuseId = fnv1a(L"Rock_T.png");       // FNV1A of L"Lunar_T"
     const TextureID kRockNormalId = fnv1a(L"Rock_N.png");       // FNV1A of L"Lunar_T"
 
-    const ShaderID kPhongVSID = fnv1a("PhongVS.cso");
-    const ShaderID kPhongPSID = 0x4dc6e249;          // FNV1A of L"PhongPS.cso"
-    const ShaderID kPhongPSNormalMapID = fnv1a(L"Phong_NormalMapPS.cso");
+    const ShaderID kPhongVSID = fnv1a("Phong.vs");
+    const ShaderID kPhongPSID = fnv1a("Phong.ps");          // FNV1A of L"Phong.ps"
+    const ShaderID kPhongPSNormalMapID = fnv1a(L"Phong_NormalMap.ps");
     const MeshID kSkyMeshID = 0x4a986f37; // cube
 
     const VertexShader* pPhongVS = codex.GetVertexShader(kPhongVSID);
