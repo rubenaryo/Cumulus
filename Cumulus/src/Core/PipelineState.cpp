@@ -8,7 +8,6 @@ Description : Implementation for Pipeline state objects (PSO)
 #include <Core/Shader.h>
 #include <Core/ThrowMacros.h>
 #include <Core/DXCore.h>
-#include "ComputePass.h"
 
 namespace Muon
 {
