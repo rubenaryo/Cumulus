@@ -13,6 +13,7 @@ Description : Holds all the central DX12 Data structures
 #pragma comment(lib, "d3d12.lib")
 #pragma comment(lib, "dxgi.lib")
 #pragma comment(lib, "d3dcompiler.lib")
+#pragma comment(lib, "dxcompiler.lib")
 #pragma comment(lib, "dxguid.lib")
 
 namespace Muon

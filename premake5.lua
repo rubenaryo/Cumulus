@@ -75,18 +75,16 @@ project (APP_NAME)
         defines "MN_DEBUG"
         symbols "On"
         staticruntime "Off"
-        shadermodel "5.0"
 
     filter "configurations:Release"
         defines "MN_RELEASE"
         optimize "On"
         staticruntime "Off"
-        shadermodel "5.0"
 
 project "Shaders"
     location "Assets/Shaders"
     kind "ConsoleApp"
-    shadermodel "5.0"
+    shadermodel "6.5"
 
     shaderobjectfileoutput ("%{!wks.location}/_bin/Shaders/%%(Filename).cso")
     objdir ("_int/" .. outputdir .. "/%{prj.name}")
@@ -97,8 +95,11 @@ project "Shaders"
         "%{!wks.location}/Assets/Shaders/**.hlsli"
     }
 
-    filter { "files:**PS.hlsl" }
+    filter { "files:**.ps.hlsl" }
         shadertype "Pixel"
 
-    filter { "files:**VS.hlsl" }
+    filter { "files:**.vs.hlsl" }
         shadertype "Vertex"
+		
+	filter { "files:**.cs.hlsl" }
+        shadertype "Compute"

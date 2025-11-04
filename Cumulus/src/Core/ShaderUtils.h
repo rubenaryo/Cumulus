@@ -8,6 +8,8 @@ Description : Useful functions for shader reflection system
 
 #include <Core/DXCore.h>
 
+#include <dxcapi.h>
+
 namespace Muon
 {
     struct VertexShader;
@@ -25,6 +27,12 @@ size_t GetParamTypeSize(ParameterType type);
 
 ParameterType D3DTypeToParameterType(const D3D12_SHADER_TYPE_DESC& typeDesc);
     
+bool LoadBlob(const wchar_t* path, IDxcBlobEncoding** ppBlob);
+
+bool ReflectAndParse(IDxcBlobEncoding* pShaderBlob,
+    ID3D12ShaderReflection** pOutReflection, 
+    ShaderReflectionData& outShaderReflectionData);
+
 bool ParseReflectedResources(ID3D12ShaderReflection* pReflection, 
     ShaderReflectionData& outShaderReflectionData);
 
@@ -36,7 +44,6 @@ void PopulateInputElements(D3D12_INPUT_CLASSIFICATION slotClass,
     uint16_t& out_byteSize);
 
 bool BuildInputLayout(ID3D12ShaderReflection* pReflection, 
-    ID3DBlob* pBlob, 
     VertexShader* out_shader);
 
 bool MergeReflectionData(

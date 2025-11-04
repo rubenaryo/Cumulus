@@ -10,6 +10,9 @@ Description : Useful functions for shader reflection system
 #include <DirectXMath.h>
 #include <unordered_map>
 
+#include <dxcapi.h>
+#include <d3d12shader.h>
+
 namespace Muon
 {
     static const char* kSemanticNames[] =
@@ -88,6 +91,47 @@ namespace Muon
         }
 
         return ParameterType::Invalid;
+    }
+
+    bool LoadBlob(const wchar_t* path, IDxcBlobEncoding** ppBlob)
+    {
+        Microsoft::WRL::ComPtr<IDxcLibrary> pLibrary;
+        HRESULT hr = DxcCreateInstance(CLSID_DxcLibrary, IID_PPV_ARGS(&pLibrary));
+        if (FAILED(hr))
+            return false;
+
+        hr = pLibrary->CreateBlobFromFile(path, nullptr, ppBlob);
+        return SUCCEEDED(hr) && ppBlob;
+    }
+
+    bool ReflectAndParse(IDxcBlobEncoding* pShaderBlob, ID3D12ShaderReflection** pOutReflection, ShaderReflectionData& outShaderReflectionData)
+    {
+        if (!pShaderBlob)
+            return false;
+
+        Microsoft::WRL::ComPtr<IDxcContainerReflection> pContainerReflection;
+        HRESULT hr = DxcCreateInstance(CLSID_DxcContainerReflection, IID_PPV_ARGS(&pContainerReflection));
+        COM_EXCEPT(hr);
+        if (FAILED(hr))
+            return false;
+
+        hr = pContainerReflection->Load(pShaderBlob);
+        COM_EXCEPT(hr);
+        if (FAILED(hr))
+            return false;
+
+        UINT32 index;
+        hr = pContainerReflection->FindFirstPartKind(DXC_PART_DXIL, &index);
+        COM_EXCEPT(hr);
+        if (FAILED(hr))
+            return false;
+
+        hr = pContainerReflection->GetPartReflection(index, __uuidof(ID3D12ShaderReflection), reinterpret_cast<void**>(pOutReflection));
+        COM_EXCEPT(hr);
+        if (FAILED(hr) || !pOutReflection)
+            return false;
+
+        return ParseReflectedResources(*pOutReflection, outShaderReflectionData);
     }
 
     bool ParseReflectedResources(ID3D12ShaderReflection* pReflection, ShaderReflectionData& outShaderReflectionData)
@@ -255,9 +299,9 @@ namespace Muon
         out_byteSize = totalByteSize;
     }
 
-    bool BuildInputLayout(ID3D12ShaderReflection* pReflection, ID3DBlob* pBlob, VertexShader* out_shader)
+    bool BuildInputLayout(ID3D12ShaderReflection* pReflection, VertexShader* out_shader)
     {
-        if (!pReflection || !pBlob || !out_shader)
+        if (!pReflection || !out_shader)
             return false;
 
         D3D12_SHADER_DESC shaderDesc;

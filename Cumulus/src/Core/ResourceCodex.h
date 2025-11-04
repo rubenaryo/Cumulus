@@ -77,6 +77,7 @@ public:
 private:
     std::unordered_map<ShaderID, VertexShader>  mVertexShaders;
     std::unordered_map<ShaderID, PixelShader>   mPixelShaders;
+    std::unordered_map<ShaderID, ComputeShader> mComputeShaders;
     std::unordered_map<MeshID, Mesh>            mMeshMap;
     std::unordered_map<TextureID, Texture>      mTextureMap;
     std::unordered_map<MaterialTypeID, MaterialType> mMaterialTypeMap;
@@ -99,6 +100,7 @@ private:
     friend struct ShaderFactory;
     void AddVertexShader(ShaderID hash, const wchar_t* path);
     void AddPixelShader(ShaderID hash, const wchar_t* path);
+    void AddComputeShader(ShaderID hash, const wchar_t* path);
 };
 }
 #endif

@@ -164,6 +164,11 @@ void ResourceCodex::AddPixelShader(ShaderID hash, const wchar_t* path)
     mPixelShaders.emplace(hash, path);
 }
 
+void ResourceCodex::AddComputeShader(ShaderID hash, const wchar_t* path)
+{
+    mComputeShaders.emplace(hash, path);
+}
+
 Texture& ResourceCodex::InsertTexture(TextureID hash)
 {
     if (mTextureMap.find(hash) != mTextureMap.end())
