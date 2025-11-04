@@ -30,6 +30,8 @@ project (APP_NAME)
         "%{prj.name}/src/**.h",
         "%{prj.name}/src/**.cpp"
     }
+	
+    dependson { "Shaders" }
 
     includedirs
     {
