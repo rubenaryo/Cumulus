@@ -18,12 +18,12 @@ void RootSignatureBuilder::Reset()
 
 void RootSignatureBuilder::AddConstantBufferView(UINT shaderRegister, UINT space, D3D12_SHADER_VISIBILITY visibility)
 {
-    D3D12_ROOT_PARAMETER param = {};
-    param.ParameterType = D3D12_ROOT_PARAMETER_TYPE_CBV;
-    param.ShaderVisibility = visibility;
-    param.Descriptor.ShaderRegister = shaderRegister;
-    param.Descriptor.RegisterSpace = space;
-    mParameters.push_back(param);
+    D3D12_ROOT_PARAMETER cbv = {};
+    cbv.ParameterType = D3D12_ROOT_PARAMETER_TYPE_CBV;
+    cbv.ShaderVisibility = visibility;
+    cbv.Descriptor.ShaderRegister = shaderRegister;
+    cbv.Descriptor.RegisterSpace = space;
+    mParameters.push_back(cbv);
 }
 
 void RootSignatureBuilder::AddShaderResourceView(UINT shaderRegister, UINT space, D3D12_SHADER_VISIBILITY visibility)
@@ -36,6 +36,18 @@ void RootSignatureBuilder::AddShaderResourceView(UINT shaderRegister, UINT space
     srvRange.OffsetInDescriptorsFromTableStart = D3D12_DESCRIPTOR_RANGE_OFFSET_APPEND;
 
     AddDescriptorTable(&srvRange, 1, visibility);
+}
+
+void RootSignatureBuilder::AddUnorderedAccessView(UINT shaderRegister, UINT space, D3D12_SHADER_VISIBILITY visibility)
+{
+    D3D12_DESCRIPTOR_RANGE uavRange = {};
+    uavRange.RangeType = D3D12_DESCRIPTOR_RANGE_TYPE_UAV;
+    uavRange.NumDescriptors = 1;
+    uavRange.BaseShaderRegister = shaderRegister;
+    uavRange.RegisterSpace = space;
+    uavRange.OffsetInDescriptorsFromTableStart = D3D12_DESCRIPTOR_RANGE_OFFSET_APPEND;
+
+    AddDescriptorTable(&uavRange, 1, visibility);
 }
 
 void RootSignatureBuilder::AddDescriptorTable(const D3D12_DESCRIPTOR_RANGE* ranges, UINT numRanges, D3D12_SHADER_VISIBILITY visibility)

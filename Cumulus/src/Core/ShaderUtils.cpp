@@ -173,6 +173,7 @@ namespace Muon
                 resource.Type = ShaderResourceType::RWStructuredBuffer;
                 break;
             default:
+                Printf("Warning: Found unsupported shader resource: %s\n", resource.Name.c_str());
                 continue;
             }
 

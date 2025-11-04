@@ -25,43 +25,6 @@ struct PixelShader;
 namespace Muon
 {
 
-enum class TextureSlots : UINT
-{
-    DIFFUSE   = 0U,
-    NORMAL    = 1U,
-    SPECULAR  = 2U,
-    ROUGHNESS = 3U,
-    CUBE      = 4U,
-    COUNT
-};
-
-enum TextureSlotFlags : UINT
-{
-    TSF_NONE        = 0,
-    TSF_DIFFUSE     = 1 << (UINT)TextureSlots::DIFFUSE,
-    TSF_NORMAL      = 1 << (UINT)TextureSlots::NORMAL,
-    TSF_SPECULAR    = 1 << (UINT)TextureSlots::SPECULAR,
-    TSF_ROUGHNESS   = 1 << (UINT)TextureSlots::ROUGHNESS,
-    TSF_CUBE        = 1 << (UINT)TextureSlots::CUBE, 
-};
-
-//struct ResourceBindChord
-//{
-//    ID3D11ShaderResourceView*  SRVs[(UINT)TextureSlots::COUNT];
-//};
-
-// Materials own both VS and PS because they must match in the pipeline
-//struct Material
-//{
-//    const VertexShader*         VS = nullptr;
-//    const PixelShader*          PS = nullptr;;
-//    const ResourceBindChord*    Resources = nullptr;
-//    ID3D11RasterizerState*      RasterStateOverride = nullptr;
-//    ID3D11DepthStencilState*    DepthStencilStateOverride = nullptr;
-//    cbMaterialParams            Description;
-//};
-
-
 struct ParameterValue
 {
     union {

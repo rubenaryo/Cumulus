@@ -99,6 +99,7 @@ bool PixelShader::Release()
 
 ComputeShader::ComputeShader(const wchar_t* path)
 {
+    Init(path);
 }
 
 bool ComputeShader::Init(const wchar_t* path)
