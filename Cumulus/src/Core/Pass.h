@@ -14,11 +14,11 @@ Description : Wraps compute pass functionality
 namespace Muon
 {
 
-class ComputePass
+class Pass
 {
 public:
-    ComputePass(const wchar_t* name) : mName(name) {}
-    ~ComputePass();
+    Pass(const wchar_t* name) : mName(name) {}
+    ~Pass();
 
     void SetComputeShader(const ComputeShader* pCS) { mpCS = pCS; }
     bool Generate();

@@ -12,6 +12,7 @@ Description : Useful functions for shader reflection system
 
 namespace Muon
 {
+    struct Shader;
     struct VertexShader;
     struct PixelShader;
     struct ShaderReflectionData;
@@ -29,12 +30,14 @@ ParameterType D3DTypeToParameterType(const D3D12_SHADER_TYPE_DESC& typeDesc);
     
 bool LoadBlob(const wchar_t* path, IDxcBlobEncoding** ppBlob);
 
+bool ReflectAndBuildInputLayout(IDxcBlobEncoding* pShaderBlob, 
+    VertexShader& outShader);
+
 bool ReflectAndParse(IDxcBlobEncoding* pShaderBlob,
-    ID3D12ShaderReflection** pOutReflection, 
-    ShaderReflectionData& outShaderReflectionData);
+    Shader& outShader);
 
 bool ParseReflectedResources(ID3D12ShaderReflection* pReflection, 
-    ShaderReflectionData& outShaderReflectionData);
+    Shader& outShader);
 
 void PopulateInputElements(D3D12_INPUT_CLASSIFICATION slotClass,
     std::vector<D3D12_SIGNATURE_PARAMETER_DESC> paramDescs,

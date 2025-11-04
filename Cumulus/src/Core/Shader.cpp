@@ -12,9 +12,31 @@ Description : Implementations of Muon shader objects
 namespace Muon
 {
 
+Shader::Shader(const wchar_t* path)
+{
+    Init(path);
+}
+
+Shader::~Shader()
+{
+}
+
+bool Shader::Init(const wchar_t* path)
+{
+    if (!LoadBlob(path, this->ShaderBlob.GetAddressOf()))
+        return false;
+
+    return ReflectAndParse(this->ShaderBlob.Get(), *this);
+}
+
+bool Shader::Release()
+{
+    return true;
+}
+
 /////////////////////////////////////////////////////////
 
-VertexShader::VertexShader(const wchar_t* path)
+VertexShader::VertexShader(const wchar_t* path) : Shader(path)
 {
     Init(path);
 }
@@ -27,15 +49,7 @@ bool VertexShader::Init(const wchar_t* path)
         return false;
     }
 
-    if (!LoadBlob(path, this->ShaderBlob.GetAddressOf()))
-        return false;
-
-    Microsoft::WRL::ComPtr<ID3D12ShaderReflection> pReflection;
-    Initialized = ReflectAndParse(this->ShaderBlob.Get(), pReflection.GetAddressOf(), this->ReflectionData);
-
-    if (!BuildInputLayout(pReflection.Get(), this))
-        return false;
-
+    Initialized = ReflectAndBuildInputLayout(this->ShaderBlob.Get(), *this);
     return Initialized;
 }
 
@@ -74,18 +88,14 @@ bool VertexShader::Release()
 
 //////////////////////////////////////////////////////////////////////////////////
 
-PixelShader::PixelShader(const wchar_t* path)
+PixelShader::PixelShader(const wchar_t* path) : Shader(path)
 {
     Init(path);
 }
 
 bool PixelShader::Init(const wchar_t* path)
 {
-    if (!LoadBlob(path, this->ShaderBlob.GetAddressOf()))
-        return false;
-
-    Microsoft::WRL::ComPtr<ID3D12ShaderReflection> pReflection;
-    Initialized = ReflectAndParse(this->ShaderBlob.Get(), pReflection.GetAddressOf(), this->ReflectionData);
+    Initialized = true;
     return Initialized;
 }
 
@@ -97,18 +107,14 @@ bool PixelShader::Release()
 
 //////////////////////////////////////////////////////////////////////////////////
 
-ComputeShader::ComputeShader(const wchar_t* path)
+ComputeShader::ComputeShader(const wchar_t* path) : Shader(path)
 {
     Init(path);
 }
 
 bool ComputeShader::Init(const wchar_t* path)
 {
-    if (!LoadBlob(path, this->ShaderBlob.GetAddressOf()))
-        return false;
-
-    Microsoft::WRL::ComPtr<ID3D12ShaderReflection> pReflection;
-    Initialized = ReflectAndParse(this->ShaderBlob.Get(), pReflection.GetAddressOf(), this->ReflectionData);
+    Initialized = true;
     return Initialized;
 }
 

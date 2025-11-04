@@ -30,6 +30,7 @@ struct ShaderResourceBinding
 {
     std::string Name;
     ShaderResourceType Type;
+    D3D12_SHADER_VISIBILITY Visibility;
     UINT BindPoint;
     UINT BindCount;
     UINT Space;
@@ -101,50 +102,46 @@ struct VertexBufferDescription
 };
 #pragma endregion
 
-// TODO: Make this a proper class hierarchy
-
-struct VertexShader
+struct Shader
 {
-    VertexShader() = default;
+    Shader(const wchar_t* path);
+    virtual ~Shader();
+
+    bool Init(const wchar_t* path);
+    bool Release();
+
+    Microsoft::WRL::ComPtr<IDxcBlobEncoding> ShaderBlob;
+    ShaderReflectionData ReflectionData;
+    BOOL Initialized = false;
+};
+
+struct VertexShader : public Shader
+{
     VertexShader(const wchar_t* path);
 
     bool Init(const wchar_t* path);
     bool Release();
 
     std::vector<D3D12_INPUT_ELEMENT_DESC> InputElements;
-    Microsoft::WRL::ComPtr<IDxcBlobEncoding> ShaderBlob;
     VertexBufferDescription VertexDesc;
     VertexBufferDescription InstanceDesc; // Note: The allocated memory inside this one is contiguous with VertexDesc, so no additional free's are required.
-
-    ShaderReflectionData ReflectionData;
-    BOOL Initialized = false;
     BOOL Instanced = false;
 };
 
-struct PixelShader
+struct PixelShader : public Shader
 {
-    PixelShader() = default;
     PixelShader(const wchar_t* path);
     
     bool Init(const wchar_t* path);
     bool Release();
-
-    Microsoft::WRL::ComPtr<IDxcBlobEncoding> ShaderBlob;
-    ShaderReflectionData ReflectionData;
-    BOOL Initialized = false;
 };
 
-struct ComputeShader
+struct ComputeShader : public Shader
 {
-    ComputeShader() = default;
     ComputeShader(const wchar_t* path);
 
     bool Init(const wchar_t* path);
     bool Release();
-
-    Microsoft::WRL::ComPtr<IDxcBlobEncoding> ShaderBlob;
-    ShaderReflectionData ReflectionData;
-    BOOL Initialized = false;
 };
 
 }

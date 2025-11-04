@@ -10,17 +10,17 @@ Description : Wraps compute pass functionality
 namespace Muon
 {
 
-ComputePass::~ComputePass()
+Pass::~Pass()
 {
 
 }
 
-bool ComputePass::GeneratePipelineState()
+bool Pass::GeneratePipelineState()
 {
     return true;
 }
 
-bool ComputePass::GenerateRootSignature()
+bool Pass::GenerateRootSignature()
 {
     ID3D12Device* pDevice = Muon::GetDevice();
 
@@ -80,7 +80,7 @@ bool ComputePass::GenerateRootSignature()
     return builder.Build(pDevice, mpRootSignature.GetAddressOf());
 }
 
-bool ComputePass::Generate()
+bool Pass::Generate()
 {
     if (!GenerateRootSignature())
         return false;
