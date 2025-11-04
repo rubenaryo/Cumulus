@@ -4,7 +4,7 @@ Date : 2025/11
 Description : Wraps compute pass functionality
 ----------------------------------------------*/
 
-#include <Core/ComputePass.h>
+#include <Core/Pass.h>
 #include <Core/RootSignatureBuilder.h>
 
 namespace Muon
