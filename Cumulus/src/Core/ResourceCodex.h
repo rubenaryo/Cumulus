@@ -72,7 +72,6 @@ public:
     const Texture* GetTexture(TextureID UID) const;
     UploadBuffer& GetMeshStagingBuffer() { return mMeshStagingBuffer; }
     UploadBuffer& GetMatParamsStagingBuffer() { return mMaterialParamsStagingBuffer; }
-    DescriptorHeap& GetSRVDescriptorHeap() { return mSRVDescriptorHeap; }
     DirectX::ResourceUploadBatch* GetUploadBatch() { return mTextureUploadBatch.get(); }
 
 private:
@@ -87,8 +86,6 @@ private:
     UploadBuffer mMeshStagingBuffer;
     UploadBuffer mMaterialParamsStagingBuffer;
     std::unique_ptr<DirectX::ResourceUploadBatch> mTextureUploadBatch;
-
-    DescriptorHeap mSRVDescriptorHeap;
 
 private:
     friend struct TextureFactory;

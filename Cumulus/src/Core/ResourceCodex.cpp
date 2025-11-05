@@ -57,7 +57,7 @@ void ResourceCodex::Init()
     gCodexInstance = new ResourceCodex();
     gCodexInstance->mMeshStagingBuffer.Create(L"Mesh Staging Buffer", 64 * 1024 * 1024);
     gCodexInstance->mMaterialParamsStagingBuffer.Create(L"material params staging buffer", sizeof(cbMaterialParams));
-    gCodexInstance->mSRVDescriptorHeap.Init(GetDevice(), 64);
+    //gCodexInstance->mSRVDescriptorHeap.Init(GetDevice(), 64);
 
     //gCodexInstance->mTextureUploadBatch = std::make_unique<DirectX::ResourceUploadBatch>(GetDevice());
 
@@ -108,7 +108,7 @@ void ResourceCodex::Destroy()
         tex.Destroy();
     }
     gCodexInstance->mTextureMap.clear();
-    gCodexInstance->mSRVDescriptorHeap.Destroy();
+    //gCodexInstance->mSRVDescriptorHeap.Destroy();
 
     delete gCodexInstance;
     gCodexInstance = nullptr;

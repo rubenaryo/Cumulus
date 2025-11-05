@@ -18,12 +18,18 @@ Description : Holds all the central DX12 Data structures
 
 namespace Muon
 {
+class DescriptorHeap;
+}
+
+namespace Muon
+{
 	ID3D12Device* GetDevice();
 	ID3D12CommandQueue* GetCommandQueue();
 	ID3D12GraphicsCommandList* GetCommandList();
 	ID3D12CommandAllocator* GetCommandAllocator();
 	ID3D12Fence* GetFence();
 	DXGI_FORMAT GetRTVFormat();
+	DescriptorHeap* GetSRVHeap();
 
 	bool ResetCommandList(ID3D12PipelineState* pInitialPipelineState);
 	bool CloseCommandList();
@@ -38,6 +44,19 @@ namespace Muon
 
 	bool InitDX12(HWND hwnd, int width, int height);
 	bool DestroyDX12();
+
+	struct RenderTarget
+	{
+		UINT mWidth;
+		UINT mHeight;
+		DXGI_FORMAT mFormat = DXGI_FORMAT_R8G8B8A8_UNORM;
+
+		CD3DX12_CPU_DESCRIPTOR_HANDLE mhCpuSrv;
+		CD3DX12_GPU_DESCRIPTOR_HANDLE mhGpuSrv;
+		CD3DX12_CPU_DESCRIPTOR_HANDLE mhCpuRtv;
+
+		Microsoft::WRL::ComPtr<ID3D12Resource> mpResource;
+	};
 }
 
 #endif

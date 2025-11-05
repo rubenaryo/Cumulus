@@ -15,6 +15,7 @@ class DescriptorHeap
 {
 public:
     DescriptorHeap() = default;
+    DescriptorHeap(ID3D12Device* pDevice, UINT numDescriptors, D3D12_DESCRIPTOR_HEAP_TYPE type);
     ~DescriptorHeap();
 
     void Destroy();
