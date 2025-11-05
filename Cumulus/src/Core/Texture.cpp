@@ -10,7 +10,8 @@ namespace Muon
 {
 
 bool MuonTexture::Create(ID3D12Device* pDevice, UINT width, UINT height, 
-    DXGI_FORMAT format, D3D12_RESOURCE_FLAGS flags, D3D12_RESOURCE_STATES initialState)
+    DXGI_FORMAT format, D3D12_RESOURCE_FLAGS flags, D3D12_RESOURCE_STATES initialState,
+    D3D12_CLEAR_VALUE* pClearValue)
 {
     mWidth = width;
     mHeight = height;
@@ -34,7 +35,7 @@ bool MuonTexture::Create(ID3D12Device* pDevice, UINT width, UINT height,
         D3D12_HEAP_FLAG_NONE,
         &desc,
         initialState,
-        nullptr,
+        pClearValue,
         IID_PPV_ARGS(&mpResource));
 
     if (FAILED(hr))

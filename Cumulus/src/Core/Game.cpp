@@ -352,6 +352,7 @@ Game::~Game()
     mInput.Destroy();
     mOpaquePass.Destroy();
     mSobelPass.Destroy();
+    mCompositePass.Destroy();
 
     Muon::ResourceCodex::Destroy();
     Muon::DestroyDX12();
