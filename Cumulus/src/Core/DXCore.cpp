@@ -212,6 +212,24 @@ namespace Muon
         {
             out_device = pTempDevice;
         }
+
+    #if MN_DEBUG
+        Microsoft::WRL::ComPtr<ID3D12InfoQueue> pInfoQueue;
+        if (SUCCEEDED(out_device.As(&pInfoQueue)))
+        {
+            // Disable this warning, as it is how we draw the fullscreen quad after post process
+            D3D12_MESSAGE_ID hide[] =
+            {
+                D3D12_MESSAGE_ID_COMMAND_LIST_DRAW_VERTEX_BUFFER_NOT_SET,
+            };
+
+            D3D12_INFO_QUEUE_FILTER filter = {};
+            filter.DenyList.NumIDs = _countof(hide);
+            filter.DenyList.pIDList = hide;
+            pInfoQueue->AddStorageFilterEntries(&filter);
+        }
+    #endif
+
         return out_device.Get() != nullptr;
     }
 
