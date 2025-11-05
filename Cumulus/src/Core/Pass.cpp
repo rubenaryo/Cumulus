@@ -83,7 +83,7 @@ bool Pass::GenerateRootSignature()
 
     for (const auto& uav : UAVs)
     {
-        builder.AddShaderResourceView(uav.BindPoint, uav.Space, uav.Visibility);
+        builder.AddUnorderedAccessView(uav.BindPoint, uav.Space, uav.Visibility);
         mResourceNameToRootIndex[uav.Name] = rootParamIndex++;
     }
 
@@ -125,16 +125,6 @@ bool Pass::Generate()
     return true;
 }
 
-bool Pass::Bind(ID3D12GraphicsCommandList* pCommandList) const
-{
-    if (!mInitialized || !mpRootSignature || !mpPipelineState)
-        return false;
-
-    pCommandList->SetGraphicsRootSignature(mpRootSignature.Get());
-    pCommandList->SetPipelineState(mpPipelineState.Get());
-    return true;
-}
-
 bool Pass::BindMaterial(const Material& material, ID3D12GraphicsCommandList* pCommandList) const
 {
     const DefaultBuffer& paramBuffer = material.GetParamBuffer();
@@ -165,6 +155,16 @@ bool Pass::BindMaterial(const Material& material, ID3D12GraphicsCommandList* pCo
 }
 
 /////////////////////////////////////////////////////////
+
+bool GraphicsPass::Bind(ID3D12GraphicsCommandList* pCommandList) const
+{
+    if (!mInitialized || !mpRootSignature || !mpPipelineState)
+        return false;
+
+    pCommandList->SetGraphicsRootSignature(mpRootSignature.Get());
+    pCommandList->SetPipelineState(mpPipelineState.Get());
+    return true;
+}
 
 bool GraphicsPass::GatherShaderResources()
 {
@@ -239,6 +239,46 @@ bool GraphicsPass::GeneratePipelineState()
     psoDesc.PrimitiveTopologyType = D3D12_PRIMITIVE_TOPOLOGY_TYPE_TRIANGLE;
 
     HRESULT hr = pDevice->CreateGraphicsPipelineState(&psoDesc, IID_PPV_ARGS(&mpPipelineState));
+    return SUCCEEDED(hr);
+}
+
+/////////////////////////////////////////////////////////
+
+bool ComputePass::Bind(ID3D12GraphicsCommandList* pCommandList) const
+{
+    if (!mInitialized || !mpRootSignature || !mpPipelineState)
+        return false;
+
+    pCommandList->SetComputeRootSignature(mpRootSignature.Get());
+    pCommandList->SetPipelineState(mpPipelineState.Get());
+    return true;
+}
+
+bool ComputePass::GatherShaderResources()
+{
+    if (!mpCS || !mpCS->Initialized)
+        return false;
+
+    mResources.clear();
+    mConstantBuffers.clear();
+
+    const ShaderReflectionData& data = mpCS->ReflectionData;
+    mResources.assign(data.Resources.begin(), data.Resources.end());
+    mConstantBuffers.assign(data.ConstantBuffers.begin(), data.ConstantBuffers.end());
+
+    return true;
+}
+
+bool ComputePass::GeneratePipelineState()
+{
+    ID3D12Device* pDevice = Muon::GetDevice();
+
+    D3D12_COMPUTE_PIPELINE_STATE_DESC compDesc = {};
+    compDesc.pRootSignature = mpRootSignature.Get();
+    compDesc.CS = CD3DX12_SHADER_BYTECODE(mpCS->ShaderBlob->GetBufferPointer(), mpCS->ShaderBlob->GetBufferSize());
+    compDesc.Flags = D3D12_PIPELINE_STATE_FLAG_NONE;
+
+    HRESULT hr = pDevice->CreateComputePipelineState(&compDesc, IID_PPV_ARGS(&mpPipelineState));
     return SUCCEEDED(hr);
 }
 

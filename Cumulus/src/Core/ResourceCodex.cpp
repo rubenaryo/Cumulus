@@ -57,15 +57,10 @@ void ResourceCodex::Init()
     gCodexInstance = new ResourceCodex();
     gCodexInstance->mMeshStagingBuffer.Create(L"Mesh Staging Buffer", 64 * 1024 * 1024);
     gCodexInstance->mMaterialParamsStagingBuffer.Create(L"material params staging buffer", sizeof(cbMaterialParams));
-    gCodexInstance->mSRVDescriptorHeap.Init(GetDevice(), 64);
-
-    //gCodexInstance->mTextureUploadBatch = std::make_unique<DirectX::ResourceUploadBatch>(GetDevice());
 
     ShaderFactory::LoadAllShaders(*gCodexInstance);
     TextureFactory::LoadAllTextures(GetDevice(), GetCommandList(), *gCodexInstance);
     MaterialFactory::CreateAllMaterials(*gCodexInstance);
-
-    //gCodexInstance->mTextureUploadBatch.reset();
 }
 
 void ResourceCodex::Destroy()
@@ -108,7 +103,6 @@ void ResourceCodex::Destroy()
         tex.Destroy();
     }
     gCodexInstance->mTextureMap.clear();
-    gCodexInstance->mSRVDescriptorHeap.Destroy();
 
     delete gCodexInstance;
     gCodexInstance = nullptr;
@@ -134,6 +128,14 @@ const PixelShader* ResourceCodex::GetPixelShader(ShaderID UID) const
 {
     if(mPixelShaders.find(UID) != mPixelShaders.end())
         return &mPixelShaders.at(UID);
+    else
+        return nullptr;
+}
+
+const ComputeShader* ResourceCodex::GetComputeShader(ShaderID UID) const
+{
+    if (mComputeShaders.find(UID) != mComputeShaders.end())
+        return &mComputeShaders.at(UID);
     else
         return nullptr;
 }

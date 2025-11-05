@@ -14,13 +14,16 @@ Description : Implementation of Game.h
 #include <Core/PipelineState.h>
 #include <Core/ResourceCodex.h>
 #include <Core/Shader.h>
+#include <Core/Texture.h>
 #include <Core/hash_util.h>
 #include <Utils/Utils.h>
 
 Game::Game() :
     mInput(),
     mCamera(),
-    mOpaquePass(L"OpaquePass")
+    mOpaquePass(L"OpaquePass"),
+    mSobelPass(L"SobelPass"),
+    mCompositePass(L"CompositePass")
 {
     mTimer.SetFixedTimeStep(false);
 }
@@ -37,16 +40,43 @@ bool Game::Init(HWND window, int width, int height)
     ResourceCodex& codex = ResourceCodex::GetSingleton();
     const ShaderID kPhongVSID = fnv1a(L"Phong.vs");
     const ShaderID kPhongPSID = fnv1a(L"Phong.ps");    
+    const ShaderID kSobelCSID = fnv1a(L"Sobel.cs");
+    const ShaderID kCompositeVSID = fnv1a(L"Composite.vs");
+    const ShaderID kCompositePSID = fnv1a(L"Composite.ps");
     const VertexShader* pPhongVS = codex.GetVertexShader(kPhongVSID);
     const PixelShader* pPhongPS = codex.GetPixelShader(kPhongPSID);
+    const ComputeShader* pSobelCS = codex.GetComputeShader(kSobelCSID);
+    const VertexShader* pCompositeVS = codex.GetVertexShader(kCompositeVSID);
+    const PixelShader*  pCompositePS = codex.GetPixelShader(kCompositePSID);
+
 
     mCamera.Init(DirectX::XMFLOAT3(3.0, 3.0, 3.0), width / (float)height, 0.1f, 1000.0f);
 
-    mOpaquePass.SetVertexShader(pPhongVS);
-    mOpaquePass.SetPixelShader(pPhongPS);
+    // Assemble opaque render pass
+    {
+        mOpaquePass.SetVertexShader(pPhongVS);
+        mOpaquePass.SetPixelShader(pPhongPS);
 
-    if (!mOpaquePass.Generate())
-        Printf(L"Warning: %s failed to generate!\n", mOpaquePass.GetName());
+        if (!mOpaquePass.Generate())
+            Printf(L"Warning: %s failed to generate!\n", mOpaquePass.GetName());
+    }
+
+    // Assemble compute filter pass
+    {
+        mSobelPass.SetComputeShader(pSobelCS);
+
+        if (!mSobelPass.Generate())
+            Printf(L"Warning: %s failed to generate!\n", mSobelPass.GetName());
+    }
+
+    // Assemble composite render pass
+    {
+        mCompositePass.SetVertexShader(pCompositeVS);
+        mCompositePass.SetPixelShader(pCompositePS);
+
+        if (!mCompositePass.Generate())
+            Printf(L"Warning: %s failed to generate!\n", mCompositePass.GetName());
+    }
 
     struct Vertex
     {
@@ -202,7 +232,7 @@ void Game::Render()
     const Muon::Material* pPhongMaterial = codex.GetMaterialType(matId);
 
     ID3D12GraphicsCommandList* pCommandList = GetCommandList();
-    pCommandList->SetDescriptorHeaps(1, codex.GetSRVDescriptorHeap().GetHeapAddr());
+    pCommandList->SetDescriptorHeaps(1, GetSRVHeap()->GetHeapAddr());
 
     if (mOpaquePass.Bind(pCommandList))
     {
@@ -233,6 +263,67 @@ void Game::Render()
         mCube.Draw(Muon::GetCommandList());
     }
 
+    // Change offscreen texture to be used as an input.
+    MuonTexture& offscreenTarget = GetOffscreenTarget();
+    MuonTexture& computeOutput = GetComputeOutput();
+    if (mSobelPass.Bind(pCommandList))
+    {
+
+        pCommandList->ResourceBarrier(1, &CD3DX12_RESOURCE_BARRIER::Transition(offscreenTarget.mpResource.Get(),
+            D3D12_RESOURCE_STATE_RENDER_TARGET, D3D12_RESOURCE_STATE_GENERIC_READ));
+
+        int32_t inIdx = mSobelPass.GetResourceRootIndex("gInput");
+        if (inIdx != ROOTIDX_INVALID)
+        {
+            pCommandList->SetComputeRootDescriptorTable(inIdx, offscreenTarget.mViewSRV.HandleGPU);
+        }
+
+        int32_t outIdx = mSobelPass.GetResourceRootIndex("gOutput");
+        if (outIdx != ROOTIDX_INVALID)
+        {
+            pCommandList->SetComputeRootDescriptorTable(outIdx, computeOutput.mViewUAV.HandleGPU);
+        }
+
+        pCommandList->ResourceBarrier(1, &CD3DX12_RESOURCE_BARRIER::Transition(computeOutput.mpResource.Get(),
+            D3D12_RESOURCE_STATE_GENERIC_READ, D3D12_RESOURCE_STATE_UNORDERED_ACCESS));
+
+        UINT numGroupsX = (UINT)ceilf(offscreenTarget.mWidth  / 16.0f);
+        UINT numGroupsY = (UINT)ceilf(offscreenTarget.mHeight / 16.0f);
+        pCommandList->Dispatch(numGroupsX, numGroupsY, 1);
+
+        pCommandList->ResourceBarrier(1, &CD3DX12_RESOURCE_BARRIER::Transition(computeOutput.mpResource.Get(),
+            D3D12_RESOURCE_STATE_UNORDERED_ACCESS, D3D12_RESOURCE_STATE_GENERIC_READ));
+
+        // Indicate a state transition on the resource usage.
+        pCommandList->ResourceBarrier(1, &CD3DX12_RESOURCE_BARRIER::Transition(GetCurrentBackBuffer(),
+            D3D12_RESOURCE_STATE_PRESENT, D3D12_RESOURCE_STATE_RENDER_TARGET));
+
+        // Specify the buffers we are going to render to.
+        pCommandList->OMSetRenderTargets(1, &GetCurrentBackBufferView(), true, &GetDepthStencilView());
+    }
+
+    if (mCompositePass.Bind(pCommandList))
+    {
+        int32_t baseMapIdx = mCompositePass.GetResourceRootIndex("gBaseMap");
+        if (baseMapIdx != ROOTIDX_INVALID)
+        {
+            pCommandList->SetGraphicsRootDescriptorTable(baseMapIdx, offscreenTarget.mViewSRV.HandleGPU);
+        }
+
+        int32_t edgeMapIdx = mCompositePass.GetResourceRootIndex("gEdgeMap");
+        if (edgeMapIdx != ROOTIDX_INVALID)
+        {
+            pCommandList->SetGraphicsRootDescriptorTable(edgeMapIdx, computeOutput.mViewSRV.HandleGPU);
+        }
+
+        // Draw fullscreen quad
+        pCommandList->IASetVertexBuffers(0, 1, nullptr);
+        pCommandList->IASetIndexBuffer(nullptr);
+        pCommandList->IASetPrimitiveTopology(D3D_PRIMITIVE_TOPOLOGY_TRIANGLELIST);
+
+        pCommandList->DrawInstanced(6, 1, 0, 0);
+    }
+
     FinalizeRender();
     CloseCommandList();
     ExecuteCommandList();
@@ -260,6 +351,8 @@ Game::~Game()
     mCamera.Destroy();
     mInput.Destroy();
     mOpaquePass.Destroy();
+    mSobelPass.Destroy();
+    mCompositePass.Destroy();
 
     Muon::ResourceCodex::Destroy();
     Muon::DestroyDX12();

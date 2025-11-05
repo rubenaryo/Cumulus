@@ -51,6 +51,8 @@ private:
     Muon::Camera mCamera;
 
     Muon::GraphicsPass mOpaquePass;
+    Muon::ComputePass mSobelPass;
+    Muon::GraphicsPass mCompositePass;
 
     // TEMP: For testing
     Muon::Mesh mTriangle;

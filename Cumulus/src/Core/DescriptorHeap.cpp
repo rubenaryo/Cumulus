@@ -9,6 +9,11 @@ Description : Wrapper for DX12 Descriptor Heap
 namespace Muon
 {
 
+DescriptorHeap::DescriptorHeap(ID3D12Device* pDevice, UINT numDescriptors, D3D12_DESCRIPTOR_HEAP_TYPE type)
+{
+    Init(pDevice, numDescriptors);
+}
+
 DescriptorHeap::~DescriptorHeap()
 {
 }
