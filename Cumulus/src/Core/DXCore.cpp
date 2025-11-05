@@ -51,6 +51,8 @@ namespace Muon
     const int SWAP_CHAIN_BUFFER_COUNT = 2;
     int CurrentBackBuffer = 0;
 
+    D3D12_CLEAR_VALUE gClearValue;
+
     Microsoft::WRL::ComPtr<IDXGISwapChain3> gSwapChain;
     Microsoft::WRL::ComPtr<ID3D12Resource> gSwapChainBuffers[SWAP_CHAIN_BUFFER_COUNT];
     Microsoft::WRL::ComPtr<ID3D12Resource> gDepthStencilBuffer;
@@ -395,7 +397,13 @@ namespace Muon
 
         bool success = true;
 
-        success &= gOffscreenTarget.Create(pDevice, width, height, format, D3D12_RESOURCE_FLAG_ALLOW_RENDER_TARGET, D3D12_RESOURCE_STATE_GENERIC_READ);
+        gClearValue.Format = format;
+        gClearValue.Color[0] = 0.0f;
+        gClearValue.Color[1] = 0.2f;
+        gClearValue.Color[2] = 0.4f;
+        gClearValue.Color[3] = 1.0f;
+
+        success &= gOffscreenTarget.Create(pDevice, width, height, format, D3D12_RESOURCE_FLAG_ALLOW_RENDER_TARGET, D3D12_RESOURCE_STATE_GENERIC_READ, &gClearValue);
         if (!success)
             return false;
 
@@ -564,16 +572,10 @@ namespace Muon
         pCommandList->ResourceBarrier(1, &CD3DX12_RESOURCE_BARRIER::Transition(gOffscreenTarget.mpResource.Get(), 
             D3D12_RESOURCE_STATE_GENERIC_READ, D3D12_RESOURCE_STATE_RENDER_TARGET));
         
-        //pCommandList->ResourceBarrier(1, &CD3DX12_RESOURCE_BARRIER::Transition(gSwapChainBuffers[CurrentBackBuffer].Get(), 
-        //    D3D12_RESOURCE_STATE_PRESENT, D3D12_RESOURCE_STATE_RENDER_TARGET));
-
-        //CD3DX12_CPU_DESCRIPTOR_HANDLE rtvHandle(gRTVHeap->GetCPUDescriptorHandleForHeapStart(), CurrentBackBuffer, gRTVSize);
-        //CD3DX12_CPU_DESCRIPTOR_HANDLE rtvHandle(gRTVHeap->GetCPUDescriptorHandleForHeapStart(), CurrentBackBuffer, gRTVSize);
         pCommandList->OMSetRenderTargets(1, &gOffscreenTarget.mViewRTV.HandleCPU, FALSE, nullptr);
 
         // Clear the back buffer
-        const float clearColor[] = { 0.0f, 0.2f, 0.4f, 1.0f };
-        pCommandList->ClearRenderTargetView(gOffscreenTarget.mViewRTV.HandleCPU, clearColor, 0, nullptr);
+        pCommandList->ClearRenderTargetView(gOffscreenTarget.mViewRTV.HandleCPU, gClearValue.Color, 0, nullptr);
         
         // TODO: Clear depth stencil once we need that
 

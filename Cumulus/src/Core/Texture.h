@@ -28,7 +28,8 @@ class MuonTexture
 public:
     MuonTexture(const wchar_t* name) : mName(name) {}
     bool Create(ID3D12Device* pDevice, UINT width, UINT height,
-        DXGI_FORMAT format, D3D12_RESOURCE_FLAGS flags, D3D12_RESOURCE_STATES initialState);
+        DXGI_FORMAT format, D3D12_RESOURCE_FLAGS flags, D3D12_RESOURCE_STATES initialState,
+        D3D12_CLEAR_VALUE* pClearValue = nullptr);
     bool Destroy();
 
     TextureView mViewRTV;
