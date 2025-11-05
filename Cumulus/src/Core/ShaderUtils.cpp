@@ -104,11 +104,8 @@ namespace Muon
         return SUCCEEDED(hr) && ppBlob;
     }
 
-    bool ReflectAndParse(IDxcBlobEncoding* pShaderBlob, ID3D12ShaderReflection** pOutReflection, ShaderReflectionData& outShaderReflectionData)
+    bool Reflect(IDxcBlobEncoding* pShaderBlob, ID3D12ShaderReflection** pOutReflection)
     {
-        if (!pShaderBlob)
-            return false;
-
         Microsoft::WRL::ComPtr<IDxcContainerReflection> pContainerReflection;
         HRESULT hr = DxcCreateInstance(CLSID_DxcContainerReflection, IID_PPV_ARGS(&pContainerReflection));
         COM_EXCEPT(hr);
@@ -128,13 +125,32 @@ namespace Muon
 
         hr = pContainerReflection->GetPartReflection(index, __uuidof(ID3D12ShaderReflection), reinterpret_cast<void**>(pOutReflection));
         COM_EXCEPT(hr);
-        if (FAILED(hr) || !pOutReflection)
-            return false;
 
-        return ParseReflectedResources(*pOutReflection, outShaderReflectionData);
+        return SUCCEEDED(hr) && pOutReflection;
     }
 
-    bool ParseReflectedResources(ID3D12ShaderReflection* pReflection, ShaderReflectionData& outShaderReflectionData)
+    bool ReflectAndBuildInputLayout(IDxcBlobEncoding* pShaderBlob, VertexShader& outShader)
+    {
+        Microsoft::WRL::ComPtr<ID3D12ShaderReflection> pReflection;
+        if (!Reflect(pShaderBlob, pReflection.GetAddressOf()))
+            return false;
+
+        return BuildInputLayout(pReflection.Get(), &outShader);
+    }
+
+    bool ReflectAndParse(IDxcBlobEncoding* pShaderBlob, Shader& outShader)
+    {
+        if (!pShaderBlob)
+            return false;
+
+        Microsoft::WRL::ComPtr<ID3D12ShaderReflection> pReflection;
+        if (!Reflect(pShaderBlob, pReflection.GetAddressOf()))
+            return false;
+
+        return ParseReflectedResources(pReflection.Get(), outShader);
+    }
+
+    bool ParseReflectedResources(ID3D12ShaderReflection* pReflection, Shader& outShader)
     {
         D3D12_SHADER_DESC shaderDesc;
         pReflection->GetDesc(&shaderDesc);
@@ -147,6 +163,7 @@ namespace Muon
 
             ShaderResourceBinding resource;
             resource.Name = bindDesc.Name;
+            resource.Visibility = outShader.GetVisibility();
             resource.BindPoint = bindDesc.BindPoint;
             resource.BindCount = bindDesc.BindCount;
             resource.Space = bindDesc.Space;
@@ -173,6 +190,7 @@ namespace Muon
                 resource.Type = ShaderResourceType::RWStructuredBuffer;
                 break;
             default:
+                Printf("Warning: Found unsupported shader resource: %s\n", resource.Name.c_str());
                 continue;
             }
 
@@ -212,15 +230,15 @@ namespace Muon
                         cbReflection.Variables.push_back(param);
                 }
 
-                outShaderReflectionData.ConstantBuffers.push_back(cbReflection);
+                outShader.ReflectionData.ConstantBuffers.push_back(cbReflection);
 
                 // Update resource size
                 resource.Size = cbDesc.Size;
             }
-            outShaderReflectionData.Resources.push_back(resource);
+            outShader.ReflectionData.Resources.push_back(resource);
         }
 
-        outShaderReflectionData.IsReflected = true;
+        outShader.ReflectionData.IsReflected = true;
         return true;
     }
 

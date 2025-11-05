@@ -10,6 +10,7 @@ This class encapsulates all app functionality
 #include <Core/Camera.h>
 #include <Core/Mesh.h>
 #include <Core/PipelineState.h>
+#include <Core/Pass.h>
 #include <Core/StepTimer.h>
 
 #include <Input/GameInput.h>
@@ -48,6 +49,8 @@ private:
 
     // Main Camera
     Muon::Camera mCamera;
+
+    Muon::GraphicsPass mOpaquePass;
 
     // TEMP: For testing
     Muon::Mesh mTriangle;

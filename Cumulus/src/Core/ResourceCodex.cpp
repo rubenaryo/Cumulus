@@ -79,12 +79,12 @@ void ResourceCodex::Destroy()
 
     gCodexInstance->mMeshStagingBuffer.Destroy();
 
-    for (auto& m : gCodexInstance->mMaterialTypeMap)
+    for (auto& m : gCodexInstance->mMaterialMap)
     {
-        MaterialType& mat = m.second;
+        Material& mat = m.second;
         mat.Destroy();
     }
-    gCodexInstance->mMaterialTypeMap.clear();
+    gCodexInstance->mMaterialMap.clear();
 
     gCodexInstance->mMaterialParamsStagingBuffer.Destroy();
 
@@ -138,10 +138,10 @@ const PixelShader* ResourceCodex::GetPixelShader(ShaderID UID) const
         return nullptr;
 }
 
-const MaterialType* ResourceCodex::GetMaterialType(MaterialTypeID UID) const
+const Material* ResourceCodex::GetMaterialType(MaterialID UID) const
 {
-    if (mMaterialTypeMap.find(UID) != mMaterialTypeMap.end())
-        return &mMaterialTypeMap.at(UID);
+    if (mMaterialMap.find(UID) != mMaterialMap.end())
+        return &mMaterialMap.at(UID);
     else
         return nullptr;
 }
@@ -179,13 +179,13 @@ Texture& ResourceCodex::InsertTexture(TextureID hash)
     return mTextureMap[hash];
 }
 
-MaterialType* ResourceCodex::InsertMaterialType(const wchar_t* name)
+Material* ResourceCodex::InsertMaterialType(const wchar_t* name)
 {
     if (!name)
         return nullptr;
 
-    MaterialTypeID typeId = fnv1a(name);
-    auto emplaceResult = mMaterialTypeMap.emplace(typeId, name);
+    MaterialID typeId = fnv1a(name);
+    auto emplaceResult = mMaterialMap.emplace(typeId, name);
     if (emplaceResult.second == false)
         return nullptr;
 

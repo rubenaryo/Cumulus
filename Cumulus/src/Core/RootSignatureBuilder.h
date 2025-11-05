@@ -17,6 +17,7 @@ public:
     void Reset();
     void AddConstantBufferView(UINT shaderRegister, UINT space, D3D12_SHADER_VISIBILITY visibility);
     void AddShaderResourceView(UINT shaderRegister, UINT space, D3D12_SHADER_VISIBILITY visibility);
+    void AddUnorderedAccessView(UINT shaderRegister, UINT space, D3D12_SHADER_VISIBILITY visibility);
     void AddDescriptorTable(const D3D12_DESCRIPTOR_RANGE* ranges, UINT numRanges, D3D12_SHADER_VISIBILITY visibility);
     void AddStaticSampler(const D3D12_STATIC_SAMPLER_DESC& sampler);
 
