@@ -337,7 +337,7 @@ namespace Muon
         Microsoft::WRL::ComPtr<ID3D12DescriptorHeap>& out_dsv)
     {
         D3D12_DESCRIPTOR_HEAP_DESC rtvHeapDesc;
-        rtvHeapDesc.NumDescriptors = SWAP_CHAIN_BUFFER_COUNT;
+        rtvHeapDesc.NumDescriptors = SWAP_CHAIN_BUFFER_COUNT + 1; // +1 for offscreen target
         rtvHeapDesc.Type = D3D12_DESCRIPTOR_HEAP_TYPE_RTV;
         rtvHeapDesc.Flags = D3D12_DESCRIPTOR_HEAP_FLAG_NONE;
         rtvHeapDesc.NodeMask = 0;
@@ -379,6 +379,9 @@ namespace Muon
 
     bool InitOffscreenTarget(ID3D12Device* pDevice, UINT width, UINT height, DXGI_FORMAT format)
     {
+        if (!gSRVHeap)
+            return false;
+
         gOffscreenTarget.mWidth = width;
         gOffscreenTarget.mHeight = height;
         gOffscreenTarget.mFormat = format;
@@ -404,8 +407,30 @@ namespace Muon
             D3D12_RESOURCE_STATE_GENERIC_READ,
             nullptr,
             IID_PPV_ARGS(&gOffscreenTarget.mpResource));
+        COM_EXCEPT(hr);
+        if (FAILED(hr))
+            return false;
 
-        return SUCCEEDED(hr);
+        bool allocSuccess = gSRVHeap->Allocate(gOffscreenTarget.mhCpuSrv, gOffscreenTarget.mhGpuSrv);
+        gOffscreenTarget.mhCpuRtv = CD3DX12_CPU_DESCRIPTOR_HANDLE(gRTVHeap->GetCPUDescriptorHandleForHeapStart(), SWAP_CHAIN_BUFFER_COUNT, gRTVSize);
+
+        if (!allocSuccess)
+        {
+            Printf("Error: Failed to allocate on the SRV heap for offscreen render target!\n");
+            return false;
+        }
+
+        D3D12_SHADER_RESOURCE_VIEW_DESC srvDesc = {};
+        srvDesc.Shader4ComponentMapping = D3D12_DEFAULT_SHADER_4_COMPONENT_MAPPING;
+        srvDesc.Format = format;
+        srvDesc.ViewDimension = D3D12_SRV_DIMENSION_TEXTURE2D;
+        srvDesc.Texture2D.MostDetailedMip = 0;
+        srvDesc.Texture2D.MipLevels = 1;
+
+        pDevice->CreateShaderResourceView(gOffscreenTarget.mpResource.Get(), &srvDesc, gOffscreenTarget.mhCpuSrv);
+        pDevice->CreateRenderTargetView(gOffscreenTarget.mpResource.Get(), nullptr, gOffscreenTarget.mhCpuRtv);
+
+        return true;
     }
 
     bool CreateDepthStencilBuffer(ID3D12Device* pDevice, ID3D12GraphicsCommandList* pCommandList, ID3D12CommandQueue* pCommandQueue, int width, int height, Microsoft::WRL::ComPtr<ID3D12Resource>& out_depthStencilBuffer)
@@ -700,11 +725,11 @@ namespace Muon
         success &= CreateFence(GetDevice(), gFence);
         CHECK_SUCCESS(success, "Error: Failed to create fence!\n");
 
-        success &= InitOffscreenTarget(GetDevice(), width, height, GetBackBufferFormat());
-        CHECK_SUCCESS(success, "Error: Failed to init offscreen targetz!\n");
-
         success &= CreateDescriptorHeaps(GetDevice(), gRTVHeap, gDSVHeap);
         CHECK_SUCCESS(success, "Error: Failed to create descriptor heaps!\n");
+
+        success &= InitOffscreenTarget(GetDevice(), width, height, GetBackBufferFormat());
+        CHECK_SUCCESS(success, "Error: Failed to init offscreen targetz!\n");
 
         success &= CreateRenderTargetView(GetDevice(), GetSwapChain(), gSwapChainBuffers);
         CHECK_SUCCESS(success, "Error: Failed to create render target view!\n");
