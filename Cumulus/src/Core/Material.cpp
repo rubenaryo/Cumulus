@@ -30,11 +30,11 @@ void MaterialType::Destroy()
 
 bool MaterialType::Bind(ID3D12GraphicsCommandList* pCommandList) const
 {
-    if (!mpRootSignature || !mpPipelineState)
-        return false;
-
-    pCommandList->SetGraphicsRootSignature(mpRootSignature.Get());
-    pCommandList->SetPipelineState(mpPipelineState.Get());
+    //if (!mpRootSignature || !mpPipelineState)
+    //    return false;
+    //
+    //pCommandList->SetGraphicsRootSignature(mpRootSignature.Get());
+    //pCommandList->SetPipelineState(mpPipelineState.Get());
 
     int32_t materialParamsRootIndex = GetResourceRootIndex("PSPerMaterial");
     if (materialParamsRootIndex != ROOTIDX_INVALID)
@@ -52,9 +52,7 @@ bool MaterialType::Bind(ID3D12GraphicsCommandList* pCommandList) const
 
         int32_t texRootParamIndex = GetResourceRootIndex(texPair.first.c_str());
         if (texRootParamIndex == ROOTIDX_INVALID)
-            continue;
-
-        pCommandList->SetDescriptorHeaps(1, codex.GetSRVDescriptorHeap().GetHeapAddr()); // TODO: This should be done more globally and only once. 
+            continue;        
         pCommandList->SetGraphicsRootDescriptorTable(texRootParamIndex, pTex->GPUHandle);
     }
 

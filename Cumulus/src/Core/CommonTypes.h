@@ -18,6 +18,8 @@ namespace Muon
 
     static const id_type IDTYPE_MAX = UINT32_MAX;
     static const TextureID TEXTUREID_INVALID = IDTYPE_MAX;
+
+    static const int32_t ROOTIDX_INVALID = -1;
 }
 
 #endif

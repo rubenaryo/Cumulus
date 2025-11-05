@@ -36,8 +36,6 @@ struct ParameterValue
     };
 };
 
-static const int32_t ROOTIDX_INVALID = -1;
-
 // Material types define the required parameters, shaders, and hold the underlying pipeline state.
 class MaterialType
 {
@@ -58,6 +56,9 @@ public:
     bool PopulateMaterialParams(UploadBuffer& stagingBuffer, ID3D12GraphicsCommandList* pCommandList);
 
     bool SetTextureParam(const char* paramName, TextureID texId);
+    const std::unordered_map<std::string, TextureID>& GetTextureParams() const { return mTextureParams; }
+
+    const DefaultBuffer& GetParamBuffer() const { return mMaterialParamsBuffer; }
 
     const std::vector<ConstantBufferReflection>& GetConstantBuffers() const { return mConstantBuffers; }
     int GetResourceRootIndex(const char* name) const;

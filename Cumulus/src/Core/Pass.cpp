@@ -4,8 +4,10 @@ Date : 2025/11
 Description : Wraps compute pass functionality
 ----------------------------------------------*/
 
+#include <Core/CommonTypes.h>
 #include <Core/Pass.h>
 #include <Core/RootSignatureBuilder.h>
+#include <Core/ResourceCodex.h>
 #include <Core/ShaderUtils.h>
 
 namespace Muon
@@ -17,11 +19,14 @@ Pass::~Pass()
     mpPipelineState.Reset();
 }
 
-bool Pass::GeneratePipelineState()
+int32_t Pass::GetResourceRootIndex(const char* name) const
 {
-    return true;
-}
+    auto itFind = mResourceNameToRootIndex.find(name);
+    if (itFind == mResourceNameToRootIndex.end())
+        return ROOTIDX_INVALID;
 
+    return itFind->second;
+}
 bool Pass::GenerateRootSignature()
 {
     ID3D12Device* pDevice = Muon::GetDevice();
@@ -115,6 +120,45 @@ bool Pass::Generate()
     return true;
 }
 
+bool Pass::Bind(ID3D12GraphicsCommandList* pCommandList) const
+{
+    if (!mInitialized || !mpRootSignature || !mpPipelineState)
+        return false;
+
+    pCommandList->SetGraphicsRootSignature(mpRootSignature.Get());
+    pCommandList->SetPipelineState(mpPipelineState.Get());
+    return true;
+}
+
+bool Pass::BindMaterial(const MaterialType& material, ID3D12GraphicsCommandList* pCommandList) const
+{
+    const DefaultBuffer& paramBuffer = material.GetParamBuffer();
+    const std::unordered_map<std::string, TextureID>& textureParams = material.GetTextureParams();
+
+    int32_t materialParamsRootIndex = GetResourceRootIndex("PSPerMaterial");
+    if (materialParamsRootIndex != ROOTIDX_INVALID)
+    {
+        pCommandList->SetGraphicsRootConstantBufferView(materialParamsRootIndex, paramBuffer.GetGPUVirtualAddress());
+    }
+
+    ResourceCodex& codex = ResourceCodex::GetSingleton();
+    for (auto texPair : textureParams)
+    {
+        TextureID texId = texPair.second;
+        const Texture* pTex = codex.GetTexture(texId);
+        if (!pTex || !pTex->pResource)
+            continue;
+
+        int32_t texRootParamIndex = GetResourceRootIndex(texPair.first.c_str());
+        if (texRootParamIndex == ROOTIDX_INVALID)
+            continue;
+
+        pCommandList->SetGraphicsRootDescriptorTable(texRootParamIndex, pTex->GPUHandle);
+    }
+
+    return true;
+}
+
 /////////////////////////////////////////////////////////
 
 bool GraphicsPass::GatherShaderResources()
@@ -149,6 +193,48 @@ bool GraphicsPass::GatherShaderResources()
     }
 
     return true;
+}
+
+bool GraphicsPass::GeneratePipelineState()
+{
+    ID3D12Device* pDevice = Muon::GetDevice();
+
+    D3D12_GRAPHICS_PIPELINE_STATE_DESC psoDesc = {};
+    psoDesc.pRootSignature = mpRootSignature.Get();
+
+    // Vertex Shader 
+    psoDesc.VS = CD3DX12_SHADER_BYTECODE(mpVS->ShaderBlob->GetBufferPointer(), mpVS->ShaderBlob->GetBufferSize());
+
+    // Pixel Shader
+    psoDesc.PS = CD3DX12_SHADER_BYTECODE(mpPS->ShaderBlob->GetBufferPointer(), mpPS->ShaderBlob->GetBufferSize());
+
+    // Input layout
+    psoDesc.InputLayout.pInputElementDescs = mpVS->InputElements.data();
+    psoDesc.InputLayout.NumElements = static_cast<UINT>(mpVS->InputElements.size());
+
+    // Rasterizer state
+    psoDesc.RasterizerState.FillMode = D3D12_FILL_MODE_SOLID;
+    psoDesc.RasterizerState.CullMode = D3D12_CULL_MODE_BACK;
+    psoDesc.RasterizerState.FrontCounterClockwise = FALSE;
+    psoDesc.RasterizerState.DepthClipEnable = TRUE;
+
+    // Blend state
+    psoDesc.BlendState.RenderTarget[0].RenderTargetWriteMask = D3D12_COLOR_WRITE_ENABLE_ALL;
+
+    // Depth stencil state
+    psoDesc.DepthStencilState.DepthEnable = FALSE; // TODO: Enable this when we want to do depth testing
+    psoDesc.DepthStencilState.DepthWriteMask = D3D12_DEPTH_WRITE_MASK_ALL;
+    psoDesc.DepthStencilState.DepthFunc = D3D12_COMPARISON_FUNC_LESS;
+
+    // Render target formats
+    psoDesc.NumRenderTargets = 1;
+    psoDesc.RTVFormats[0] = Muon::GetRTVFormat();
+    psoDesc.SampleDesc.Count = 1;
+    psoDesc.SampleMask = UINT_MAX;  // Enable all samples
+    psoDesc.PrimitiveTopologyType = D3D12_PRIMITIVE_TOPOLOGY_TYPE_TRIANGLE;
+
+    HRESULT hr = pDevice->CreateGraphicsPipelineState(&psoDesc, IID_PPV_ARGS(&mpPipelineState));
+    return SUCCEEDED(hr);
 }
 
 }

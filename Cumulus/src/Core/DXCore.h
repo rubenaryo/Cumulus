@@ -23,6 +23,7 @@ namespace Muon
 	ID3D12GraphicsCommandList* GetCommandList();
 	ID3D12CommandAllocator* GetCommandAllocator();
 	ID3D12Fence* GetFence();
+	DXGI_FORMAT GetRTVFormat();
 
 	bool ResetCommandList(ID3D12PipelineState* pInitialPipelineState);
 	bool CloseCommandList();

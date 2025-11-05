@@ -13,6 +13,11 @@ Description : Wraps compute pass functionality
 
 namespace Muon
 {
+class MaterialType;
+}
+
+namespace Muon
+{
 
 class Pass
 {
@@ -21,10 +26,16 @@ public:
     virtual ~Pass();
 
     bool Generate();
+    bool Bind(ID3D12GraphicsCommandList* pCommandList) const;
+    bool BindMaterial(const MaterialType& material, ID3D12GraphicsCommandList* pCommandList) const;
+    const wchar_t* GetName() const { return mName.c_str(); }
+
+    int GetResourceRootIndex(const char* name) const;
+    const ParameterDesc* GetParameter(const char* paramName) const;
 
 protected:
     virtual bool GatherShaderResources() = 0;
-    bool GeneratePipelineState();
+    virtual bool GeneratePipelineState() = 0;
     bool GenerateRootSignature();
 
     std::vector<ShaderResourceBinding> mResources;
@@ -46,13 +57,13 @@ class GraphicsPass : public Pass
 {
 public:
     GraphicsPass(const wchar_t* name) : Pass(name) {}
-    ~GraphicsPass();
 
     void SetVertexShader(const VertexShader* pVS) { mpVS = pVS; }
     void SetPixelShader(const PixelShader* pPS) { mpPS = pPS; }
 
 protected:
     virtual bool GatherShaderResources() override;
+    virtual bool GeneratePipelineState() override;
 
     const VertexShader* mpVS = nullptr;
     const PixelShader* mpPS = nullptr;

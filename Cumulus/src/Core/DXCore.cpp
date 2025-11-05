@@ -70,6 +70,7 @@ namespace Muon
 
     ID3D12Device* GetDevice() { return gDevice.Get(); }
     ID3D12Fence* GetFence() { return gFence.Get(); }
+    DXGI_FORMAT GetRTVFormat() { return BackBufferFormat; }
     UINT GetRTVDescriptorSize() { return gRTVSize; }
     UINT GetDSVDescriptorSize() { return gDSVSize; }
     UINT GetCBVDescriptorSize() { return gCBVSize; }

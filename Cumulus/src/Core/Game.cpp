@@ -19,7 +19,8 @@ Description : Implementation of Game.h
 
 Game::Game() :
     mInput(),
-    mCamera()
+    mCamera(),
+    mOpaquePass(L"OpaquePass")
 {
     mTimer.SetFixedTimeStep(false);
 }
@@ -34,17 +35,18 @@ bool Game::Init(HWND window, int width, int height)
     ResourceCodex::Init();
 
     ResourceCodex& codex = ResourceCodex::GetSingleton();
-    const ShaderID kSimpleVSID = fnv1a(L"Simple.vs");
-    const ShaderID kSimplePSID = fnv1a(L"Simple.ps");
     const ShaderID kPhongVSID = fnv1a(L"Phong.vs");
-    const ShaderID kPhongPSID = fnv1a(L"Phong.ps");
-    const VertexShader* pVS = codex.GetVertexShader(kSimpleVSID);
-    const PixelShader* pPS = codex.GetPixelShader(kSimplePSID);
-    
+    const ShaderID kPhongPSID = fnv1a(L"Phong.ps");    
     const VertexShader* pPhongVS = codex.GetVertexShader(kPhongVSID);
     const PixelShader* pPhongPS = codex.GetPixelShader(kPhongPSID);
 
     mCamera.Init(DirectX::XMFLOAT3(3.0, 3.0, 3.0), width / (float)height, 0.1f, 1000.0f);
+
+    mOpaquePass.SetVertexShader(pPhongVS);
+    mOpaquePass.SetPixelShader(pPhongPS);
+
+    if (!mOpaquePass.Generate())
+        Printf(L"Warning: %s failed to generate!\n", mOpaquePass.GetName());
 
     struct Vertex
     {
@@ -198,37 +200,35 @@ void Game::Render()
     ResourceCodex& codex = ResourceCodex::GetSingleton();
     MaterialTypeID matId = fnv1a("Phong");
     const Muon::MaterialType* pPhongMaterial = codex.GetMaterialType(matId);
-    if (pPhongMaterial)
+
+    ID3D12GraphicsCommandList* pCommandList = GetCommandList();
+    pCommandList->SetDescriptorHeaps(1, codex.GetSRVDescriptorHeap().GetHeapAddr());
+
+    if (mOpaquePass.Bind(pCommandList))
     {
-        // Bind the material's PipelineState and RootSignature (Defined by Shaders)
-        pPhongMaterial->Bind(GetCommandList());
-        
+        // Bind's the materials parameter buffer and textures.
+        mOpaquePass.BindMaterial(*pPhongMaterial, pCommandList);
+
         // Bind the Camera's Upload Buffer to the root index known by the material
         int32_t cameraRootIdx = pPhongMaterial->GetResourceRootIndex("VSCamera");
         if (cameraRootIdx != ROOTIDX_INVALID)
         {
-            mCamera.Bind(cameraRootIdx, GetCommandList());
+            mCamera.Bind(cameraRootIdx, pCommandList);
         }
 
         // Bind the world matrix Upload Buffer to the root index known by the material
         int32_t worldMatrixRootIdx = pPhongMaterial->GetResourceRootIndex("VSWorld");
         if (worldMatrixRootIdx != ROOTIDX_INVALID)
         {
-            GetCommandList()->SetGraphicsRootConstantBufferView(worldMatrixRootIdx, mWorldMatrixBuffer.GetGPUVirtualAddress());
+            pCommandList->SetGraphicsRootConstantBufferView(worldMatrixRootIdx, mWorldMatrixBuffer.GetGPUVirtualAddress());
         }
 
         int32_t lightsRootIdx = pPhongMaterial->GetResourceRootIndex("PSLights");
         if (lightsRootIdx != ROOTIDX_INVALID)
         {
-            GetCommandList()->SetGraphicsRootConstantBufferView(lightsRootIdx, mLightBuffer.GetGPUVirtualAddress());
+            pCommandList->SetGraphicsRootConstantBufferView(lightsRootIdx, mLightBuffer.GetGPUVirtualAddress());
         }
-    }
 
-    // Fetch the desired mesh from the codex
-    const MeshID cubeID = fnv1a("cube.obj");
-    const Mesh* cubeMesh = codex.GetMesh(cubeID);
-    if (cubeMesh)
-    {
         // Bind VBO/IBO and Draw
         mCube.Draw(Muon::GetCommandList());
     }
