@@ -138,6 +138,14 @@ const PixelShader* ResourceCodex::GetPixelShader(ShaderID UID) const
         return nullptr;
 }
 
+const ComputeShader* ResourceCodex::GetComputeShader(ShaderID UID) const
+{
+    if (mComputeShaders.find(UID) != mComputeShaders.end())
+        return &mComputeShaders.at(UID);
+    else
+        return nullptr;
+}
+
 const Material* ResourceCodex::GetMaterialType(MaterialID UID) const
 {
     if (mMaterialMap.find(UID) != mMaterialMap.end())

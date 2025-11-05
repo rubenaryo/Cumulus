@@ -67,6 +67,7 @@ public:
     
     const VertexShader* GetVertexShader(ShaderID UID) const;
     const PixelShader* GetPixelShader(ShaderID UID) const;
+    const ComputeShader* GetComputeShader(ShaderID UID) const;
     const Material* GetMaterialType(MaterialID UID) const;
     const Texture* GetTexture(TextureID UID) const;
     UploadBuffer& GetMeshStagingBuffer() { return mMeshStagingBuffer; }

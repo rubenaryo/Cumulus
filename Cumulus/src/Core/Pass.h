@@ -71,6 +71,20 @@ protected:
     const PixelShader* mpPS = nullptr;
 };
 
+class ComputePass : public Pass
+{
+public:
+    ComputePass(const wchar_t* name) : Pass(name) {}
+
+    void SetComputeShader(const ComputeShader* pCS) { mpCS = pCS; }
+
+protected:
+    virtual bool GatherShaderResources() override;
+    virtual bool GeneratePipelineState() override;
+
+    const ComputeShader* mpCS = nullptr;
+};
+
 }
 
 #endif
