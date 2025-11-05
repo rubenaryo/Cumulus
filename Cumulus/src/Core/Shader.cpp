@@ -14,7 +14,6 @@ namespace Muon
 
 Shader::Shader(const wchar_t* path)
 {
-    Init(path);
 }
 
 Shader::~Shader()
@@ -48,6 +47,9 @@ bool VertexShader::Init(const wchar_t* path)
         Muon::Printf(L"Warning: Attempted to initialized [%s]. When it was already initialized!", path);
         return false;
     }
+
+    if (!Shader::Init(path))
+        return false;
 
     Initialized = ReflectAndBuildInputLayout(this->ShaderBlob.Get(), *this);
     return Initialized;
@@ -95,6 +97,9 @@ PixelShader::PixelShader(const wchar_t* path) : Shader(path)
 
 bool PixelShader::Init(const wchar_t* path)
 {
+    if (!Shader::Init(path))
+        return false;
+
     Initialized = true;
     return Initialized;
 }
@@ -114,6 +119,9 @@ ComputeShader::ComputeShader(const wchar_t* path) : Shader(path)
 
 bool ComputeShader::Init(const wchar_t* path)
 {
+    if (!Shader::Init(path))
+        return false;
+
     Initialized = true;
     return Initialized;
 }

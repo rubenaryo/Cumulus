@@ -110,6 +110,8 @@ struct Shader
     bool Init(const wchar_t* path);
     bool Release();
 
+    virtual D3D12_SHADER_VISIBILITY GetVisibility() = 0;
+
     Microsoft::WRL::ComPtr<IDxcBlobEncoding> ShaderBlob;
     ShaderReflectionData ReflectionData;
     BOOL Initialized = false;
@@ -121,6 +123,8 @@ struct VertexShader : public Shader
 
     bool Init(const wchar_t* path);
     bool Release();
+
+    virtual D3D12_SHADER_VISIBILITY GetVisibility() override { return D3D12_SHADER_VISIBILITY_VERTEX; }
 
     std::vector<D3D12_INPUT_ELEMENT_DESC> InputElements;
     VertexBufferDescription VertexDesc;
@@ -134,6 +138,8 @@ struct PixelShader : public Shader
     
     bool Init(const wchar_t* path);
     bool Release();
+
+    virtual D3D12_SHADER_VISIBILITY GetVisibility() override { return D3D12_SHADER_VISIBILITY_PIXEL; }
 };
 
 struct ComputeShader : public Shader
@@ -142,6 +148,8 @@ struct ComputeShader : public Shader
 
     bool Init(const wchar_t* path);
     bool Release();
+
+    virtual D3D12_SHADER_VISIBILITY GetVisibility() override { return D3D12_SHADER_VISIBILITY_ALL; }
 };
 
 }

@@ -163,6 +163,7 @@ namespace Muon
 
             ShaderResourceBinding resource;
             resource.Name = bindDesc.Name;
+            resource.Visibility = outShader.GetVisibility();
             resource.BindPoint = bindDesc.BindPoint;
             resource.BindCount = bindDesc.BindCount;
             resource.Space = bindDesc.Space;
