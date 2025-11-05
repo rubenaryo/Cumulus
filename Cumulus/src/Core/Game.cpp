@@ -198,8 +198,8 @@ void Game::Render()
 
     // Fetch the desired material from the codex
     ResourceCodex& codex = ResourceCodex::GetSingleton();
-    MaterialTypeID matId = fnv1a("Phong");
-    const Muon::MaterialType* pPhongMaterial = codex.GetMaterialType(matId);
+    MaterialID matId = fnv1a("Phong");
+    const Muon::Material* pPhongMaterial = codex.GetMaterialType(matId);
 
     ID3D12GraphicsCommandList* pCommandList = GetCommandList();
     pCommandList->SetDescriptorHeaps(1, codex.GetSRVDescriptorHeap().GetHeapAddr());
@@ -210,20 +210,20 @@ void Game::Render()
         mOpaquePass.BindMaterial(*pPhongMaterial, pCommandList);
 
         // Bind the Camera's Upload Buffer to the root index known by the material
-        int32_t cameraRootIdx = pPhongMaterial->GetResourceRootIndex("VSCamera");
+        int32_t cameraRootIdx = mOpaquePass.GetResourceRootIndex("VSCamera");
         if (cameraRootIdx != ROOTIDX_INVALID)
         {
             mCamera.Bind(cameraRootIdx, pCommandList);
         }
 
         // Bind the world matrix Upload Buffer to the root index known by the material
-        int32_t worldMatrixRootIdx = pPhongMaterial->GetResourceRootIndex("VSWorld");
+        int32_t worldMatrixRootIdx = mOpaquePass.GetResourceRootIndex("VSWorld");
         if (worldMatrixRootIdx != ROOTIDX_INVALID)
         {
             pCommandList->SetGraphicsRootConstantBufferView(worldMatrixRootIdx, mWorldMatrixBuffer.GetGPUVirtualAddress());
         }
 
-        int32_t lightsRootIdx = pPhongMaterial->GetResourceRootIndex("PSLights");
+        int32_t lightsRootIdx = mOpaquePass.GetResourceRootIndex("PSLights");
         if (lightsRootIdx != ROOTIDX_INVALID)
         {
             pCommandList->SetGraphicsRootConstantBufferView(lightsRootIdx, mLightBuffer.GetGPUVirtualAddress());
@@ -259,6 +259,7 @@ Game::~Game()
     mLightBuffer.Destroy();
     mCamera.Destroy();
     mInput.Destroy();
+    mOpaquePass.Destroy();
 
     Muon::ResourceCodex::Destroy();
     Muon::DestroyDX12();

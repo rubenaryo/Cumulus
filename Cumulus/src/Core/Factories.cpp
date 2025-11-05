@@ -307,40 +307,14 @@ bool TextureFactory::CreateSRV(DescriptorHeap& descHeap, ID3D12Device* pDevice, 
 
 bool MaterialFactory::CreateAllMaterials(ResourceCodex& codex)
 {
-    const TextureID kRockDiffuseId = fnv1a(L"Rock_T.png");       // FNV1A of L"Lunar_T"
-    const TextureID kRockNormalId = fnv1a(L"Rock_N.png");       // FNV1A of L"Lunar_T"
-
-    const ShaderID kPhongVSID = fnv1a("Phong.vs");
-    const ShaderID kPhongPSID = fnv1a("Phong.ps");          // FNV1A of L"Phong.ps"
-    const ShaderID kPhongPSNormalMapID = fnv1a(L"Phong_NormalMap.ps");
-    const MeshID kSkyMeshID = 0x4a986f37; // cube
-
-    const VertexShader* pPhongVS = codex.GetVertexShader(kPhongVSID);
-    const PixelShader* pPhongPS = codex.GetPixelShader(kPhongPSID);
-
-    if (!pPhongVS || !pPhongPS)
-    {
-        Muon::Print("Error: Failed to fetch Phong VS/PS from codex!");
-        return false;
-    }
-
-    // Test MaterialType
+    const TextureID kRockDiffuseId = fnv1a(L"Rock_T.png");
+    const TextureID kRockNormalId = fnv1a(L"Rock_N.png");
     {
         const wchar_t* kPhongMaterialName = L"Phong";
-        MaterialType* pPhongMaterial = codex.InsertMaterialType(kPhongMaterialName);
+        Material* pPhongMaterial = codex.InsertMaterialType(kPhongMaterialName);
         if (!pPhongMaterial)
         {
-            Muon::Printf(L"Warning: %s MaterialType failed to be inserted into codex!", kPhongMaterialName);
-            return false;
-        }
-
-        //pbr->SetRootSignature(Muon::GetRootSignature());
-        pPhongMaterial->SetVertexShader(pPhongVS);
-        pPhongMaterial->SetPixelShader(pPhongPS);
-
-        if (!pPhongMaterial->Generate())
-        {
-            Muon::Printf(L"Warning: %s MaterialType failed to Generate()!", pPhongMaterial->GetName().c_str());
+            Muon::Printf(L"Warning: %s Material failed to be inserted into codex!", kPhongMaterialName);
             return false;
         }
 

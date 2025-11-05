@@ -14,7 +14,7 @@ namespace Muon
     typedef id_type ShaderID;
     typedef id_type MeshID;
     typedef id_type TextureID;
-    typedef id_type MaterialTypeID;
+    typedef id_type MaterialID;
 
     static const id_type IDTYPE_MAX = UINT32_MAX;
     static const TextureID TEXTUREID_INVALID = IDTYPE_MAX;

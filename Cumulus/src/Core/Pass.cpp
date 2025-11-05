@@ -15,8 +15,13 @@ namespace Muon
 
 Pass::~Pass()
 {
+}
+
+bool Pass::Destroy()
+{
     mpRootSignature.Reset();
     mpPipelineState.Reset();
+    return true;
 }
 
 int32_t Pass::GetResourceRootIndex(const char* name) const
@@ -130,7 +135,7 @@ bool Pass::Bind(ID3D12GraphicsCommandList* pCommandList) const
     return true;
 }
 
-bool Pass::BindMaterial(const MaterialType& material, ID3D12GraphicsCommandList* pCommandList) const
+bool Pass::BindMaterial(const Material& material, ID3D12GraphicsCommandList* pCommandList) const
 {
     const DefaultBuffer& paramBuffer = material.GetParamBuffer();
     const std::unordered_map<std::string, TextureID>& textureParams = material.GetTextureParams();

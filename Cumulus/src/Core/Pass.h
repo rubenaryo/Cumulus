@@ -13,7 +13,7 @@ Description : Wraps compute pass functionality
 
 namespace Muon
 {
-class MaterialType;
+class Material;
 }
 
 namespace Muon
@@ -26,8 +26,10 @@ public:
     virtual ~Pass();
 
     bool Generate();
+    bool Destroy();
+
     bool Bind(ID3D12GraphicsCommandList* pCommandList) const;
-    bool BindMaterial(const MaterialType& material, ID3D12GraphicsCommandList* pCommandList) const;
+    bool BindMaterial(const Material& material, ID3D12GraphicsCommandList* pCommandList) const;
     const wchar_t* GetName() const { return mName.c_str(); }
 
     int GetResourceRootIndex(const char* name) const;
