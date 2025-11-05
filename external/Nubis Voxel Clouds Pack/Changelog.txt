@@ -1,0 +1,3 @@
+07.31.2023 - First release of the pack containing NVDF Examples of the Parkouring Cloud and the Stormbird Cloud in TGA and VDB format + Noise Generator and example exports in the form of TGA slices and a VDB file.
+
+08.10.2023 - Fixed bad slice #128 of the Nubis Voxel Cloud Noise 3d Texture (TGA) / Corrected Nubis Voxel Cloud Noise Generator to prevent this / Added Sampler and Upres Code examples.
