@@ -125,16 +125,6 @@ bool Pass::Generate()
     return true;
 }
 
-bool Pass::Bind(ID3D12GraphicsCommandList* pCommandList) const
-{
-    if (!mInitialized || !mpRootSignature || !mpPipelineState)
-        return false;
-
-    pCommandList->SetGraphicsRootSignature(mpRootSignature.Get());
-    pCommandList->SetPipelineState(mpPipelineState.Get());
-    return true;
-}
-
 bool Pass::BindMaterial(const Material& material, ID3D12GraphicsCommandList* pCommandList) const
 {
     const DefaultBuffer& paramBuffer = material.GetParamBuffer();
@@ -165,6 +155,16 @@ bool Pass::BindMaterial(const Material& material, ID3D12GraphicsCommandList* pCo
 }
 
 /////////////////////////////////////////////////////////
+
+bool GraphicsPass::Bind(ID3D12GraphicsCommandList* pCommandList) const
+{
+    if (!mInitialized || !mpRootSignature || !mpPipelineState)
+        return false;
+
+    pCommandList->SetGraphicsRootSignature(mpRootSignature.Get());
+    pCommandList->SetPipelineState(mpPipelineState.Get());
+    return true;
+}
 
 bool GraphicsPass::GatherShaderResources()
 {
@@ -243,6 +243,16 @@ bool GraphicsPass::GeneratePipelineState()
 }
 
 /////////////////////////////////////////////////////////
+
+bool ComputePass::Bind(ID3D12GraphicsCommandList* pCommandList) const
+{
+    if (!mInitialized || !mpRootSignature || !mpPipelineState)
+        return false;
+
+    pCommandList->SetComputeRootSignature(mpRootSignature.Get());
+    pCommandList->SetPipelineState(mpPipelineState.Get());
+    return true;
+}
 
 bool ComputePass::GatherShaderResources()
 {
