@@ -55,7 +55,9 @@ namespace Muon
     Microsoft::WRL::ComPtr<ID3D12Resource> gSwapChainBuffers[SWAP_CHAIN_BUFFER_COUNT];
     Microsoft::WRL::ComPtr<ID3D12Resource> gDepthStencilBuffer;
 
+    // TODO: Rather than live here, they should be manual entries in the codex
     MuonTexture gOffscreenTarget(L"Offscreen Target");
+    MuonTexture gComputeOutput(L"Sobel Output");
 
     D3D12_VIEWPORT gViewport = { 0 };
 
@@ -408,6 +410,28 @@ namespace Muon
         pDevice->CreateShaderResourceView(gOffscreenTarget.mpResource.Get(), &srvDesc, gOffscreenTarget.mViewSRV.HandleCPU);
         pDevice->CreateRenderTargetView(gOffscreenTarget.mpResource.Get(), nullptr, gOffscreenTarget.mViewRTV.HandleCPU);
 
+        /// Sobel Output 
+
+        success &= gComputeOutput.Create(pDevice, width, height, format, D3D12_RESOURCE_FLAG_ALLOW_UNORDERED_ACCESS, D3D12_RESOURCE_STATE_GENERIC_READ);
+        if (!success)
+            return false;
+
+        success &= gSRVHeap->Allocate(gComputeOutput.mViewSRV.HandleCPU, gComputeOutput.mViewSRV.HandleGPU);
+        if (!success)
+            return false;
+        
+        success &= gSRVHeap->Allocate(gComputeOutput.mViewUAV.HandleCPU, gComputeOutput.mViewUAV.HandleGPU);
+        if (!success)
+            return false;
+
+        D3D12_UNORDERED_ACCESS_VIEW_DESC uavDesc = {};
+        uavDesc.Format = format;
+        uavDesc.ViewDimension = D3D12_UAV_DIMENSION_TEXTURE2D;
+        uavDesc.Texture2D.MipSlice = 0;
+        
+        pDevice->CreateShaderResourceView(gComputeOutput.mpResource.Get(), &srvDesc, gComputeOutput.mViewSRV.HandleCPU);
+        pDevice->CreateUnorderedAccessView(gComputeOutput.mpResource.Get(), nullptr, &uavDesc, gComputeOutput.mViewUAV.HandleCPU);
+        
         return success;
     }
 
@@ -776,7 +800,9 @@ namespace Muon
         {
             gSwapChainBuffers[i].Reset();
         }
+        // TODO: These are leaking 16 bytes each, investigate why.
         gOffscreenTarget.Destroy();
+        gComputeOutput.Destroy();
 
         gDepthStencilBuffer.Reset();
         gRTVHeap.Reset();
