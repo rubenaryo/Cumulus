@@ -48,6 +48,7 @@ bool MuonTexture::Create(ID3D12Device* pDevice, UINT width, UINT height,
 bool MuonTexture::Destroy()
 {
     mpResource.Reset();
+    mName = std::wstring();
     return true;
 }
 

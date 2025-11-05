@@ -44,19 +44,6 @@ namespace Muon
 
 	bool InitDX12(HWND hwnd, int width, int height);
 	bool DestroyDX12();
-
-	struct RenderTarget
-	{
-		UINT mWidth;
-		UINT mHeight;
-		DXGI_FORMAT mFormat = DXGI_FORMAT_R8G8B8A8_UNORM;
-
-		CD3DX12_CPU_DESCRIPTOR_HANDLE mhCpuSrv;
-		CD3DX12_GPU_DESCRIPTOR_HANDLE mhGpuSrv;
-		CD3DX12_CPU_DESCRIPTOR_HANDLE mhCpuRtv;
-
-		Microsoft::WRL::ComPtr<ID3D12Resource> mpResource;
-	};
 }
 
 #endif
