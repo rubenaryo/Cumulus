@@ -79,6 +79,9 @@ namespace Muon
     ID3D12Fence* GetFence() { return gFence.Get(); }
     DXGI_FORMAT GetRTVFormat() { return BackBufferFormat; }
     DescriptorHeap* GetSRVHeap() { return gSRVHeap; }
+    ID3D12Resource* GetCurrentBackBuffer() { return gSwapChainBuffers[CurrentBackBuffer].Get(); }
+    D3D12_CPU_DESCRIPTOR_HANDLE GetCurrentBackBufferView() { return CD3DX12_CPU_DESCRIPTOR_HANDLE(gRTVHeap->GetCPUDescriptorHandleForHeapStart(), CurrentBackBuffer, gRTVSize); }
+    D3D12_CPU_DESCRIPTOR_HANDLE GetDepthStencilView() { return gDSVHeap->GetCPUDescriptorHandleForHeapStart(); }
     UINT GetRTVDescriptorSize() { return gRTVSize; }
     UINT GetDSVDescriptorSize() { return gDSVSize; }
     UINT GetCBVDescriptorSize() { return gCBVSize; }
@@ -88,25 +91,12 @@ namespace Muon
     ID3D12CommandAllocator* GetCommandAllocator() { return gCommandAllocator.Get(); }
     IDXGISwapChain3* GetSwapChain() { return gSwapChain.Get(); }
     MuonTexture& GetOffscreenTarget() { return gOffscreenTarget; }
+    MuonTexture& GetComputeOutput() { return gComputeOutput; }
     DXGI_FORMAT GetBackBufferFormat() { return BackBufferFormat; }
     DXGI_FORMAT GetDepthStencilFormat() { return DepthStencilFormat; }
 
     /////////////////////////////////////////////////////////////////////
     /// Interface Utility Functions
-
-    D3D12_CPU_DESCRIPTOR_HANDLE CurrentBackBufferView()
-    {
-        return CD3DX12_CPU_DESCRIPTOR_HANDLE(
-            gRTVHeap->GetCPUDescriptorHandleForHeapStart(),
-            CurrentBackBuffer,
-            gRTVSize
-        );
-    }
-
-    D3D12_CPU_DESCRIPTOR_HANDLE DepthStencilView()
-    {
-        return gDSVHeap->GetCPUDescriptorHandleForHeapStart();
-    }
 
     const wchar_t* GetDirect3DNameForFeatureLevel(D3D_FEATURE_LEVEL level)
     {
@@ -475,7 +465,7 @@ namespace Muon
         dsvDesc.ViewDimension = D3D12_DSV_DIMENSION_TEXTURE2D;
         dsvDesc.Format = DepthStencilFormat;
         dsvDesc.Texture2D.MipSlice = 0;
-        pDevice->CreateDepthStencilView(out_depthStencilBuffer.Get(), &dsvDesc, DepthStencilView());
+        pDevice->CreateDepthStencilView(out_depthStencilBuffer.Get(), &dsvDesc, GetDepthStencilView());
 
         // Transition from initial -> depth buffer use
         pCommandList->Reset(GetCommandAllocator(), nullptr);
@@ -552,20 +542,22 @@ namespace Muon
         pCommandList->RSSetViewports(1, &gViewport);
         pCommandList->RSSetScissorRects(1, &gScissorRect);
 
-        // Set back buffer as render target
-        //pCommandList->ResourceBarrier(1, &CD3DX12_RESOURCE_BARRIER::Transition(gOffscreenTarget.mpResource.Get(), 
-        //    D3D12_RESOURCE_STATE_GENERIC_READ, D3D12_RESOURCE_STATE_RENDER_TARGET));
+        // Set offscreen target as the render output
+        pCommandList->ResourceBarrier(1, &CD3DX12_RESOURCE_BARRIER::Transition(gOffscreenTarget.mpResource.Get(), 
+            D3D12_RESOURCE_STATE_GENERIC_READ, D3D12_RESOURCE_STATE_RENDER_TARGET));
         
-        pCommandList->ResourceBarrier(1, &CD3DX12_RESOURCE_BARRIER::Transition(gSwapChainBuffers[CurrentBackBuffer].Get(), 
-            D3D12_RESOURCE_STATE_PRESENT, D3D12_RESOURCE_STATE_RENDER_TARGET));
+        //pCommandList->ResourceBarrier(1, &CD3DX12_RESOURCE_BARRIER::Transition(gSwapChainBuffers[CurrentBackBuffer].Get(), 
+        //    D3D12_RESOURCE_STATE_PRESENT, D3D12_RESOURCE_STATE_RENDER_TARGET));
 
         //CD3DX12_CPU_DESCRIPTOR_HANDLE rtvHandle(gRTVHeap->GetCPUDescriptorHandleForHeapStart(), CurrentBackBuffer, gRTVSize);
-        CD3DX12_CPU_DESCRIPTOR_HANDLE rtvHandle(gRTVHeap->GetCPUDescriptorHandleForHeapStart(), CurrentBackBuffer, gRTVSize);
-        pCommandList->OMSetRenderTargets(1, &rtvHandle, FALSE, nullptr);
+        //CD3DX12_CPU_DESCRIPTOR_HANDLE rtvHandle(gRTVHeap->GetCPUDescriptorHandleForHeapStart(), CurrentBackBuffer, gRTVSize);
+        pCommandList->OMSetRenderTargets(1, &gOffscreenTarget.mViewRTV.HandleCPU, FALSE, nullptr);
 
         // Clear the back buffer
         const float clearColor[] = { 0.0f, 0.2f, 0.4f, 1.0f };
-        pCommandList->ClearRenderTargetView(rtvHandle, clearColor, 0, nullptr);
+        pCommandList->ClearRenderTargetView(gOffscreenTarget.mViewRTV.HandleCPU, clearColor, 0, nullptr);
+        
+        // TODO: Clear depth stencil once we need that
 
         return true;
     }
