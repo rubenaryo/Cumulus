@@ -10,6 +10,7 @@ or "Introduction to 3D Game Programming with DirectX 12" by Frank Luna
 #include <Core/DXCore.h>
 #include <Core/ThrowMacros.h>
 #include <Core/CBufferStructs.h>
+#include <Core/DescriptorHeap.h>
 
 #include <d3dx12.h>
 #include <d3d12.h>
@@ -53,10 +54,13 @@ namespace Muon
     Microsoft::WRL::ComPtr<ID3D12Resource> gSwapChainBuffers[SWAP_CHAIN_BUFFER_COUNT];
     Microsoft::WRL::ComPtr<ID3D12Resource> gDepthStencilBuffer;
 
+    RenderTarget gOffscreenTarget;
+
     D3D12_VIEWPORT gViewport = { 0 };
 
     Microsoft::WRL::ComPtr<ID3D12DescriptorHeap> gRTVHeap;
     Microsoft::WRL::ComPtr<ID3D12DescriptorHeap> gDSVHeap;
+    DescriptorHeap* gSRVHeap = nullptr;
 
     tagRECT gScissorRect;
 
@@ -71,6 +75,7 @@ namespace Muon
     ID3D12Device* GetDevice() { return gDevice.Get(); }
     ID3D12Fence* GetFence() { return gFence.Get(); }
     DXGI_FORMAT GetRTVFormat() { return BackBufferFormat; }
+    DescriptorHeap* GetSRVHeap() { return gSRVHeap; }
     UINT GetRTVDescriptorSize() { return gRTVSize; }
     UINT GetDSVDescriptorSize() { return gDSVSize; }
     UINT GetCBVDescriptorSize() { return gCBVSize; }
@@ -79,6 +84,7 @@ namespace Muon
     ID3D12GraphicsCommandList* GetCommandList() { return gCommandList.Get(); }
     ID3D12CommandAllocator* GetCommandAllocator() { return gCommandAllocator.Get(); }
     IDXGISwapChain3* GetSwapChain() { return gSwapChain.Get(); }
+    RenderTarget& GetOffscreenTarget() { return gOffscreenTarget; }
     DXGI_FORMAT GetBackBufferFormat() { return BackBufferFormat; }
     DXGI_FORMAT GetDepthStencilFormat() { return DepthStencilFormat; }
 
@@ -349,6 +355,9 @@ namespace Muon
             &dsvHeapDesc, IID_PPV_ARGS(out_dsv.GetAddressOf()));
         COM_EXCEPT(hr);
 
+        static const UINT SRV_DESCRIPTOR_CAPACITY = 64; // Support up to 64 SRVs
+        gSRVHeap = new DescriptorHeap(GetDevice(), SRV_DESCRIPTOR_CAPACITY, D3D12_DESCRIPTOR_HEAP_TYPE_CBV_SRV_UAV);
+
         return SUCCEEDED(hr);
     }
 
@@ -366,6 +375,37 @@ namespace Muon
         }
 
         return true;
+    }
+
+    bool InitOffscreenTarget(ID3D12Device* pDevice, UINT width, UINT height, DXGI_FORMAT format)
+    {
+        gOffscreenTarget.mWidth = width;
+        gOffscreenTarget.mHeight = height;
+        gOffscreenTarget.mFormat = format;
+
+        D3D12_RESOURCE_DESC targetDesc;
+        ZeroMemory(&targetDesc, sizeof(D3D12_RESOURCE_DESC));
+        targetDesc.Dimension = D3D12_RESOURCE_DIMENSION_TEXTURE2D;
+        targetDesc.Alignment = 0;
+        targetDesc.Width = width;
+        targetDesc.Height = height;
+        targetDesc.DepthOrArraySize = 1;
+        targetDesc.MipLevels = 1;
+        targetDesc.Format = format;
+        targetDesc.SampleDesc.Count = 1;
+        targetDesc.SampleDesc.Quality = 0;
+        targetDesc.Layout = D3D12_TEXTURE_LAYOUT_UNKNOWN;
+        targetDesc.Flags = D3D12_RESOURCE_FLAG_ALLOW_RENDER_TARGET;
+
+        HRESULT hr = pDevice->CreateCommittedResource(
+            &CD3DX12_HEAP_PROPERTIES(D3D12_HEAP_TYPE_DEFAULT),
+            D3D12_HEAP_FLAG_NONE,
+            &targetDesc,
+            D3D12_RESOURCE_STATE_GENERIC_READ,
+            nullptr,
+            IID_PPV_ARGS(&gOffscreenTarget.mpResource));
+
+        return SUCCEEDED(hr);
     }
 
     bool CreateDepthStencilBuffer(ID3D12Device* pDevice, ID3D12GraphicsCommandList* pCommandList, ID3D12CommandQueue* pCommandQueue, int width, int height, Microsoft::WRL::ComPtr<ID3D12Resource>& out_depthStencilBuffer)
@@ -482,13 +522,17 @@ namespace Muon
     {
         ID3D12GraphicsCommandList* pCommandList = GetCommandList();
 
-        //pCommandList->SetGraphicsRootSignature(gRootSig.Get());
         pCommandList->RSSetViewports(1, &gViewport);
         pCommandList->RSSetScissorRects(1, &gScissorRect);
 
         // Set back buffer as render target
-        pCommandList->ResourceBarrier(1, &CD3DX12_RESOURCE_BARRIER::Transition(gSwapChainBuffers[CurrentBackBuffer].Get(), D3D12_RESOURCE_STATE_PRESENT, D3D12_RESOURCE_STATE_RENDER_TARGET));
+        //pCommandList->ResourceBarrier(1, &CD3DX12_RESOURCE_BARRIER::Transition(gOffscreenTarget.mpResource.Get(), 
+        //    D3D12_RESOURCE_STATE_GENERIC_READ, D3D12_RESOURCE_STATE_RENDER_TARGET));
+        
+        pCommandList->ResourceBarrier(1, &CD3DX12_RESOURCE_BARRIER::Transition(gSwapChainBuffers[CurrentBackBuffer].Get(), 
+            D3D12_RESOURCE_STATE_PRESENT, D3D12_RESOURCE_STATE_RENDER_TARGET));
 
+        //CD3DX12_CPU_DESCRIPTOR_HANDLE rtvHandle(gRTVHeap->GetCPUDescriptorHandleForHeapStart(), CurrentBackBuffer, gRTVSize);
         CD3DX12_CPU_DESCRIPTOR_HANDLE rtvHandle(gRTVHeap->GetCPUDescriptorHandleForHeapStart(), CurrentBackBuffer, gRTVSize);
         pCommandList->OMSetRenderTargets(1, &rtvHandle, FALSE, nullptr);
 
@@ -656,6 +700,9 @@ namespace Muon
         success &= CreateFence(GetDevice(), gFence);
         CHECK_SUCCESS(success, "Error: Failed to create fence!\n");
 
+        success &= InitOffscreenTarget(GetDevice(), width, height, GetBackBufferFormat());
+        CHECK_SUCCESS(success, "Error: Failed to init offscreen targetz!\n");
+
         success &= CreateDescriptorHeaps(GetDevice(), gRTVHeap, gDSVHeap);
         CHECK_SUCCESS(success, "Error: Failed to create descriptor heaps!\n");
 
@@ -709,6 +756,15 @@ namespace Muon
 
     bool DestroyDX12()
     {
+        auto DestroyDescriptorHeap = [](DescriptorHeap*& heap)
+        {
+            if (!heap) return;
+
+            heap->Destroy();
+            delete heap;
+            heap = nullptr;
+        };
+
         // Ensure all GPU work is complete before releasing resources
         FlushCommandQueue();
 
@@ -717,10 +773,12 @@ namespace Muon
         {
             gSwapChainBuffers[i].Reset();
         }
+        gOffscreenTarget.mpResource.Reset();
 
         gDepthStencilBuffer.Reset();
         gRTVHeap.Reset();
         gDSVHeap.Reset();
+        DestroyDescriptorHeap(gSRVHeap);
         gCommandList.Reset();
         gCommandAllocator.Reset();
         gCommandQueue.Reset();

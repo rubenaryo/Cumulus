@@ -265,7 +265,7 @@ void TextureFactory::LoadAllTextures(ID3D12Device* pDevice, ID3D12CommandList* p
             continue;
         }
 
-        if (!CreateSRV(codex.GetSRVDescriptorHeap(), pDevice, tex.pResource.Get(), tex))
+        if (!CreateSRV(pDevice, tex.pResource.Get(), tex))
         {
             Muon::Printf(L"Error: Failed to create D3D12 Resource and SRV for %s!\n", path.c_str());
             continue;
@@ -279,13 +279,14 @@ void TextureFactory::LoadAllTextures(ID3D12Device* pDevice, ID3D12CommandList* p
     FlushCommandQueue();
 }
 
-bool TextureFactory::CreateSRV(DescriptorHeap& descHeap, ID3D12Device* pDevice, ID3D12Resource* pResource, Texture& outTexture)
+bool TextureFactory::CreateSRV(ID3D12Device* pDevice, ID3D12Resource* pResource, Texture& outTexture)
 {
     if (!pResource)
         return false;
 
     // Allocate descriptor
-    if (!descHeap.Allocate(outTexture.CPUHandle, outTexture.GPUHandle))
+    DescriptorHeap* pSRVHeap = Muon::GetSRVHeap();
+    if (!pSRVHeap || !pSRVHeap->Allocate(outTexture.CPUHandle, outTexture.GPUHandle))
         return false;
 
     D3D12_RESOURCE_DESC resourceDesc = pResource->GetDesc();

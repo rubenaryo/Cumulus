@@ -216,7 +216,7 @@ void Game::Render()
     const Muon::Material* pPhongMaterial = codex.GetMaterialType(matId);
 
     ID3D12GraphicsCommandList* pCommandList = GetCommandList();
-    pCommandList->SetDescriptorHeaps(1, codex.GetSRVDescriptorHeap().GetHeapAddr());
+    pCommandList->SetDescriptorHeaps(1, GetSRVHeap()->GetHeapAddr());
 
     if (mOpaquePass.Bind(pCommandList))
     {
@@ -274,6 +274,7 @@ Game::~Game()
     mCamera.Destroy();
     mInput.Destroy();
     mOpaquePass.Destroy();
+    mSobelPass.Destroy();
 
     Muon::ResourceCodex::Destroy();
     Muon::DestroyDX12();
