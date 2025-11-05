@@ -20,7 +20,8 @@ Description : Implementation of Game.h
 Game::Game() :
     mInput(),
     mCamera(),
-    mOpaquePass(L"OpaquePass")
+    mOpaquePass(L"OpaquePass"),
+    mSobelPass(L"SobelPass")
 {
     mTimer.SetFixedTimeStep(false);
 }
@@ -37,16 +38,29 @@ bool Game::Init(HWND window, int width, int height)
     ResourceCodex& codex = ResourceCodex::GetSingleton();
     const ShaderID kPhongVSID = fnv1a(L"Phong.vs");
     const ShaderID kPhongPSID = fnv1a(L"Phong.ps");    
+    const ShaderID kSobelCSID = fnv1a(L"Sobel.cs");
     const VertexShader* pPhongVS = codex.GetVertexShader(kPhongVSID);
     const PixelShader* pPhongPS = codex.GetPixelShader(kPhongPSID);
+    const ComputeShader* pSobelCS = codex.GetComputeShader(kSobelCSID);
 
     mCamera.Init(DirectX::XMFLOAT3(3.0, 3.0, 3.0), width / (float)height, 0.1f, 1000.0f);
 
-    mOpaquePass.SetVertexShader(pPhongVS);
-    mOpaquePass.SetPixelShader(pPhongPS);
+    // Assemble opaque render pass
+    {
+        mOpaquePass.SetVertexShader(pPhongVS);
+        mOpaquePass.SetPixelShader(pPhongPS);
 
-    if (!mOpaquePass.Generate())
-        Printf(L"Warning: %s failed to generate!\n", mOpaquePass.GetName());
+        if (!mOpaquePass.Generate())
+            Printf(L"Warning: %s failed to generate!\n", mOpaquePass.GetName());
+    }
+
+    // Assemble compute render pass
+    {
+        mSobelPass.SetComputeShader(pSobelCS);
+
+        if (!mSobelPass.Generate())
+            Printf(L"Warning: %s failed to generate!\n", mSobelPass.GetName());
+    }
 
     struct Vertex
     {
