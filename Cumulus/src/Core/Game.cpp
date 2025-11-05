@@ -14,6 +14,7 @@ Description : Implementation of Game.h
 #include <Core/PipelineState.h>
 #include <Core/ResourceCodex.h>
 #include <Core/Shader.h>
+#include <Core/Texture.h>
 #include <Core/hash_util.h>
 #include <Utils/Utils.h>
 
@@ -245,6 +246,47 @@ void Game::Render()
 
         // Bind VBO/IBO and Draw
         mCube.Draw(Muon::GetCommandList());
+    }
+
+    {
+        // Change offscreen texture to be used as an input.
+        MuonTexture& offscreenTarget = GetOffscreenTarget();
+        MuonTexture& computeOutput = GetComputeOutput();
+
+        pCommandList->ResourceBarrier(1, &CD3DX12_RESOURCE_BARRIER::Transition(offscreenTarget.mpResource.Get(),
+            D3D12_RESOURCE_STATE_RENDER_TARGET, D3D12_RESOURCE_STATE_GENERIC_READ));
+
+        mSobelPass.Bind(pCommandList);
+
+        int32_t inIdx = mSobelPass.GetResourceRootIndex("gInput");
+        if (inIdx != ROOTIDX_INVALID)
+        {
+            pCommandList->SetComputeRootDescriptorTable(inIdx, offscreenTarget.mViewSRV.HandleGPU);
+        }
+
+        int32_t outIdx = mSobelPass.GetResourceRootIndex("gOutput");
+        if (outIdx != ROOTIDX_INVALID)
+        {
+            pCommandList->SetComputeRootDescriptorTable(outIdx, computeOutput.mViewUAV.HandleGPU);
+        }
+
+        pCommandList->ResourceBarrier(1, &CD3DX12_RESOURCE_BARRIER::Transition(computeOutput.mpResource.Get(),
+            D3D12_RESOURCE_STATE_GENERIC_READ, D3D12_RESOURCE_STATE_UNORDERED_ACCESS));
+
+        UINT numGroupsX = (UINT)ceilf(offscreenTarget.mWidth  / 16.0f);
+        UINT numGroupsY = (UINT)ceilf(offscreenTarget.mHeight / 16.0f);
+        pCommandList->Dispatch(numGroupsX, numGroupsY, 1);
+
+        pCommandList->ResourceBarrier(1, &CD3DX12_RESOURCE_BARRIER::Transition(computeOutput.mpResource.Get(),
+            D3D12_RESOURCE_STATE_UNORDERED_ACCESS, D3D12_RESOURCE_STATE_GENERIC_READ));
+
+        // Indicate a state transition on the resource usage.
+        pCommandList->ResourceBarrier(1, &CD3DX12_RESOURCE_BARRIER::Transition(GetCurrentBackBuffer(),
+            D3D12_RESOURCE_STATE_PRESENT, D3D12_RESOURCE_STATE_RENDER_TARGET));
+
+        // Specify the buffers we are going to render to.
+        pCommandList->OMSetRenderTargets(1, &GetCurrentBackBufferView(), true, &GetDepthStencilView());
+
     }
 
     FinalizeRender();
