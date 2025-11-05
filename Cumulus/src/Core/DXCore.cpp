@@ -11,6 +11,7 @@ or "Introduction to 3D Game Programming with DirectX 12" by Frank Luna
 #include <Core/ThrowMacros.h>
 #include <Core/CBufferStructs.h>
 #include <Core/DescriptorHeap.h>
+#include <Core/Texture.h>
 
 #include <d3dx12.h>
 #include <d3d12.h>
@@ -54,7 +55,7 @@ namespace Muon
     Microsoft::WRL::ComPtr<ID3D12Resource> gSwapChainBuffers[SWAP_CHAIN_BUFFER_COUNT];
     Microsoft::WRL::ComPtr<ID3D12Resource> gDepthStencilBuffer;
 
-    RenderTarget gOffscreenTarget;
+    MuonTexture gOffscreenTarget(L"Offscreen Target");
 
     D3D12_VIEWPORT gViewport = { 0 };
 
@@ -84,7 +85,7 @@ namespace Muon
     ID3D12GraphicsCommandList* GetCommandList() { return gCommandList.Get(); }
     ID3D12CommandAllocator* GetCommandAllocator() { return gCommandAllocator.Get(); }
     IDXGISwapChain3* GetSwapChain() { return gSwapChain.Get(); }
-    RenderTarget& GetOffscreenTarget() { return gOffscreenTarget; }
+    MuonTexture& GetOffscreenTarget() { return gOffscreenTarget; }
     DXGI_FORMAT GetBackBufferFormat() { return BackBufferFormat; }
     DXGI_FORMAT GetDepthStencilFormat() { return DepthStencilFormat; }
 
@@ -379,42 +380,19 @@ namespace Muon
 
     bool InitOffscreenTarget(ID3D12Device* pDevice, UINT width, UINT height, DXGI_FORMAT format)
     {
-        if (!gSRVHeap)
+        if (!gSRVHeap || !gRTVHeap)
             return false;
 
-        gOffscreenTarget.mWidth = width;
-        gOffscreenTarget.mHeight = height;
-        gOffscreenTarget.mFormat = format;
+        bool success = true;
 
-        D3D12_RESOURCE_DESC targetDesc;
-        ZeroMemory(&targetDesc, sizeof(D3D12_RESOURCE_DESC));
-        targetDesc.Dimension = D3D12_RESOURCE_DIMENSION_TEXTURE2D;
-        targetDesc.Alignment = 0;
-        targetDesc.Width = width;
-        targetDesc.Height = height;
-        targetDesc.DepthOrArraySize = 1;
-        targetDesc.MipLevels = 1;
-        targetDesc.Format = format;
-        targetDesc.SampleDesc.Count = 1;
-        targetDesc.SampleDesc.Quality = 0;
-        targetDesc.Layout = D3D12_TEXTURE_LAYOUT_UNKNOWN;
-        targetDesc.Flags = D3D12_RESOURCE_FLAG_ALLOW_RENDER_TARGET;
-
-        HRESULT hr = pDevice->CreateCommittedResource(
-            &CD3DX12_HEAP_PROPERTIES(D3D12_HEAP_TYPE_DEFAULT),
-            D3D12_HEAP_FLAG_NONE,
-            &targetDesc,
-            D3D12_RESOURCE_STATE_GENERIC_READ,
-            nullptr,
-            IID_PPV_ARGS(&gOffscreenTarget.mpResource));
-        COM_EXCEPT(hr);
-        if (FAILED(hr))
+        success &= gOffscreenTarget.Create(pDevice, width, height, format, D3D12_RESOURCE_FLAG_ALLOW_RENDER_TARGET, D3D12_RESOURCE_STATE_GENERIC_READ);
+        if (!success)
             return false;
 
-        bool allocSuccess = gSRVHeap->Allocate(gOffscreenTarget.mhCpuSrv, gOffscreenTarget.mhGpuSrv);
-        gOffscreenTarget.mhCpuRtv = CD3DX12_CPU_DESCRIPTOR_HANDLE(gRTVHeap->GetCPUDescriptorHandleForHeapStart(), SWAP_CHAIN_BUFFER_COUNT, gRTVSize);
+        success &= gSRVHeap->Allocate(gOffscreenTarget.mViewSRV.HandleCPU, gOffscreenTarget.mViewSRV.HandleGPU);
+        gOffscreenTarget.mViewRTV.HandleCPU = CD3DX12_CPU_DESCRIPTOR_HANDLE(gRTVHeap->GetCPUDescriptorHandleForHeapStart(), SWAP_CHAIN_BUFFER_COUNT, gRTVSize);
 
-        if (!allocSuccess)
+        if (!success)
         {
             Printf("Error: Failed to allocate on the SRV heap for offscreen render target!\n");
             return false;
@@ -427,10 +405,10 @@ namespace Muon
         srvDesc.Texture2D.MostDetailedMip = 0;
         srvDesc.Texture2D.MipLevels = 1;
 
-        pDevice->CreateShaderResourceView(gOffscreenTarget.mpResource.Get(), &srvDesc, gOffscreenTarget.mhCpuSrv);
-        pDevice->CreateRenderTargetView(gOffscreenTarget.mpResource.Get(), nullptr, gOffscreenTarget.mhCpuRtv);
+        pDevice->CreateShaderResourceView(gOffscreenTarget.mpResource.Get(), &srvDesc, gOffscreenTarget.mViewSRV.HandleCPU);
+        pDevice->CreateRenderTargetView(gOffscreenTarget.mpResource.Get(), nullptr, gOffscreenTarget.mViewRTV.HandleCPU);
 
-        return true;
+        return success;
     }
 
     bool CreateDepthStencilBuffer(ID3D12Device* pDevice, ID3D12GraphicsCommandList* pCommandList, ID3D12CommandQueue* pCommandQueue, int width, int height, Microsoft::WRL::ComPtr<ID3D12Resource>& out_depthStencilBuffer)
@@ -798,7 +776,7 @@ namespace Muon
         {
             gSwapChainBuffers[i].Reset();
         }
-        gOffscreenTarget.mpResource.Reset();
+        gOffscreenTarget.Destroy();
 
         gDepthStencilBuffer.Reset();
         gRTVHeap.Reset();

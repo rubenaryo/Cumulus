@@ -108,7 +108,6 @@ void ResourceCodex::Destroy()
         tex.Destroy();
     }
     gCodexInstance->mTextureMap.clear();
-    //gCodexInstance->mSRVDescriptorHeap.Destroy();
 
     delete gCodexInstance;
     gCodexInstance = nullptr;
