@@ -59,7 +59,7 @@ void ResourceCodex::Init()
     gCodexInstance = new ResourceCodex();
     gCodexInstance->mMeshStagingBuffer.Create(L"Mesh Staging Buffer", 64 * 1024 * 1024);
     gCodexInstance->mMaterialParamsStagingBuffer.Create(L"Material Params Staging Buffer", sizeof(cbMaterialParams));
-    gCodexInstance->m3DTextureStagingBuffer.Create(L"NVDF Staging Buffer", 512 * 512 * 128 * 4);
+    gCodexInstance->m3DTextureStagingBuffer.Create(L"NVDF Staging Buffer", 512 * 512 * 128 * 4 * sizeof(float));
 
     ShaderFactory::LoadAllShaders(*gCodexInstance);
     TextureFactory::LoadAllTextures(GetDevice(), GetCommandList(), *gCodexInstance);

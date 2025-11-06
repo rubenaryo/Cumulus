@@ -226,7 +226,7 @@ bool TextureFactory::Upload3DTextureFromData(const wchar_t* textureName, void* d
     const size_t floatsPerPixel = bytesPerPixel / sizeof(float);
     assert(floatsPerPixel == 4); // any size is fine as long as it's 4
 
-    const size_t dataSize = width * height * depth * floatsPerPixel;
+    const size_t dataSize = width * height * depth * bytesPerPixel;
 
     UploadBuffer& stagingBuffer = codex.Get3DTextureStagingBuffer();
     assert(dataSize <= stagingBuffer.GetBufferSize());
@@ -477,10 +477,13 @@ void TextureFactory::LoadTexturesForNVDF(std::filesystem::path directoryPath, ID
         {
             size_t baseIndex = sliceOffset + j * CHANNELS_PER_VOXEL;
 
-            float fR = fPixels[j * fBytes]     / 255.0f; // R = field_data.R
-            float mR = mPixels[j * mBytes + 0] / 255.0f; // G = modeling_data.R
-            float mG = mPixels[j * mBytes + 1] / 255.0f; // B = modeling_data.G
-            float mB = mPixels[j * mBytes + 2] / 255.0f; // A = modeling_data.B
+            // account for TGA padding
+            size_t x = j % width;
+            size_t y = j / width;
+            float fR = fPixels[y * fImg->rowPitch + x * fBytes] / 255.0f;
+            float mR = mPixels[y * mImg->rowPitch + x * mBytes + 0] / 255.0f;
+            float mG = mPixels[y * mImg->rowPitch + x * mBytes + 1] / 255.0f;
+            float mB = mPixels[y * mImg->rowPitch + x * mBytes + 2] / 255.0f;
 
             outData[baseIndex + 0] = fR;
             outData[baseIndex + 1] = mR;
@@ -553,6 +556,7 @@ bool MaterialFactory::CreateAllMaterials(ResourceCodex& codex)
 {
     const TextureID kRockDiffuseId = fnv1a(L"Rock_T.png");
     const TextureID kRockNormalId = fnv1a(L"Rock_N.png");
+    const TextureID kTestNVDFId = fnv1a(L"StormbirdCloud_NVDF");
     {
         const wchar_t* kPhongMaterialName = L"Phong";
         Material* pPhongMaterial = codex.InsertMaterialType(kPhongMaterialName);
@@ -570,6 +574,7 @@ bool MaterialFactory::CreateAllMaterials(ResourceCodex& codex)
 
         pPhongMaterial->SetTextureParam("diffuseTexture",   kRockDiffuseId);
         pPhongMaterial->SetTextureParam("normalMap",        kRockNormalId);
+        pPhongMaterial->SetTextureParam("testNVDF",         kTestNVDFId);
     }
 
 
