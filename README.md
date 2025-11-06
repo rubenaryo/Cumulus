@@ -13,7 +13,7 @@ To generate a Visual Studio solution, simply run generate_vs2022.bat on Windows.
 This project is built using MSVC with the Visual Studio 2022 toolset (v143) for the C++17 standard.
 
 ## Dependencies
-* [DirectX Toolkit 12](https://github.com/microsoft/DirectXTK12)
+* [DirectX Tex](https://github.com/microsoft/DirectXTex/)
   * Reading image files for texture generation
 * [Assimp 3.0.0](http://www.assimp.org/)
   * Loading 3D Models
