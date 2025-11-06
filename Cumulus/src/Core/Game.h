@@ -52,6 +52,7 @@ private:
 
     Muon::GraphicsPass mOpaquePass;
     Muon::ComputePass mSobelPass;
+    Muon::ComputePass mRaymarchPass;
     Muon::GraphicsPass mCompositePass;
 
     // TEMP: For testing

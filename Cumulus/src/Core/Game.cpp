@@ -23,6 +23,7 @@ Game::Game() :
     mCamera(),
     mOpaquePass(L"OpaquePass"),
     mSobelPass(L"SobelPass"),
+    mRaymarchPass(L"RaymarchPass"),
     mCompositePass(L"CompositePass")
 {
     mTimer.SetFixedTimeStep(false);
@@ -42,6 +43,7 @@ bool Game::Init(HWND window, int width, int height)
     const ShaderID kPhongVSID = fnv1a(L"Phong.vs");
     const ShaderID kPhongPSID = fnv1a(L"Phong.ps");    
     const ShaderID kSobelCSID = fnv1a(L"Sobel.cs");
+    const ShaderID kRaymarchCSID = fnv1a(L"Raymarch.cs");
     const ShaderID kCompositeVSID = fnv1a(L"Composite.vs");
     const ShaderID kCompositePSID = fnv1a(L"Composite.ps");
     const VertexShader* pPhongVS = codex.GetVertexShader(kPhongVSID);
@@ -358,6 +360,7 @@ Game::~Game()
     mInput.Destroy();
     mOpaquePass.Destroy();
     mSobelPass.Destroy();
+    mRaymarchPass.Destroy();
     mCompositePass.Destroy();
 
     Muon::ResourceCodex::Destroy();
