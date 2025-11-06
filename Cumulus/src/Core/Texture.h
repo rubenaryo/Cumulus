@@ -36,6 +36,7 @@ public:
         D3D12_CLEAR_VALUE* pClearValue = nullptr);
 
     bool InitSRV(ID3D12Device* pDevice, DescriptorHeap* pSRVHeap);
+    bool InitUAV(ID3D12Device* pDevice, DescriptorHeap* pSRVHeap);
 
     bool Destroy();
 

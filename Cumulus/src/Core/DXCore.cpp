@@ -407,47 +407,29 @@ namespace Muon
         if (!success)
             return false;
 
-        success &= gSRVHeap->Allocate(gOffscreenTarget.mViewSRV.HandleCPU, gOffscreenTarget.mViewSRV.HandleGPU);
-        gOffscreenTarget.mViewRTV.HandleCPU = CD3DX12_CPU_DESCRIPTOR_HANDLE(gRTVHeap->GetCPUDescriptorHandleForHeapStart(), SWAP_CHAIN_BUFFER_COUNT, gRTVSize);
-
+        success &= gOffscreenTarget.InitSRV(pDevice, gSRVHeap);
         if (!success)
         {
             Printf("Error: Failed to allocate on the SRV heap for offscreen render target!\n");
             return false;
         }
 
-        D3D12_SHADER_RESOURCE_VIEW_DESC srvDesc = {};
-        srvDesc.Shader4ComponentMapping = D3D12_DEFAULT_SHADER_4_COMPONENT_MAPPING;
-        srvDesc.Format = format;
-        srvDesc.ViewDimension = D3D12_SRV_DIMENSION_TEXTURE2D;
-        srvDesc.Texture2D.MostDetailedMip = 0;
-        srvDesc.Texture2D.MipLevels = 1;
-
-        pDevice->CreateShaderResourceView(gOffscreenTarget.mpResource.Get(), &srvDesc, gOffscreenTarget.mViewSRV.HandleCPU);
+        gOffscreenTarget.mViewRTV.HandleCPU = CD3DX12_CPU_DESCRIPTOR_HANDLE(gRTVHeap->GetCPUDescriptorHandleForHeapStart(), SWAP_CHAIN_BUFFER_COUNT, gRTVSize);
         pDevice->CreateRenderTargetView(gOffscreenTarget.mpResource.Get(), nullptr, gOffscreenTarget.mViewRTV.HandleCPU);
 
         /// Sobel Output 
-
         success &= gComputeOutput.Create(L"SobelOutput", pDevice, width, height, 1, format, D3D12_RESOURCE_FLAG_ALLOW_UNORDERED_ACCESS, D3D12_RESOURCE_STATE_GENERIC_READ);
         if (!success)
             return false;
 
-        success &= gSRVHeap->Allocate(gComputeOutput.mViewSRV.HandleCPU, gComputeOutput.mViewSRV.HandleGPU);
+        success &= gComputeOutput.InitSRV(pDevice, gSRVHeap);
         if (!success)
             return false;
         
-        success &= gSRVHeap->Allocate(gComputeOutput.mViewUAV.HandleCPU, gComputeOutput.mViewUAV.HandleGPU);
+        success &= gComputeOutput.InitUAV(pDevice, gSRVHeap);
         if (!success)
             return false;
 
-        D3D12_UNORDERED_ACCESS_VIEW_DESC uavDesc = {};
-        uavDesc.Format = format;
-        uavDesc.ViewDimension = D3D12_UAV_DIMENSION_TEXTURE2D;
-        uavDesc.Texture2D.MipSlice = 0;
-        
-        pDevice->CreateShaderResourceView(gComputeOutput.mpResource.Get(), &srvDesc, gComputeOutput.mViewSRV.HandleCPU);
-        pDevice->CreateUnorderedAccessView(gComputeOutput.mpResource.Get(), nullptr, &uavDesc, gComputeOutput.mViewUAV.HandleCPU);
-        
         return success;
     }
 
