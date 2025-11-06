@@ -7,8 +7,11 @@ Description : Implementation of GPU Buffers
 #include <d3dx12.h>
 #include <Core/DXCore.h>
 #include <Core/Buffers.h>
+#include <Core/Texture.h>
 #include <Core/ThrowMacros.h>
 #include <Utils/Utils.h>
+
+#include <DirectXTex.h>
 
 namespace Muon
 {
@@ -146,6 +149,33 @@ bool UploadBuffer::Allocate(UINT desiredSize, UINT alignment, void*& out_mappedP
 	// Adjust write head
 	mOffset = aligned + desiredSize;
 
+	return true;
+}
+
+bool UploadBuffer::UploadToTexture(MuonTexture& dstTexture, void* data, ID3D12GraphicsCommandList* pCommandList)
+{
+	if (!dstTexture.mpResource.Get())
+		return false; // There is nowhere to copy to.
+
+	const size_t bitsPerPixel = DirectX::BitsPerPixel(dstTexture.mFormat);
+	const size_t bytesPerPixel = bitsPerPixel / 8;
+
+	// schedule a copy through the staging buffer into the main resource
+	D3D12_SUBRESOURCE_DATA subresourceData = {};
+	subresourceData.pData = data;
+	subresourceData.RowPitch = dstTexture.mWidth * bytesPerPixel; // bytes per row
+	subresourceData.SlicePitch = dstTexture.mWidth * dstTexture.mHeight * bytesPerPixel; // bytes per slice
+
+	UpdateSubresources<1>(pCommandList, dstTexture.mpResource.Get(), this->GetResource(), 0, 0, 1, &subresourceData);
+
+	// This barrier transitions the resource state to be srv-ready
+	CD3DX12_RESOURCE_BARRIER barrier = CD3DX12_RESOURCE_BARRIER::Transition(
+		dstTexture.mpResource.Get(),
+		D3D12_RESOURCE_STATE_COPY_DEST,
+		D3D12_RESOURCE_STATE_PIXEL_SHADER_RESOURCE
+	);
+	pCommandList->ResourceBarrier(1, &barrier);
+	
 	return true;
 }
 

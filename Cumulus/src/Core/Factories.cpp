@@ -14,9 +14,6 @@
 // TextureFactory
 #include "Material.h"
 #include <filesystem>
-#include <DDSTextureLoader.h>
-#include <WICTextureLoader.h>
-#include <ResourceUploadBatch.h>
 #include <DirectXTex.h>
 #include <Core/Texture.h>
 
@@ -224,9 +221,6 @@ bool TextureFactory::Upload3DTextureFromData(const wchar_t* textureName, void* d
 {
     const size_t bitsPerPixel = DirectX::BitsPerPixel(fmt);
     const size_t bytesPerPixel = bitsPerPixel / 8;
-    const size_t floatsPerPixel = bytesPerPixel / sizeof(float);
-    assert(floatsPerPixel == 4); // any size is fine as long as it's 4
-
     const size_t dataSize = width * height * depth * bytesPerPixel;
 
     UploadBuffer& stagingBuffer = codex.Get3DTextureStagingBuffer();
@@ -235,50 +229,17 @@ bool TextureFactory::Upload3DTextureFromData(const wchar_t* textureName, void* d
     TextureID hash = fnv1a(textureName);
     MuonTexture& tex = codex.InsertTexture(hash);
 
-    D3D12_RESOURCE_DESC texDesc = {};
-    texDesc.Dimension = D3D12_RESOURCE_DIMENSION_TEXTURE3D;
-    texDesc.Alignment = 0;
-    texDesc.Width = width;
-    texDesc.Height = height;
-    texDesc.DepthOrArraySize = depth;
-    texDesc.MipLevels = 1;
-    texDesc.Format = fmt;
-    texDesc.SampleDesc.Count = 1;
-    texDesc.SampleDesc.Quality = 0;
-    texDesc.Layout = D3D12_TEXTURE_LAYOUT_UNKNOWN;
-    texDesc.Flags = D3D12_RESOURCE_FLAG_NONE;
-
-    // Create default heap resource
-    HRESULT hr = pDevice->CreateCommittedResource(
-        &CD3DX12_HEAP_PROPERTIES(D3D12_HEAP_TYPE_DEFAULT),
-        D3D12_HEAP_FLAG_NONE,
-        &texDesc,
-        D3D12_RESOURCE_STATE_COPY_DEST,
-        nullptr,
-        IID_PPV_ARGS(&tex.mpResource));
-    COM_EXCEPT(hr);
-
-    if (FAILED(hr))
+    if (!tex.Create(textureName, pDevice, width, height, depth, fmt, D3D12_RESOURCE_FLAG_NONE, D3D12_RESOURCE_STATE_COPY_DEST))
     {
         Muon::Printf(L"Error: Failed to create default heap resource for 3d texture %s!\n", textureName);
         return false;
     }
 
-    // schedule a copy through the staging buffer into the main resource
-    D3D12_SUBRESOURCE_DATA subresourceData = {};
-    subresourceData.pData = data;
-    subresourceData.RowPitch = width * floatsPerPixel * sizeof(float); // bytes per row
-    subresourceData.SlicePitch = width * height * floatsPerPixel * sizeof(float); // bytes per slice
-
-    UpdateSubresources<1>(pCommandList, tex.mpResource.Get(), stagingBuffer.GetResource(), 0, 0, 1, &subresourceData);
-    
-    // This barrier transitions the resource state to be srv-ready
-    CD3DX12_RESOURCE_BARRIER barrier = CD3DX12_RESOURCE_BARRIER::Transition(
-        tex.mpResource.Get(),
-        D3D12_RESOURCE_STATE_COPY_DEST,
-        D3D12_RESOURCE_STATE_PIXEL_SHADER_RESOURCE
-    );
-    pCommandList->ResourceBarrier(1, &barrier);
+    if (!stagingBuffer.UploadToTexture(tex, data, pCommandList))
+    {
+        Muon::Printf(L"Error: Failed to create default heap resource for 3d texture %s!\n", textureName);
+        return false;
+    }
 
     return CreateSRV(pDevice, tex.mpResource.Get(), D3D12_SRV_DIMENSION_TEXTURE3D, tex);
 }
@@ -294,10 +255,7 @@ void TextureFactory::LoadAllTextures(ID3D12Device* pDevice, ID3D12GraphicsComman
         throw std::exception("Textures folder doesn't exist!");
 #endif
 
-    // NOTE: This has a known memory leak in the DXTK
-    DirectX::ResourceUploadBatch* pResourceUpload = new DirectX::ResourceUploadBatch(pDevice);
-
-    pResourceUpload->Begin();
+    UploadBuffer& stagingBuffer = codex.Get2DTextureStagingBuffer();
 
     for (const auto& entry : fs::directory_iterator(texturePath))
     {
@@ -317,20 +275,24 @@ void TextureFactory::LoadAllTextures(ID3D12Device* pDevice, ID3D12GraphicsComman
         TextureID tid = fnv1a(name.c_str());
         MuonTexture& tex = codex.InsertTexture(tid);
 
-        HRESULT hr = DirectX::CreateWICTextureFromFile(
-            pDevice,
-            *pResourceUpload,
-            path.c_str(),
-            tex.mpResource.GetAddressOf()
-        );
-
-        //DirectX::ScratchImage scratchImg;
-        //DirectX::LoadFromWICFile(path.c_str(), DirectX::WIC_FLAGS_NONE, nullptr, scratchImg, nullptr);
-        //const DirectX::Image* pImage = scratchImg.GetImage(0, 0, 0);
-
+        DirectX::ScratchImage scratchImg;
+        HRESULT hr = DirectX::LoadFromWICFile(path.c_str(), DirectX::WIC_FLAGS_NONE, nullptr, scratchImg, nullptr);
         if (FAILED(hr))
         {
             Muon::Printf(L"Error: Failed to load texture %s: 0x%08X\n", path.c_str(), hr);
+            continue;
+        }
+
+        const DirectX::Image* pImage = scratchImg.GetImage(0, 0, 0);
+        if (!pImage || !tex.Create(name.c_str(), pDevice, pImage->width, pImage->height, 1, pImage->format, D3D12_RESOURCE_FLAG_NONE, D3D12_RESOURCE_STATE_COPY_DEST))
+        {
+            Muon::Printf(L"Error: Failed to create texture on default heap %s: 0x%08X\n", path.c_str(), hr);
+            continue;
+        }
+
+        if (!stagingBuffer.UploadToTexture(tex, pImage->pixels, pCommandList))
+        {
+            Muon::Printf(L"Error: Failed to upload data to texture %s: 0x%08X\n", path.c_str(), hr);
             continue;
         }
 
@@ -340,12 +302,6 @@ void TextureFactory::LoadAllTextures(ID3D12Device* pDevice, ID3D12GraphicsComman
             continue;
         }
     }
-
-    auto uploadResourcesFinished = pResourceUpload->End(Muon::GetCommandQueue());
-    uploadResourcesFinished.wait();
-
-    delete pResourceUpload;
-    FlushCommandQueue();
 }
 
 // Extracts index from tga file name. ie: field_data.#.tga

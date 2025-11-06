@@ -48,6 +48,7 @@ public:
     const MuonTexture* GetTexture(TextureID UID) const;
     UploadBuffer& GetMeshStagingBuffer() { return mMeshStagingBuffer; }
     UploadBuffer& GetMatParamsStagingBuffer() { return mMaterialParamsStagingBuffer; }
+    UploadBuffer& Get2DTextureStagingBuffer() { return m2DTextureStagingBuffer; }
     UploadBuffer& Get3DTextureStagingBuffer() { return m3DTextureStagingBuffer; }
 
 private:
@@ -61,6 +62,7 @@ private:
     // An intermediate upload buffer used for uploading vertex/index data to the GPU
     UploadBuffer mMeshStagingBuffer;
     UploadBuffer mMaterialParamsStagingBuffer;
+    UploadBuffer m2DTextureStagingBuffer;
     UploadBuffer m3DTextureStagingBuffer;
 
 private:
@@ -68,7 +70,6 @@ private:
     MuonTexture& InsertTexture(TextureID hash);
 
     friend struct MaterialFactory;
-    //MaterialIndex PushMaterial(const Material& material);
     Material* InsertMaterialType(const wchar_t* name);
 
     friend struct ShaderFactory;

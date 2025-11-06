@@ -18,8 +18,10 @@ bool MuonTexture::Create(const wchar_t* name, ID3D12Device* pDevice, UINT width,
     mHeight = height;
     mFormat = format;
 
+    bool is3D = depth > 1;
+
     D3D12_RESOURCE_DESC desc = {};
-    desc.Dimension = D3D12_RESOURCE_DIMENSION_TEXTURE2D;
+    desc.Dimension = is3D ? D3D12_RESOURCE_DIMENSION_TEXTURE3D : D3D12_RESOURCE_DIMENSION_TEXTURE2D;
     desc.Alignment = 0;
     desc.Width = width;
     desc.Height = height;
