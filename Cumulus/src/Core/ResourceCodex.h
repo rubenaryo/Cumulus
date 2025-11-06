@@ -28,30 +28,6 @@ struct TextureFactory;
 namespace Muon
 {
 
-struct Texture
-{
-    Microsoft::WRL::ComPtr<ID3D12Resource> pResource;
-    D3D12_CPU_DESCRIPTOR_HANDLE CPUHandle = { 0 };
-    D3D12_GPU_DESCRIPTOR_HANDLE GPUHandle = { 0 };
-
-    UINT Width = 0;
-    UINT Height = 0;
-    UINT Depth = 0;
-    DXGI_FORMAT Format = DXGI_FORMAT_UNKNOWN;
-
-    bool IsValid() const { return pResource != nullptr && GPUHandle.ptr != 0; }
-    void Destroy()
-    {     
-        pResource.Reset();
-        CPUHandle = { 0 };
-        GPUHandle = { 0 };
-        Width = 0;
-        Height = 0;
-        Depth = 0;
-        Format = DXGI_FORMAT_UNKNOWN;
-    }
-};
-
 class alignas(8) ResourceCodex
 {
 public:
@@ -69,7 +45,7 @@ public:
     const PixelShader* GetPixelShader(ShaderID UID) const;
     const ComputeShader* GetComputeShader(ShaderID UID) const;
     const Material* GetMaterialType(MaterialID UID) const;
-    const Texture* GetTexture(TextureID UID) const;
+    const MuonTexture* GetTexture(TextureID UID) const;
     UploadBuffer& GetMeshStagingBuffer() { return mMeshStagingBuffer; }
     UploadBuffer& GetMatParamsStagingBuffer() { return mMaterialParamsStagingBuffer; }
     UploadBuffer& Get3DTextureStagingBuffer() { return m3DTextureStagingBuffer; }
@@ -79,7 +55,7 @@ private:
     std::unordered_map<ShaderID, PixelShader>   mPixelShaders;
     std::unordered_map<ShaderID, ComputeShader> mComputeShaders;
     std::unordered_map<MeshID, Mesh>            mMeshMap;
-    std::unordered_map<TextureID, Texture>      mTextureMap;
+    std::unordered_map<TextureID, MuonTexture>  mTextureMap;
     std::unordered_map<MaterialID, Material>    mMaterialMap;
 
     // An intermediate upload buffer used for uploading vertex/index data to the GPU
@@ -89,7 +65,7 @@ private:
 
 private:
     friend struct TextureFactory;
-    Texture& InsertTexture(TextureID hash);
+    MuonTexture& InsertTexture(TextureID hash);
 
     friend struct MaterialFactory;
     //MaterialIndex PushMaterial(const Material& material);

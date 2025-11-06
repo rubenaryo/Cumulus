@@ -18,6 +18,7 @@
 #include <WICTextureLoader.h>
 #include <ResourceUploadBatch.h>
 #include <DirectXTex.h>
+#include <Core/Texture.h>
 
 #include <Core/DXCore.h>
 #include <Utils/Utils.h>
@@ -232,7 +233,7 @@ bool TextureFactory::Upload3DTextureFromData(const wchar_t* textureName, void* d
     assert(dataSize <= stagingBuffer.GetBufferSize());
 
     TextureID hash = fnv1a(textureName);
-    Texture& tex = codex.InsertTexture(hash);
+    MuonTexture& tex = codex.InsertTexture(hash);
 
     D3D12_RESOURCE_DESC texDesc = {};
     texDesc.Dimension = D3D12_RESOURCE_DIMENSION_TEXTURE3D;
@@ -254,7 +255,7 @@ bool TextureFactory::Upload3DTextureFromData(const wchar_t* textureName, void* d
         &texDesc,
         D3D12_RESOURCE_STATE_COPY_DEST,
         nullptr,
-        IID_PPV_ARGS(&tex.pResource));
+        IID_PPV_ARGS(&tex.mpResource));
     COM_EXCEPT(hr);
 
     if (FAILED(hr))
@@ -269,17 +270,17 @@ bool TextureFactory::Upload3DTextureFromData(const wchar_t* textureName, void* d
     subresourceData.RowPitch = width * floatsPerPixel * sizeof(float); // bytes per row
     subresourceData.SlicePitch = width * height * floatsPerPixel * sizeof(float); // bytes per slice
 
-    UpdateSubresources<1>(pCommandList, tex.pResource.Get(), stagingBuffer.GetResource(), 0, 0, 1, &subresourceData);
+    UpdateSubresources<1>(pCommandList, tex.mpResource.Get(), stagingBuffer.GetResource(), 0, 0, 1, &subresourceData);
     
     // This barrier transitions the resource state to be srv-ready
     CD3DX12_RESOURCE_BARRIER barrier = CD3DX12_RESOURCE_BARRIER::Transition(
-        tex.pResource.Get(),
+        tex.mpResource.Get(),
         D3D12_RESOURCE_STATE_COPY_DEST,
         D3D12_RESOURCE_STATE_PIXEL_SHADER_RESOURCE
     );
     pCommandList->ResourceBarrier(1, &barrier);
 
-    return CreateSRV(pDevice, tex.pResource.Get(), D3D12_SRV_DIMENSION_TEXTURE3D, tex);
+    return CreateSRV(pDevice, tex.mpResource.Get(), D3D12_SRV_DIMENSION_TEXTURE3D, tex);
 }
 
 // Loads all the textures from the directory and returns them as out params to the ResourceCodex
@@ -314,14 +315,18 @@ void TextureFactory::LoadAllTextures(ID3D12Device* pDevice, ID3D12GraphicsComman
             continue;
 
         TextureID tid = fnv1a(name.c_str());
-        Texture& tex = codex.InsertTexture(tid);
+        MuonTexture& tex = codex.InsertTexture(tid);
 
         HRESULT hr = DirectX::CreateWICTextureFromFile(
             pDevice,
             *pResourceUpload,
             path.c_str(),
-            tex.pResource.GetAddressOf()
+            tex.mpResource.GetAddressOf()
         );
+
+        //DirectX::ScratchImage scratchImg;
+        //DirectX::LoadFromWICFile(path.c_str(), DirectX::WIC_FLAGS_NONE, nullptr, scratchImg, nullptr);
+        //const DirectX::Image* pImage = scratchImg.GetImage(0, 0, 0);
 
         if (FAILED(hr))
         {
@@ -329,7 +334,7 @@ void TextureFactory::LoadAllTextures(ID3D12Device* pDevice, ID3D12GraphicsComman
             continue;
         }
 
-        if (!CreateSRV(pDevice, tex.pResource.Get(), D3D12_SRV_DIMENSION_TEXTURE2D, tex))
+        if (!CreateSRV(pDevice, tex.mpResource.Get(), D3D12_SRV_DIMENSION_TEXTURE2D, tex))
         {
             Muon::Printf(L"Error: Failed to create D3D12 Resource and SRV for %s!\n", path.c_str());
             continue;
@@ -524,21 +529,21 @@ void TextureFactory::LoadAllNVDF(ID3D12Device* pDevice, ID3D12GraphicsCommandLis
     }
 }
 
-bool TextureFactory::CreateSRV(ID3D12Device* pDevice, ID3D12Resource* pResource, D3D12_SRV_DIMENSION dim, Texture& outTexture)
+bool TextureFactory::CreateSRV(ID3D12Device* pDevice, ID3D12Resource* pResource, D3D12_SRV_DIMENSION dim, MuonTexture& outTexture)
 {
     if (!pResource)
         return false;
 
     // Allocate descriptor
     DescriptorHeap* pSRVHeap = Muon::GetSRVHeap();
-    if (!pSRVHeap || !pSRVHeap->Allocate(outTexture.CPUHandle, outTexture.GPUHandle))
+    if (!pSRVHeap || !pSRVHeap->Allocate(outTexture.mViewSRV.HandleCPU, outTexture.mViewSRV.HandleGPU))
         return false;
 
     D3D12_RESOURCE_DESC resourceDesc = pResource->GetDesc();
-    outTexture.Width = static_cast<UINT>(resourceDesc.Width);
-    outTexture.Height = resourceDesc.Height;
-    outTexture.Depth = resourceDesc.DepthOrArraySize;
-    outTexture.Format = resourceDesc.Format;
+    outTexture.mWidth = static_cast<UINT>(resourceDesc.Width);
+    outTexture.mHeight = resourceDesc.Height;
+    outTexture.mDepth = resourceDesc.DepthOrArraySize;
+    outTexture.mFormat = resourceDesc.Format;
 
     D3D12_SHADER_RESOURCE_VIEW_DESC srvDesc = {};
     srvDesc.Shader4ComponentMapping = D3D12_DEFAULT_SHADER_4_COMPONENT_MAPPING;
@@ -547,7 +552,7 @@ bool TextureFactory::CreateSRV(ID3D12Device* pDevice, ID3D12Resource* pResource,
     srvDesc.Texture2D.MipLevels = resourceDesc.MipLevels;
     srvDesc.Texture2D.MostDetailedMip = 0;
 
-    pDevice->CreateShaderResourceView(pResource, &srvDesc, outTexture.CPUHandle);
+    pDevice->CreateShaderResourceView(pResource, &srvDesc, outTexture.mViewSRV.HandleCPU);
 
     return true;
 }

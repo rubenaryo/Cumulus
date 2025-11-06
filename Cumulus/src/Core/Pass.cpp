@@ -9,6 +9,7 @@ Description : Wraps compute pass functionality
 #include <Core/RootSignatureBuilder.h>
 #include <Core/ResourceCodex.h>
 #include <Core/ShaderUtils.h>
+#include <Core/Texture.h>
 
 namespace Muon
 {
@@ -140,15 +141,15 @@ bool Pass::BindMaterial(const Material& material, ID3D12GraphicsCommandList* pCo
     for (auto texPair : textureParams)
     {
         TextureID texId = texPair.second;
-        const Texture* pTex = codex.GetTexture(texId);
-        if (!pTex || !pTex->pResource)
+        const MuonTexture* pTex = codex.GetTexture(texId);
+        if (!pTex || !pTex->mpResource.Get())
             continue;
 
         int32_t texRootParamIndex = GetResourceRootIndex(texPair.first.c_str());
         if (texRootParamIndex == ROOTIDX_INVALID)
             continue;
 
-        pCommandList->SetGraphicsRootDescriptorTable(texRootParamIndex, pTex->GPUHandle);
+        pCommandList->SetGraphicsRootDescriptorTable(texRootParamIndex, pTex->mViewSRV.HandleGPU);
     }
 
     return true;

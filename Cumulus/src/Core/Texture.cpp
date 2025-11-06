@@ -9,10 +9,11 @@ Description : Wraps texture resource management
 namespace Muon
 {
 
-bool MuonTexture::Create(ID3D12Device* pDevice, UINT width, UINT height, 
+bool MuonTexture::Create(const wchar_t* name, ID3D12Device* pDevice, UINT width, UINT height, UINT depth,
     DXGI_FORMAT format, D3D12_RESOURCE_FLAGS flags, D3D12_RESOURCE_STATES initialState,
     D3D12_CLEAR_VALUE* pClearValue)
 {
+    mName = name;
     mWidth = width;
     mHeight = height;
     mFormat = format;
@@ -22,7 +23,7 @@ bool MuonTexture::Create(ID3D12Device* pDevice, UINT width, UINT height,
     desc.Alignment = 0;
     desc.Width = width;
     desc.Height = height;
-    desc.DepthOrArraySize = 1;
+    desc.DepthOrArraySize = depth;
     desc.MipLevels = 1;
     desc.Format = format;
     desc.SampleDesc.Count = 1;

@@ -26,8 +26,8 @@ struct TextureView
 class MuonTexture
 {
 public:
-    MuonTexture(const wchar_t* name) : mName(name) {}
-    bool Create(ID3D12Device* pDevice, UINT width, UINT height,
+    //MuonTexture(const wchar_t* name) : mName(name) {}
+    bool Create(const wchar_t* name, ID3D12Device* pDevice, UINT width, UINT height, UINT depth,
         DXGI_FORMAT format, D3D12_RESOURCE_FLAGS flags, D3D12_RESOURCE_STATES initialState,
         D3D12_CLEAR_VALUE* pClearValue = nullptr);
     bool Destroy();
@@ -38,6 +38,7 @@ public:
 
     UINT mWidth = 0;
     UINT mHeight = 0;
+    UINT mDepth = 0;
     DXGI_FORMAT mFormat = DXGI_FORMAT_UNKNOWN;
 
     Microsoft::WRL::ComPtr<ID3D12Resource> mpResource;

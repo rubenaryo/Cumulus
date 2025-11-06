@@ -58,8 +58,8 @@ namespace Muon
     Microsoft::WRL::ComPtr<ID3D12Resource> gDepthStencilBuffer;
 
     // TODO: Rather than live here, they should be manual entries in the codex
-    MuonTexture gOffscreenTarget(L"Offscreen Target");
-    MuonTexture gComputeOutput(L"Sobel Output");
+    MuonTexture gOffscreenTarget;
+    MuonTexture gComputeOutput;
 
     D3D12_VIEWPORT gViewport = { 0 };
 
@@ -403,7 +403,7 @@ namespace Muon
         gClearValue.Color[2] = 0.4f;
         gClearValue.Color[3] = 1.0f;
 
-        success &= gOffscreenTarget.Create(pDevice, width, height, format, D3D12_RESOURCE_FLAG_ALLOW_RENDER_TARGET, D3D12_RESOURCE_STATE_GENERIC_READ, &gClearValue);
+        success &= gOffscreenTarget.Create(L"OffscreenTarget", pDevice, width, height, 1, format, D3D12_RESOURCE_FLAG_ALLOW_RENDER_TARGET, D3D12_RESOURCE_STATE_GENERIC_READ, &gClearValue);
         if (!success)
             return false;
 
@@ -428,7 +428,7 @@ namespace Muon
 
         /// Sobel Output 
 
-        success &= gComputeOutput.Create(pDevice, width, height, format, D3D12_RESOURCE_FLAG_ALLOW_UNORDERED_ACCESS, D3D12_RESOURCE_STATE_GENERIC_READ);
+        success &= gComputeOutput.Create(L"SobelOutput", pDevice, width, height, 1, format, D3D12_RESOURCE_FLAG_ALLOW_UNORDERED_ACCESS, D3D12_RESOURCE_STATE_GENERIC_READ);
         if (!success)
             return false;
 
