@@ -241,7 +241,13 @@ bool TextureFactory::Upload3DTextureFromData(const wchar_t* textureName, void* d
         return false;
     }
 
-    return CreateSRV(pDevice, tex.mpResource.Get(), D3D12_SRV_DIMENSION_TEXTURE3D, tex);
+    if (!tex.InitSRV(pDevice, Muon::GetSRVHeap()))
+    {
+        Muon::Printf(L"Error: Failed to create create D3D12 Resource and SRV for 3d texture %s!\n", textureName);
+        return false;
+    }
+
+    return true;
 }
 
 // Loads all the textures from the directory and returns them as out params to the ResourceCodex
@@ -296,7 +302,7 @@ void TextureFactory::LoadAllTextures(ID3D12Device* pDevice, ID3D12GraphicsComman
             continue;
         }
 
-        if (!CreateSRV(pDevice, tex.mpResource.Get(), D3D12_SRV_DIMENSION_TEXTURE2D, tex))
+        if (!tex.InitSRV(pDevice, Muon::GetSRVHeap()))
         {
             Muon::Printf(L"Error: Failed to create D3D12 Resource and SRV for %s!\n", path.c_str());
             continue;
@@ -483,34 +489,6 @@ void TextureFactory::LoadAllNVDF(ID3D12Device* pDevice, ID3D12GraphicsCommandLis
 
         LoadTexturesForNVDF(entry.path(), pDevice, pCommandList, codex);
     }
-}
-
-bool TextureFactory::CreateSRV(ID3D12Device* pDevice, ID3D12Resource* pResource, D3D12_SRV_DIMENSION dim, Texture& outTexture)
-{
-    if (!pResource)
-        return false;
-
-    // Allocate descriptor
-    DescriptorHeap* pSRVHeap = Muon::GetSRVHeap();
-    if (!pSRVHeap || !pSRVHeap->Allocate(outTexture.mViewSRV.HandleCPU, outTexture.mViewSRV.HandleGPU))
-        return false;
-
-    D3D12_RESOURCE_DESC resourceDesc = pResource->GetDesc();
-    outTexture.mWidth = static_cast<UINT>(resourceDesc.Width);
-    outTexture.mHeight = resourceDesc.Height;
-    outTexture.mDepth = resourceDesc.DepthOrArraySize;
-    outTexture.mFormat = resourceDesc.Format;
-
-    D3D12_SHADER_RESOURCE_VIEW_DESC srvDesc = {};
-    srvDesc.Shader4ComponentMapping = D3D12_DEFAULT_SHADER_4_COMPONENT_MAPPING;
-    srvDesc.Format = resourceDesc.Format;
-    srvDesc.ViewDimension = dim;
-    srvDesc.Texture2D.MipLevels = resourceDesc.MipLevels;
-    srvDesc.Texture2D.MostDetailedMip = 0;
-
-    pDevice->CreateShaderResourceView(pResource, &srvDesc, outTexture.mViewSRV.HandleCPU);
-
-    return true;
 }
 
 bool MaterialFactory::CreateAllMaterials(ResourceCodex& codex)

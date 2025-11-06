@@ -10,6 +10,11 @@ Description : Wraps texture resource management
 
 namespace Muon
 {
+class DescriptorHeap;
+}
+
+namespace Muon
+{
 
 struct TextureView
 {
@@ -29,6 +34,9 @@ public:
     bool Create(const wchar_t* name, ID3D12Device* pDevice, UINT width, UINT height, UINT depth,
         DXGI_FORMAT format, D3D12_RESOURCE_FLAGS flags, D3D12_RESOURCE_STATES initialState,
         D3D12_CLEAR_VALUE* pClearValue = nullptr);
+
+    bool InitSRV(ID3D12Device* pDevice, DescriptorHeap* pSRVHeap);
+
     bool Destroy();
 
     TextureView mViewRTV;

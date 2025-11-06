@@ -4,6 +4,7 @@ Date : 2025/11
 Description : Wraps texture resource management
 ----------------------------------------------*/
 
+#include <Core/DescriptorHeap.h>
 #include <Core/Texture.h>
 
 namespace Muon
@@ -46,6 +47,31 @@ bool Texture::Create(const wchar_t* name, ID3D12Device* pDevice, UINT width, UIN
 
     mpResource->SetName(mName.c_str());
 
+    return true;
+}
+
+bool Texture::InitSRV(ID3D12Device* pDevice, DescriptorHeap* pSRVHeap)
+{
+    // Allocate descriptor
+    if (!pSRVHeap || !pSRVHeap->Allocate(mViewSRV.HandleCPU, mViewSRV.HandleGPU))
+        return false;
+
+    D3D12_RESOURCE_DESC resourceDesc = mpResource->GetDesc();
+    mWidth = static_cast<UINT>(resourceDesc.Width);
+    mHeight = resourceDesc.Height;
+    mDepth = resourceDesc.DepthOrArraySize;
+    mFormat = resourceDesc.Format;
+
+    bool is3D = mDepth > 1;
+
+    D3D12_SHADER_RESOURCE_VIEW_DESC srvDesc = {};
+    srvDesc.Shader4ComponentMapping = D3D12_DEFAULT_SHADER_4_COMPONENT_MAPPING;
+    srvDesc.Format = resourceDesc.Format;
+    srvDesc.ViewDimension = is3D ? D3D12_SRV_DIMENSION_TEXTURE3D : D3D12_SRV_DIMENSION_TEXTURE2D;
+    srvDesc.Texture2D.MipLevels = resourceDesc.MipLevels;
+    srvDesc.Texture2D.MostDetailedMip = 0;
+
+    pDevice->CreateShaderResourceView(mpResource.Get(), &srvDesc, mViewSRV.HandleCPU);
     return true;
 }
 
