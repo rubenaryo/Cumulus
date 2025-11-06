@@ -57,7 +57,7 @@ private:
     std::unordered_map<ShaderID, PixelShader>   mPixelShaders;
     std::unordered_map<ShaderID, ComputeShader> mComputeShaders;
     std::unordered_map<MeshID, Mesh>            mMeshMap;
-    std::unordered_map<TextureID, Texture>  mTextureMap;
+    std::unordered_map<TextureID, Texture>      mTextureMap;
     std::unordered_map<MaterialID, Material>    mMaterialMap;
 
     // An intermediate upload buffer used for uploading vertex/index data to the GPU
