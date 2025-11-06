@@ -15,8 +15,6 @@ Description : Loads and distributes all static resources (materials, textures, e
 #include <Core/Buffers.h>
 #include <Core/DescriptorHeap.h>
 
-#include <ResourceUploadBatch.h>
-
 #include <unordered_map>
 #include <memory>
 
@@ -38,6 +36,7 @@ struct Texture
 
     UINT Width = 0;
     UINT Height = 0;
+    UINT Depth = 0;
     DXGI_FORMAT Format = DXGI_FORMAT_UNKNOWN;
 
     bool IsValid() const { return pResource != nullptr && GPUHandle.ptr != 0; }
@@ -48,6 +47,7 @@ struct Texture
         GPUHandle = { 0 };
         Width = 0;
         Height = 0;
+        Depth = 0;
         Format = DXGI_FORMAT_UNKNOWN;
     }
 };
@@ -72,7 +72,7 @@ public:
     const Texture* GetTexture(TextureID UID) const;
     UploadBuffer& GetMeshStagingBuffer() { return mMeshStagingBuffer; }
     UploadBuffer& GetMatParamsStagingBuffer() { return mMaterialParamsStagingBuffer; }
-    DirectX::ResourceUploadBatch* GetUploadBatch() { return mTextureUploadBatch.get(); }
+    UploadBuffer& Get3DTextureStagingBuffer() { return m3DTextureStagingBuffer; }
 
 private:
     std::unordered_map<ShaderID, VertexShader>  mVertexShaders;
@@ -85,12 +85,12 @@ private:
     // An intermediate upload buffer used for uploading vertex/index data to the GPU
     UploadBuffer mMeshStagingBuffer;
     UploadBuffer mMaterialParamsStagingBuffer;
-    std::unique_ptr<DirectX::ResourceUploadBatch> mTextureUploadBatch;
+    UploadBuffer m3DTextureStagingBuffer;
 
 private:
     friend struct TextureFactory;
     Texture& InsertTexture(TextureID hash);
-    
+
     friend struct MaterialFactory;
     //MaterialIndex PushMaterial(const Material& material);
     Material* InsertMaterialType(const wchar_t* name);

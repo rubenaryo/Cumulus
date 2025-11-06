@@ -219,8 +219,71 @@ void ShaderFactory::LoadAllShaders(ResourceCodex& codex)
     }
 }
 
+bool TextureFactory::Upload3DTextureFromData(const wchar_t* textureName, void* data, size_t width, size_t height, size_t depth, DXGI_FORMAT fmt, ID3D12Device* pDevice, ID3D12GraphicsCommandList* pCommandList, ResourceCodex& codex)
+{
+    const size_t bitsPerPixel = DirectX::BitsPerPixel(fmt);
+    const size_t bytesPerPixel = bitsPerPixel / 8;
+    const size_t floatsPerPixel = bytesPerPixel / sizeof(float);
+    assert(floatsPerPixel == 4); // any size is fine as long as it's 4
+
+    const size_t dataSize = width * height * depth * floatsPerPixel;
+
+    UploadBuffer& stagingBuffer = codex.Get3DTextureStagingBuffer();
+    assert(dataSize <= stagingBuffer.GetBufferSize());
+
+    TextureID hash = fnv1a(textureName);
+    Texture& tex = codex.InsertTexture(hash);
+
+    D3D12_RESOURCE_DESC texDesc = {};
+    texDesc.Dimension = D3D12_RESOURCE_DIMENSION_TEXTURE3D;
+    texDesc.Alignment = 0;
+    texDesc.Width = width;
+    texDesc.Height = height;
+    texDesc.DepthOrArraySize = depth;
+    texDesc.MipLevels = 1;
+    texDesc.Format = fmt;
+    texDesc.SampleDesc.Count = 1;
+    texDesc.SampleDesc.Quality = 0;
+    texDesc.Layout = D3D12_TEXTURE_LAYOUT_UNKNOWN;
+    texDesc.Flags = D3D12_RESOURCE_FLAG_NONE;
+
+    // Create default heap resource
+    HRESULT hr = pDevice->CreateCommittedResource(
+        &CD3DX12_HEAP_PROPERTIES(D3D12_HEAP_TYPE_DEFAULT),
+        D3D12_HEAP_FLAG_NONE,
+        &texDesc,
+        D3D12_RESOURCE_STATE_COPY_DEST,
+        nullptr,
+        IID_PPV_ARGS(&tex.pResource));
+    COM_EXCEPT(hr);
+
+    if (FAILED(hr))
+    {
+        Muon::Printf(L"Error: Failed to create default heap resource for 3d texture %s!\n", textureName);
+        return false;
+    }
+
+    // schedule a copy through the staging buffer into the main resource
+    D3D12_SUBRESOURCE_DATA subresourceData = {};
+    subresourceData.pData = data;
+    subresourceData.RowPitch = width * floatsPerPixel * sizeof(float); // bytes per row
+    subresourceData.SlicePitch = width * height * floatsPerPixel * sizeof(float); // bytes per slice
+
+    UpdateSubresources<1>(pCommandList, tex.pResource.Get(), stagingBuffer.GetResource(), 0, 0, 1, &subresourceData);
+    
+    // This barrier transitions the resource state to be srv-ready
+    CD3DX12_RESOURCE_BARRIER barrier = CD3DX12_RESOURCE_BARRIER::Transition(
+        tex.pResource.Get(),
+        D3D12_RESOURCE_STATE_COPY_DEST,
+        D3D12_RESOURCE_STATE_PIXEL_SHADER_RESOURCE
+    );
+    pCommandList->ResourceBarrier(1, &barrier);
+
+    return CreateSRV(pDevice, tex.pResource.Get(), D3D12_SRV_DIMENSION_TEXTURE3D, tex);
+}
+
 // Loads all the textures from the directory and returns them as out params to the ResourceCodex
-void TextureFactory::LoadAllTextures(ID3D12Device* pDevice, ID3D12CommandList* pCommandList, ResourceCodex& codex)
+void TextureFactory::LoadAllTextures(ID3D12Device* pDevice, ID3D12GraphicsCommandList* pCommandList, ResourceCodex& codex)
 {
     namespace fs = std::filesystem;
     std::string texturePath = TEXTUREPATH;
@@ -266,7 +329,7 @@ void TextureFactory::LoadAllTextures(ID3D12Device* pDevice, ID3D12CommandList* p
             continue;
         }
 
-        if (!CreateSRV(pDevice, tex.pResource.Get(), tex))
+        if (!CreateSRV(pDevice, tex.pResource.Get(), D3D12_SRV_DIMENSION_TEXTURE2D, tex))
         {
             Muon::Printf(L"Error: Failed to create D3D12 Resource and SRV for %s!\n", path.c_str());
             continue;
@@ -290,7 +353,7 @@ size_t extractNumber(const std::filesystem::path& p)
     return std::stoul(stem.substr(dotPos + 1));
 }
 
-void TextureFactory::LoadTexturesForNVDF(const wchar_t* directoryPath, ID3D12Device* pDevice, ID3D12CommandList* pCommandList, ResourceCodex& codex)
+void TextureFactory::LoadTexturesForNVDF(std::filesystem::path directoryPath, ID3D12Device* pDevice, ID3D12GraphicsCommandList* pCommandList, ResourceCodex& codex)
 {
     namespace fs = std::filesystem;
 
@@ -341,7 +404,7 @@ void TextureFactory::LoadTexturesForNVDF(const wchar_t* directoryPath, ID3D12Dev
 
     static const size_t CHANNELS_PER_VOXEL = 4;
 
-    // Use the first image to find ideal dimensions
+    // Use the first image to find ideal dimensions ( Should always be 512 x 512 )
     {
         ScratchImage image;
         HRESULT hr = LoadFromTGAFile(fieldFiles.at(0).c_str(), nullptr, image);
@@ -425,9 +488,16 @@ void TextureFactory::LoadTexturesForNVDF(const wchar_t* directoryPath, ID3D12Dev
             outData[baseIndex + 3] = mB;
         }
     }
+
+    std::wstring lookupName = directoryPath.filename().c_str();
+    lookupName += L"_NVDF";
+
+    Upload3DTextureFromData(lookupName.c_str(), outData.data(),
+        width, height, depth, DXGI_FORMAT_R32G32B32A32_FLOAT, 
+        pDevice, pCommandList, codex);
 }
 
-void TextureFactory::LoadAllNVDF(ID3D12Device* pDevice, ID3D12CommandList* pCommandList, ResourceCodex& codex)
+void TextureFactory::LoadAllNVDF(ID3D12Device* pDevice, ID3D12GraphicsCommandList* pCommandList, ResourceCodex& codex)
 {
     namespace fs = std::filesystem;
     std::wstring nvdfPath = NVDFPATHW;
@@ -447,11 +517,11 @@ void TextureFactory::LoadAllNVDF(ID3D12Device* pDevice, ID3D12CommandList* pComm
         if (!entry.is_directory())
             continue;
 
-        LoadTexturesForNVDF(entry.path().c_str(), pDevice, pCommandList, codex);
+        LoadTexturesForNVDF(entry.path(), pDevice, pCommandList, codex);
     }
 }
 
-bool TextureFactory::CreateSRV(ID3D12Device* pDevice, ID3D12Resource* pResource, Texture& outTexture)
+bool TextureFactory::CreateSRV(ID3D12Device* pDevice, ID3D12Resource* pResource, D3D12_SRV_DIMENSION dim, Texture& outTexture)
 {
     if (!pResource)
         return false;
@@ -464,12 +534,13 @@ bool TextureFactory::CreateSRV(ID3D12Device* pDevice, ID3D12Resource* pResource,
     D3D12_RESOURCE_DESC resourceDesc = pResource->GetDesc();
     outTexture.Width = static_cast<UINT>(resourceDesc.Width);
     outTexture.Height = resourceDesc.Height;
+    outTexture.Depth = resourceDesc.DepthOrArraySize;
     outTexture.Format = resourceDesc.Format;
 
     D3D12_SHADER_RESOURCE_VIEW_DESC srvDesc = {};
     srvDesc.Shader4ComponentMapping = D3D12_DEFAULT_SHADER_4_COMPONENT_MAPPING;
     srvDesc.Format = resourceDesc.Format;
-    srvDesc.ViewDimension = D3D12_SRV_DIMENSION_TEXTURE2D;
+    srvDesc.ViewDimension = dim;
     srvDesc.Texture2D.MipLevels = resourceDesc.MipLevels;
     srvDesc.Texture2D.MostDetailedMip = 0;
 
