@@ -25,6 +25,7 @@ cbuffer PSPerMaterial : register(b11)
 }
 
 Texture2D diffuseTexture    : register(t0);
+Texture3D testNVDF : register(t1);
 SamplerState samplerOptions : register(s0);
 float4 main(VertexOut input) : SV_TARGET
 {
@@ -32,6 +33,12 @@ float4 main(VertexOut input) : SV_TARGET
 
     // Sample diffuse texture, normal map(unpacked)
     float3 surfaceColor = diffuseTexture.Sample(samplerOptions, input.uv).rgb;
+    
+    // TEST NVDF
+    float zSlice = float(12) / float(64 - 1);
+    float3 uvw = float3(input.uv, zSlice);
+    float4 sliceValue = testNVDF.Sample(samplerOptions, uvw);
+    surfaceColor.rgb = sliceValue.gba;
     
     // Normalize normal vector
     input.normal = normalize(input.normal);

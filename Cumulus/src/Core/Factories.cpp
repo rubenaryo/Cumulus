@@ -17,6 +17,7 @@
 #include <DDSTextureLoader.h>
 #include <WICTextureLoader.h>
 #include <ResourceUploadBatch.h>
+#include <DirectXTex.h>
 
 #include <Core/DXCore.h>
 #include <Utils/Utils.h>
@@ -218,8 +219,71 @@ void ShaderFactory::LoadAllShaders(ResourceCodex& codex)
     }
 }
 
+bool TextureFactory::Upload3DTextureFromData(const wchar_t* textureName, void* data, size_t width, size_t height, size_t depth, DXGI_FORMAT fmt, ID3D12Device* pDevice, ID3D12GraphicsCommandList* pCommandList, ResourceCodex& codex)
+{
+    const size_t bitsPerPixel = DirectX::BitsPerPixel(fmt);
+    const size_t bytesPerPixel = bitsPerPixel / 8;
+    const size_t floatsPerPixel = bytesPerPixel / sizeof(float);
+    assert(floatsPerPixel == 4); // any size is fine as long as it's 4
+
+    const size_t dataSize = width * height * depth * bytesPerPixel;
+
+    UploadBuffer& stagingBuffer = codex.Get3DTextureStagingBuffer();
+    assert(dataSize <= stagingBuffer.GetBufferSize());
+
+    TextureID hash = fnv1a(textureName);
+    Texture& tex = codex.InsertTexture(hash);
+
+    D3D12_RESOURCE_DESC texDesc = {};
+    texDesc.Dimension = D3D12_RESOURCE_DIMENSION_TEXTURE3D;
+    texDesc.Alignment = 0;
+    texDesc.Width = width;
+    texDesc.Height = height;
+    texDesc.DepthOrArraySize = depth;
+    texDesc.MipLevels = 1;
+    texDesc.Format = fmt;
+    texDesc.SampleDesc.Count = 1;
+    texDesc.SampleDesc.Quality = 0;
+    texDesc.Layout = D3D12_TEXTURE_LAYOUT_UNKNOWN;
+    texDesc.Flags = D3D12_RESOURCE_FLAG_NONE;
+
+    // Create default heap resource
+    HRESULT hr = pDevice->CreateCommittedResource(
+        &CD3DX12_HEAP_PROPERTIES(D3D12_HEAP_TYPE_DEFAULT),
+        D3D12_HEAP_FLAG_NONE,
+        &texDesc,
+        D3D12_RESOURCE_STATE_COPY_DEST,
+        nullptr,
+        IID_PPV_ARGS(&tex.pResource));
+    COM_EXCEPT(hr);
+
+    if (FAILED(hr))
+    {
+        Muon::Printf(L"Error: Failed to create default heap resource for 3d texture %s!\n", textureName);
+        return false;
+    }
+
+    // schedule a copy through the staging buffer into the main resource
+    D3D12_SUBRESOURCE_DATA subresourceData = {};
+    subresourceData.pData = data;
+    subresourceData.RowPitch = width * floatsPerPixel * sizeof(float); // bytes per row
+    subresourceData.SlicePitch = width * height * floatsPerPixel * sizeof(float); // bytes per slice
+
+    UpdateSubresources<1>(pCommandList, tex.pResource.Get(), stagingBuffer.GetResource(), 0, 0, 1, &subresourceData);
+    
+    // This barrier transitions the resource state to be srv-ready
+    CD3DX12_RESOURCE_BARRIER barrier = CD3DX12_RESOURCE_BARRIER::Transition(
+        tex.pResource.Get(),
+        D3D12_RESOURCE_STATE_COPY_DEST,
+        D3D12_RESOURCE_STATE_PIXEL_SHADER_RESOURCE
+    );
+    pCommandList->ResourceBarrier(1, &barrier);
+
+    return CreateSRV(pDevice, tex.pResource.Get(), D3D12_SRV_DIMENSION_TEXTURE3D, tex);
+}
+
 // Loads all the textures from the directory and returns them as out params to the ResourceCodex
-void TextureFactory::LoadAllTextures(ID3D12Device* pDevice, ID3D12CommandList* pCommandList, ResourceCodex& codex)
+void TextureFactory::LoadAllTextures(ID3D12Device* pDevice, ID3D12GraphicsCommandList* pCommandList, ResourceCodex& codex)
 {
     namespace fs = std::filesystem;
     std::string texturePath = TEXTUREPATH;
@@ -265,7 +329,7 @@ void TextureFactory::LoadAllTextures(ID3D12Device* pDevice, ID3D12CommandList* p
             continue;
         }
 
-        if (!CreateSRV(pDevice, tex.pResource.Get(), tex))
+        if (!CreateSRV(pDevice, tex.pResource.Get(), D3D12_SRV_DIMENSION_TEXTURE2D, tex))
         {
             Muon::Printf(L"Error: Failed to create D3D12 Resource and SRV for %s!\n", path.c_str());
             continue;
@@ -279,7 +343,188 @@ void TextureFactory::LoadAllTextures(ID3D12Device* pDevice, ID3D12CommandList* p
     FlushCommandQueue();
 }
 
-bool TextureFactory::CreateSRV(ID3D12Device* pDevice, ID3D12Resource* pResource, Texture& outTexture)
+// Extracts index from tga file name. ie: field_data.#.tga
+size_t extractNumber(const std::filesystem::path& p)
+{
+    std::string stem = p.stem().string();
+    auto dotPos = stem.find_last_of('.');
+    if (dotPos == std::string::npos)
+        throw std::runtime_error("Invalid filename format: " + stem);
+    return std::stoul(stem.substr(dotPos + 1));
+}
+
+void TextureFactory::LoadTexturesForNVDF(std::filesystem::path directoryPath, ID3D12Device* pDevice, ID3D12GraphicsCommandList* pCommandList, ResourceCodex& codex)
+{
+    namespace fs = std::filesystem;
+
+    auto ExtractIndexAndInsert = [](const std::filesystem::path& p, std::vector<fs::path>& outVector)
+    {
+        size_t number = extractNumber(p);
+        if (outVector.size() < number)
+            outVector.resize(number);
+        outVector[number - 1] = p;
+    };
+
+    // Assume the following naming convention: 
+    // - field_data.#.tga : red channel = dimensional_profile
+    // - modeling_data.#.tga : red = detail_type, green = density_scale, blue = sdf
+    // Note: # starts from 1. 
+    std::vector<fs::path> fieldFiles;
+    std::vector<fs::path> modelingFiles;
+
+    static const size_t INITIAL_CAPACITY = 64;
+    fieldFiles.reserve(INITIAL_CAPACITY);
+    modelingFiles.reserve(INITIAL_CAPACITY);
+
+    for (const auto& entry : fs::directory_iterator(directoryPath))
+    {
+        if (!entry.is_regular_file() || entry.path().extension() != ".tga") // Only accept tga files
+            continue;
+
+        std::wstring name = entry.path().filename().wstring();
+        if (name.rfind(L"field_data.", 0) == 0)
+        {
+            ExtractIndexAndInsert(entry.path(), fieldFiles);
+        }
+        else if (name.rfind(L"modeling_data.", 0) == 0)
+        {
+            ExtractIndexAndInsert(entry.path(), modelingFiles);
+        }
+    }
+
+    if (fieldFiles.empty())
+        return;
+
+    using namespace DirectX;
+
+    size_t width = 0;
+    size_t height = 0;
+    size_t depth = fieldFiles.size();
+    std::vector<float> outData;
+
+    static const size_t CHANNELS_PER_VOXEL = 4;
+
+    // Use the first image to find ideal dimensions ( Should always be 512 x 512 )
+    {
+        ScratchImage image;
+        HRESULT hr = LoadFromTGAFile(fieldFiles.at(0).c_str(), nullptr, image);
+        COM_EXCEPT(hr);
+        if (FAILED(hr))
+            return;
+        
+        const Image* pImage = image.GetImage(0,0,0);
+        if (!pImage)
+            return;
+
+        width = pImage->width;
+        height = pImage->height;
+
+        outData.resize(width * height * depth * CHANNELS_PER_VOXEL);
+    }
+
+    for (size_t i = 0; i != depth; ++i)
+    {
+        fs::path& fieldFile = fieldFiles.at(i);
+        fs::path& modelFile = modelingFiles.at(i);
+        
+        ScratchImage fieldImg, modelImg;
+
+        if (FAILED(LoadFromTGAFile(fieldFile.c_str(), nullptr, fieldImg)))
+        {
+            Printf(L"Error: Failed to load %s\n", fieldFile.filename().wstring().c_str());
+            return;
+        }
+
+        if (FAILED(LoadFromTGAFile(modelFile.c_str(), nullptr, modelImg)))
+        {
+            Printf(L"Error: Failed to load %s\n", modelFile.filename().wstring().c_str());
+            return;
+        }
+
+        const Image* fImg = fieldImg.GetImage(0, 0, 0);
+        const Image* mImg = modelImg.GetImage(0, 0, 0);
+
+        if (fImg->width != mImg->width || fImg->height != mImg->height)
+        {
+            Printf(L"Error: Slice Dimensions Mismatch. %s and %s\n", 
+                fieldFile.filename().wstring().c_str(), 
+                modelFile.filename().wstring().c_str());
+            return;
+        }
+
+        DXGI_FORMAT fFmt = fImg->format;
+        DXGI_FORMAT mFmt = mImg->format;
+
+        size_t fBits = DirectX::BitsPerPixel(fFmt);
+        size_t mBits = DirectX::BitsPerPixel(mFmt);
+
+        size_t fBytes = fBits / 8;
+        size_t mBytes = mBits / 8;
+
+        if (mBytes < 4)
+        {
+            Printf(L"Error: File %s has an unexpected number of bytes per pixel! %ull\n",
+                modelFile.filename().wstring().c_str(), mBytes);
+            return;
+        }
+
+        size_t sliceOffset = i * width * height * CHANNELS_PER_VOXEL;
+
+        const uint8_t* fPixels = fImg->pixels;
+        const uint8_t* mPixels = mImg->pixels;
+
+        for (size_t j = 0; j < width * height; ++j)
+        {
+            size_t baseIndex = sliceOffset + j * CHANNELS_PER_VOXEL;
+
+            // account for TGA padding
+            size_t x = j % width;
+            size_t y = j / width;
+            float fR = fPixels[y * fImg->rowPitch + x * fBytes] / 255.0f;
+            float mR = mPixels[y * mImg->rowPitch + x * mBytes + 0] / 255.0f;
+            float mG = mPixels[y * mImg->rowPitch + x * mBytes + 1] / 255.0f;
+            float mB = mPixels[y * mImg->rowPitch + x * mBytes + 2] / 255.0f;
+
+            outData[baseIndex + 0] = fR;
+            outData[baseIndex + 1] = mR;
+            outData[baseIndex + 2] = mG;
+            outData[baseIndex + 3] = mB;
+        }
+    }
+
+    std::wstring lookupName = directoryPath.filename().c_str();
+    lookupName += L"_NVDF";
+
+    Upload3DTextureFromData(lookupName.c_str(), outData.data(),
+        width, height, depth, DXGI_FORMAT_R32G32B32A32_FLOAT, 
+        pDevice, pCommandList, codex);
+}
+
+void TextureFactory::LoadAllNVDF(ID3D12Device* pDevice, ID3D12GraphicsCommandList* pCommandList, ResourceCodex& codex)
+{
+    namespace fs = std::filesystem;
+    std::wstring nvdfPath = NVDFPATHW;
+
+#if defined(MN_DEBUG)
+    if (!fs::exists(nvdfPath))
+        throw std::exception("NVDF folder doesn't exist!");
+#endif
+
+    // Each directory represents a separate NVDF, consisting of loose layers packed as tga files.
+    // Assume the following naming convention: 
+    // - field_data.#.tga : red channel = dimensional_profile
+    // - modeling_data.#.tga : red = detail_type, green = density_scale, blue = sdf
+
+    for (const auto& entry : fs::directory_iterator(nvdfPath))
+    {
+        if (!entry.is_directory())
+            continue;
+
+        LoadTexturesForNVDF(entry.path(), pDevice, pCommandList, codex);
+    }
+}
+
+bool TextureFactory::CreateSRV(ID3D12Device* pDevice, ID3D12Resource* pResource, D3D12_SRV_DIMENSION dim, Texture& outTexture)
 {
     if (!pResource)
         return false;
@@ -292,12 +537,13 @@ bool TextureFactory::CreateSRV(ID3D12Device* pDevice, ID3D12Resource* pResource,
     D3D12_RESOURCE_DESC resourceDesc = pResource->GetDesc();
     outTexture.Width = static_cast<UINT>(resourceDesc.Width);
     outTexture.Height = resourceDesc.Height;
+    outTexture.Depth = resourceDesc.DepthOrArraySize;
     outTexture.Format = resourceDesc.Format;
 
     D3D12_SHADER_RESOURCE_VIEW_DESC srvDesc = {};
     srvDesc.Shader4ComponentMapping = D3D12_DEFAULT_SHADER_4_COMPONENT_MAPPING;
     srvDesc.Format = resourceDesc.Format;
-    srvDesc.ViewDimension = D3D12_SRV_DIMENSION_TEXTURE2D;
+    srvDesc.ViewDimension = dim;
     srvDesc.Texture2D.MipLevels = resourceDesc.MipLevels;
     srvDesc.Texture2D.MostDetailedMip = 0;
 
@@ -310,6 +556,7 @@ bool MaterialFactory::CreateAllMaterials(ResourceCodex& codex)
 {
     const TextureID kRockDiffuseId = fnv1a(L"Rock_T.png");
     const TextureID kRockNormalId = fnv1a(L"Rock_N.png");
+    const TextureID kTestNVDFId = fnv1a(L"StormbirdCloud_NVDF");
     {
         const wchar_t* kPhongMaterialName = L"Phong";
         Material* pPhongMaterial = codex.InsertMaterialType(kPhongMaterialName);
@@ -327,6 +574,7 @@ bool MaterialFactory::CreateAllMaterials(ResourceCodex& codex)
 
         pPhongMaterial->SetTextureParam("diffuseTexture",   kRockDiffuseId);
         pPhongMaterial->SetTextureParam("normalMap",        kRockNormalId);
+        pPhongMaterial->SetTextureParam("testNVDF",         kTestNVDFId);
     }
 
 

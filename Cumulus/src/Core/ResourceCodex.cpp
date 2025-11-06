@@ -12,6 +12,8 @@ Description : Master Resource Distributor
 #include "Mesh.h"
 #include "Shader.h"
 
+#include <DirectXTex.h>
+
 #include "hash_util.h"
 
 namespace Muon
@@ -56,10 +58,12 @@ void ResourceCodex::Init()
 
     gCodexInstance = new ResourceCodex();
     gCodexInstance->mMeshStagingBuffer.Create(L"Mesh Staging Buffer", 64 * 1024 * 1024);
-    gCodexInstance->mMaterialParamsStagingBuffer.Create(L"material params staging buffer", sizeof(cbMaterialParams));
+    gCodexInstance->mMaterialParamsStagingBuffer.Create(L"Material Params Staging Buffer", sizeof(cbMaterialParams));
+    gCodexInstance->m3DTextureStagingBuffer.Create(L"NVDF Staging Buffer", 512 * 512 * 128 * 4 * sizeof(float));
 
     ShaderFactory::LoadAllShaders(*gCodexInstance);
     TextureFactory::LoadAllTextures(GetDevice(), GetCommandList(), *gCodexInstance);
+    TextureFactory::LoadAllNVDF(GetDevice(), GetCommandList(), *gCodexInstance);
     MaterialFactory::CreateAllMaterials(*gCodexInstance);
 }
 
@@ -103,6 +107,7 @@ void ResourceCodex::Destroy()
         tex.Destroy();
     }
     gCodexInstance->mTextureMap.clear();
+    gCodexInstance->m3DTextureStagingBuffer.Destroy();
 
     delete gCodexInstance;
     gCodexInstance = nullptr;

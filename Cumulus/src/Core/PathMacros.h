@@ -16,11 +16,16 @@ helper macros for reaching certain paths
 #define __WFILE__ WIDEN(__FILE__)
 #define __WLINE__ WIDEN(__LINE__)
 
-// Helper macros for getting correct paths. WILL ONLY WORK IN THIS PROJECT CONFIG
 #define ASSETPATH "..\\Assets\\"
 #define MODELPATH ASSETPATH ## "Models\\"
 #define MODELPATHW WIDEN(MODELPATH)
 #define TEXTUREPATH ASSETPATH ## "Textures\\"
+#define TGAPATH ASSETPATH ## "TGA\\"
+#define TGAPATHW WIDEN(TGAPATH)
+#define NVDFPATH TGAPATH ## "NVDF\\"
+#define NVDFPATHW WIDEN(NVDFPATH)
+#define NOISEPATH TGAPATH ## "Noise\\"
+#define NOISEPATHW WIDEN(NOISEPATH)
 #define SHADERPATH "..\\_bin\\Shaders\\"
 #define SHADERPATHW WIDEN(SHADERPATH)
 
