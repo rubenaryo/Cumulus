@@ -23,6 +23,8 @@ struct TextureFactory final
 {
     //typedef std::pair<TextureID, const ResourceBindChord> TexturePair;
     static void LoadAllTextures(ID3D12Device* pDevice, ID3D12CommandList* pCommandList, ResourceCodex& codex);
+    static void LoadTexturesForNVDF(const wchar_t* directoryPath, ID3D12Device* pDevice, ID3D12CommandList* pCommandList, ResourceCodex& codex);
+    static void LoadAllNVDF(ID3D12Device* pDevice, ID3D12CommandList* pCommandList, ResourceCodex& codex);
     static bool CreateSRV(ID3D12Device* pDevice, ID3D12Resource* pResource, Texture& outTexture);
 };
 
