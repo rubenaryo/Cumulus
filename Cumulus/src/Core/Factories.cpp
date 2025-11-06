@@ -250,6 +250,62 @@ bool TextureFactory::Upload3DTextureFromData(const wchar_t* textureName, void* d
     return true;
 }
 
+bool TextureFactory::CreateOffscreenRenderTarget(ID3D12Device* pDevice, UINT width, UINT height)
+{
+    DescriptorHeap* pSRVHeap = Muon::GetSRVHeap();
+    ID3D12DescriptorHeap* pRTVHeap = Muon::GetRTVHeap();
+    DXGI_FORMAT rtvFormat = Muon::GetRTVFormat();
+
+    if (!pSRVHeap || !pRTVHeap)
+        return false;
+
+    bool success = true;
+
+    D3D12_CLEAR_VALUE& clearValue = Muon::GetGlobalClearValue();
+    clearValue.Format = rtvFormat;
+    clearValue.Color[0] = 0.0f;
+    clearValue.Color[1] = 0.2f;
+    clearValue.Color[2] = 0.4f;
+    clearValue.Color[3] = 1.0f;
+
+    const wchar_t* OFFSCREEN_TARGET_NAME = L"OffscreenTarget";
+    const wchar_t* COMPUTE_OUTPUT_NAME = L"SobelOutput";
+
+    ResourceCodex& codex = ResourceCodex::GetSingleton();
+    Texture& offscreenTarget = codex.InsertTexture(fnv1a(OFFSCREEN_TARGET_NAME));
+    Texture& computeOutput = codex.InsertTexture(fnv1a(COMPUTE_OUTPUT_NAME));
+
+    success &= offscreenTarget.Create(OFFSCREEN_TARGET_NAME, pDevice, width, height, 1, rtvFormat, D3D12_RESOURCE_FLAG_ALLOW_RENDER_TARGET, D3D12_RESOURCE_STATE_GENERIC_READ, &clearValue);
+    if (!success)
+        return false;
+
+    success &= offscreenTarget.InitSRV(pDevice, pSRVHeap);
+    if (!success)
+    {
+        Printf("Error: Failed to allocate on the SRV heap for offscreen render target!\n");
+        return false;
+    }
+
+    offscreenTarget.mViewRTV.HandleCPU = CD3DX12_CPU_DESCRIPTOR_HANDLE(pRTVHeap->GetCPUDescriptorHandleForHeapStart(), Muon::GetSwapChainBufferCount(), Muon::GetRTVSize());
+    pDevice->CreateRenderTargetView(offscreenTarget.mpResource.Get(), nullptr, offscreenTarget.mViewRTV.HandleCPU);
+
+    /// Sobel Output 
+    success &= computeOutput.Create(COMPUTE_OUTPUT_NAME, pDevice, width, height, 1, rtvFormat, D3D12_RESOURCE_FLAG_ALLOW_UNORDERED_ACCESS, D3D12_RESOURCE_STATE_GENERIC_READ);
+    if (!success)
+        return false;
+
+    success &= computeOutput.InitSRV(pDevice, pSRVHeap);
+    if (!success)
+        return false;
+
+    success &= computeOutput.InitUAV(pDevice, pSRVHeap);
+    if (!success)
+        return false;
+
+    Muon::SetOffscreenTarget(&offscreenTarget); // taking addr of a reference returns the address of the original object
+    return success;
+}
+
 // Loads all the textures from the directory and returns them as out params to the ResourceCodex
 void TextureFactory::LoadAllTextures(ID3D12Device* pDevice, ID3D12GraphicsCommandList* pCommandList, ResourceCodex& codex)
 {

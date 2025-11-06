@@ -57,9 +57,7 @@ namespace Muon
     Microsoft::WRL::ComPtr<ID3D12Resource> gSwapChainBuffers[SWAP_CHAIN_BUFFER_COUNT];
     Microsoft::WRL::ComPtr<ID3D12Resource> gDepthStencilBuffer;
 
-    // TODO: Rather than live here, they should be manual entries in the codex
-    Texture gOffscreenTarget;
-    Texture gComputeOutput;
+    Texture* gOffscreenTarget = nullptr;
 
     D3D12_VIEWPORT gViewport = { 0 };
 
@@ -81,9 +79,13 @@ namespace Muon
     ID3D12Fence* GetFence() { return gFence.Get(); }
     DXGI_FORMAT GetRTVFormat() { return BackBufferFormat; }
     DescriptorHeap* GetSRVHeap() { return gSRVHeap; }
+    ID3D12DescriptorHeap* GetRTVHeap() { return gRTVHeap.Get(); }
+    UINT GetRTVSize() { return gRTVSize; }
     ID3D12Resource* GetCurrentBackBuffer() { return gSwapChainBuffers[CurrentBackBuffer].Get(); }
+    int GetSwapChainBufferCount() { return SWAP_CHAIN_BUFFER_COUNT; }
     D3D12_CPU_DESCRIPTOR_HANDLE GetCurrentBackBufferView() { return CD3DX12_CPU_DESCRIPTOR_HANDLE(gRTVHeap->GetCPUDescriptorHandleForHeapStart(), CurrentBackBuffer, gRTVSize); }
     D3D12_CPU_DESCRIPTOR_HANDLE GetDepthStencilView() { return gDSVHeap->GetCPUDescriptorHandleForHeapStart(); }
+    D3D12_CLEAR_VALUE& GetGlobalClearValue() { return gClearValue; }
     UINT GetRTVDescriptorSize() { return gRTVSize; }
     UINT GetDSVDescriptorSize() { return gDSVSize; }
     UINT GetCBVDescriptorSize() { return gCBVSize; }
@@ -92,10 +94,18 @@ namespace Muon
     ID3D12GraphicsCommandList* GetCommandList() { return gCommandList.Get(); }
     ID3D12CommandAllocator* GetCommandAllocator() { return gCommandAllocator.Get(); }
     IDXGISwapChain3* GetSwapChain() { return gSwapChain.Get(); }
-    Texture& GetOffscreenTarget() { return gOffscreenTarget; }
-    Texture& GetComputeOutput() { return gComputeOutput; }
     DXGI_FORMAT GetBackBufferFormat() { return BackBufferFormat; }
     DXGI_FORMAT GetDepthStencilFormat() { return DepthStencilFormat; }
+
+    Texture* GetOffscreenTarget()
+    {
+        return gOffscreenTarget;
+    }
+
+    void SetOffscreenTarget(Texture* pOffscreenTarget)
+    {
+        gOffscreenTarget = pOffscreenTarget;
+    }
 
     /////////////////////////////////////////////////////////////////////
     /// Interface Utility Functions
@@ -390,48 +400,48 @@ namespace Muon
         return true;
     }
 
-    bool InitOffscreenTarget(ID3D12Device* pDevice, UINT width, UINT height, DXGI_FORMAT format)
-    {
-        if (!gSRVHeap || !gRTVHeap)
-            return false;
-
-        bool success = true;
-
-        gClearValue.Format = format;
-        gClearValue.Color[0] = 0.0f;
-        gClearValue.Color[1] = 0.2f;
-        gClearValue.Color[2] = 0.4f;
-        gClearValue.Color[3] = 1.0f;
-
-        success &= gOffscreenTarget.Create(L"OffscreenTarget", pDevice, width, height, 1, format, D3D12_RESOURCE_FLAG_ALLOW_RENDER_TARGET, D3D12_RESOURCE_STATE_GENERIC_READ, &gClearValue);
-        if (!success)
-            return false;
-
-        success &= gOffscreenTarget.InitSRV(pDevice, gSRVHeap);
-        if (!success)
-        {
-            Printf("Error: Failed to allocate on the SRV heap for offscreen render target!\n");
-            return false;
-        }
-
-        gOffscreenTarget.mViewRTV.HandleCPU = CD3DX12_CPU_DESCRIPTOR_HANDLE(gRTVHeap->GetCPUDescriptorHandleForHeapStart(), SWAP_CHAIN_BUFFER_COUNT, gRTVSize);
-        pDevice->CreateRenderTargetView(gOffscreenTarget.mpResource.Get(), nullptr, gOffscreenTarget.mViewRTV.HandleCPU);
-
-        /// Sobel Output 
-        success &= gComputeOutput.Create(L"SobelOutput", pDevice, width, height, 1, format, D3D12_RESOURCE_FLAG_ALLOW_UNORDERED_ACCESS, D3D12_RESOURCE_STATE_GENERIC_READ);
-        if (!success)
-            return false;
-
-        success &= gComputeOutput.InitSRV(pDevice, gSRVHeap);
-        if (!success)
-            return false;
-        
-        success &= gComputeOutput.InitUAV(pDevice, gSRVHeap);
-        if (!success)
-            return false;
-
-        return success;
-    }
+    //bool InitOffscreenTarget(ID3D12Device* pDevice, UINT width, UINT height, DXGI_FORMAT format)
+    //{
+    //    if (!gSRVHeap || !gRTVHeap)
+    //        return false;
+    //
+    //    bool success = true;
+    //
+    //    gClearValue.Format = format;
+    //    gClearValue.Color[0] = 0.0f;
+    //    gClearValue.Color[1] = 0.2f;
+    //    gClearValue.Color[2] = 0.4f;
+    //    gClearValue.Color[3] = 1.0f;
+    //
+    //    success &= gOffscreenTarget.Create(L"OffscreenTarget", pDevice, width, height, 1, format, D3D12_RESOURCE_FLAG_ALLOW_RENDER_TARGET, D3D12_RESOURCE_STATE_GENERIC_READ, &gClearValue);
+    //    if (!success)
+    //        return false;
+    //
+    //    success &= gOffscreenTarget.InitSRV(pDevice, gSRVHeap);
+    //    if (!success)
+    //    {
+    //        Printf("Error: Failed to allocate on the SRV heap for offscreen render target!\n");
+    //        return false;
+    //    }
+    //
+    //    gOffscreenTarget.mViewRTV.HandleCPU = CD3DX12_CPU_DESCRIPTOR_HANDLE(gRTVHeap->GetCPUDescriptorHandleForHeapStart(), SWAP_CHAIN_BUFFER_COUNT, gRTVSize);
+    //    pDevice->CreateRenderTargetView(gOffscreenTarget.mpResource.Get(), nullptr, gOffscreenTarget.mViewRTV.HandleCPU);
+    //
+    //    /// Sobel Output 
+    //    success &= gComputeOutput.Create(L"SobelOutput", pDevice, width, height, 1, format, D3D12_RESOURCE_FLAG_ALLOW_UNORDERED_ACCESS, D3D12_RESOURCE_STATE_GENERIC_READ);
+    //    if (!success)
+    //        return false;
+    //
+    //    success &= gComputeOutput.InitSRV(pDevice, gSRVHeap);
+    //    if (!success)
+    //        return false;
+    //    
+    //    success &= gComputeOutput.InitUAV(pDevice, gSRVHeap);
+    //    if (!success)
+    //        return false;
+    //
+    //    return success;
+    //}
 
     bool CreateDepthStencilBuffer(ID3D12Device* pDevice, ID3D12GraphicsCommandList* pCommandList, ID3D12CommandQueue* pCommandQueue, int width, int height, Microsoft::WRL::ComPtr<ID3D12Resource>& out_depthStencilBuffer)
     {
@@ -545,19 +555,25 @@ namespace Muon
 
     bool PrepareForRender()
     {
+        if (!gOffscreenTarget)
+        {
+            Muon::Printf("Fatal Error: Offscreen target pointer not set in DXCore!\n");
+            return false;
+        }
+
         ID3D12GraphicsCommandList* pCommandList = GetCommandList();
 
         pCommandList->RSSetViewports(1, &gViewport);
         pCommandList->RSSetScissorRects(1, &gScissorRect);
 
         // Set offscreen target as the render output
-        pCommandList->ResourceBarrier(1, &CD3DX12_RESOURCE_BARRIER::Transition(gOffscreenTarget.mpResource.Get(), 
+        pCommandList->ResourceBarrier(1, &CD3DX12_RESOURCE_BARRIER::Transition(gOffscreenTarget->mpResource.Get(), 
             D3D12_RESOURCE_STATE_GENERIC_READ, D3D12_RESOURCE_STATE_RENDER_TARGET));
         
-        pCommandList->OMSetRenderTargets(1, &gOffscreenTarget.mViewRTV.HandleCPU, FALSE, nullptr);
+        pCommandList->OMSetRenderTargets(1, &gOffscreenTarget->mViewRTV.HandleCPU, FALSE, nullptr);
 
         // Clear the back buffer
-        pCommandList->ClearRenderTargetView(gOffscreenTarget.mViewRTV.HandleCPU, gClearValue.Color, 0, nullptr);
+        pCommandList->ClearRenderTargetView(gOffscreenTarget->mViewRTV.HandleCPU, gClearValue.Color, 0, nullptr);
         
         // TODO: Clear depth stencil once we need that
 
@@ -724,8 +740,8 @@ namespace Muon
         success &= CreateDescriptorHeaps(GetDevice(), gRTVHeap, gDSVHeap);
         CHECK_SUCCESS(success, "Error: Failed to create descriptor heaps!\n");
 
-        success &= InitOffscreenTarget(GetDevice(), width, height, GetBackBufferFormat());
-        CHECK_SUCCESS(success, "Error: Failed to init offscreen targetz!\n");
+        //success &= InitOffscreenTarget(GetDevice(), width, height, GetBackBufferFormat());
+        //CHECK_SUCCESS(success, "Error: Failed to init offscreen targetz!\n");
 
         success &= CreateRenderTargetView(GetDevice(), GetSwapChain(), gSwapChainBuffers);
         CHECK_SUCCESS(success, "Error: Failed to create render target view!\n");
@@ -794,9 +810,6 @@ namespace Muon
         {
             gSwapChainBuffers[i].Reset();
         }
-        // TODO: These are leaking 16 bytes each, investigate why.
-        gOffscreenTarget.Destroy();
-        gComputeOutput.Destroy();
 
         gDepthStencilBuffer.Reset();
         gRTVHeap.Reset();

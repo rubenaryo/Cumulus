@@ -36,6 +36,7 @@ bool Game::Init(HWND window, int width, int height)
     
     Muon::ResetCommandList(nullptr);
     ResourceCodex::Init();
+    TextureFactory::CreateOffscreenRenderTarget(Muon::GetDevice(), width, height);
 
     ResourceCodex& codex = ResourceCodex::GetSingleton();
     const ShaderID kPhongVSID = fnv1a(L"Phong.vs");
@@ -230,6 +231,14 @@ void Game::Render()
     ResourceCodex& codex = ResourceCodex::GetSingleton();
     MaterialID matId = fnv1a("Phong");
     const Muon::Material* pPhongMaterial = codex.GetMaterialType(matId);
+    
+    const Texture* pOffscreenTarget = codex.GetTexture(fnv1a("OffscreenTarget"));
+    const Texture* pComputeOutput = codex.GetTexture(fnv1a("SobelOutput"));
+    if (!pOffscreenTarget || !pComputeOutput)
+    {
+        Muon::Printf("Error: Game::Render Failed to fetch the offscreen target and compute output textures.\n");
+        return;
+    }
 
     ID3D12GraphicsCommandList* pCommandList = GetCommandList();
     pCommandList->SetDescriptorHeaps(1, GetSRVHeap()->GetHeapAddr());
@@ -263,35 +272,32 @@ void Game::Render()
         mCube.Draw(Muon::GetCommandList());
     }
 
-    // Change offscreen texture to be used as an input.
-    Texture& offscreenTarget = GetOffscreenTarget();
-    Texture& computeOutput = GetComputeOutput();
     if (mSobelPass.Bind(pCommandList))
     {
-
-        pCommandList->ResourceBarrier(1, &CD3DX12_RESOURCE_BARRIER::Transition(offscreenTarget.mpResource.Get(),
+        pCommandList->ResourceBarrier(1, &CD3DX12_RESOURCE_BARRIER::Transition(pOffscreenTarget->mpResource.Get(),
             D3D12_RESOURCE_STATE_RENDER_TARGET, D3D12_RESOURCE_STATE_GENERIC_READ));
 
         int32_t inIdx = mSobelPass.GetResourceRootIndex("gInput");
         if (inIdx != ROOTIDX_INVALID)
         {
-            pCommandList->SetComputeRootDescriptorTable(inIdx, offscreenTarget.mViewSRV.HandleGPU);
+            pCommandList->SetComputeRootDescriptorTable(inIdx, pOffscreenTarget->mViewSRV.HandleGPU);
         }
 
         int32_t outIdx = mSobelPass.GetResourceRootIndex("gOutput");
         if (outIdx != ROOTIDX_INVALID)
         {
-            pCommandList->SetComputeRootDescriptorTable(outIdx, computeOutput.mViewUAV.HandleGPU);
+
+            pCommandList->SetComputeRootDescriptorTable(outIdx, pComputeOutput->mViewUAV.HandleGPU);
         }
 
-        pCommandList->ResourceBarrier(1, &CD3DX12_RESOURCE_BARRIER::Transition(computeOutput.mpResource.Get(),
+        pCommandList->ResourceBarrier(1, &CD3DX12_RESOURCE_BARRIER::Transition(pComputeOutput->mpResource.Get(),
             D3D12_RESOURCE_STATE_GENERIC_READ, D3D12_RESOURCE_STATE_UNORDERED_ACCESS));
 
-        UINT numGroupsX = (UINT)ceilf(offscreenTarget.mWidth  / 16.0f);
-        UINT numGroupsY = (UINT)ceilf(offscreenTarget.mHeight / 16.0f);
+        UINT numGroupsX = (UINT)ceilf(pOffscreenTarget->mWidth  / 16.0f);
+        UINT numGroupsY = (UINT)ceilf(pOffscreenTarget->mHeight / 16.0f);
         pCommandList->Dispatch(numGroupsX, numGroupsY, 1);
 
-        pCommandList->ResourceBarrier(1, &CD3DX12_RESOURCE_BARRIER::Transition(computeOutput.mpResource.Get(),
+        pCommandList->ResourceBarrier(1, &CD3DX12_RESOURCE_BARRIER::Transition(pComputeOutput->mpResource.Get(),
             D3D12_RESOURCE_STATE_UNORDERED_ACCESS, D3D12_RESOURCE_STATE_GENERIC_READ));
 
         // Indicate a state transition on the resource usage.
@@ -307,13 +313,13 @@ void Game::Render()
         int32_t baseMapIdx = mCompositePass.GetResourceRootIndex("gBaseMap");
         if (baseMapIdx != ROOTIDX_INVALID)
         {
-            pCommandList->SetGraphicsRootDescriptorTable(baseMapIdx, offscreenTarget.mViewSRV.HandleGPU);
+            pCommandList->SetGraphicsRootDescriptorTable(baseMapIdx, pOffscreenTarget->mViewSRV.HandleGPU);
         }
 
         int32_t edgeMapIdx = mCompositePass.GetResourceRootIndex("gEdgeMap");
         if (edgeMapIdx != ROOTIDX_INVALID)
         {
-            pCommandList->SetGraphicsRootDescriptorTable(edgeMapIdx, computeOutput.mViewSRV.HandleGPU);
+            pCommandList->SetGraphicsRootDescriptorTable(edgeMapIdx, pComputeOutput->mViewSRV.HandleGPU);
         }
 
         // Draw fullscreen quad
