@@ -400,49 +400,6 @@ namespace Muon
         return true;
     }
 
-    //bool InitOffscreenTarget(ID3D12Device* pDevice, UINT width, UINT height, DXGI_FORMAT format)
-    //{
-    //    if (!gSRVHeap || !gRTVHeap)
-    //        return false;
-    //
-    //    bool success = true;
-    //
-    //    gClearValue.Format = format;
-    //    gClearValue.Color[0] = 0.0f;
-    //    gClearValue.Color[1] = 0.2f;
-    //    gClearValue.Color[2] = 0.4f;
-    //    gClearValue.Color[3] = 1.0f;
-    //
-    //    success &= gOffscreenTarget.Create(L"OffscreenTarget", pDevice, width, height, 1, format, D3D12_RESOURCE_FLAG_ALLOW_RENDER_TARGET, D3D12_RESOURCE_STATE_GENERIC_READ, &gClearValue);
-    //    if (!success)
-    //        return false;
-    //
-    //    success &= gOffscreenTarget.InitSRV(pDevice, gSRVHeap);
-    //    if (!success)
-    //    {
-    //        Printf("Error: Failed to allocate on the SRV heap for offscreen render target!\n");
-    //        return false;
-    //    }
-    //
-    //    gOffscreenTarget.mViewRTV.HandleCPU = CD3DX12_CPU_DESCRIPTOR_HANDLE(gRTVHeap->GetCPUDescriptorHandleForHeapStart(), SWAP_CHAIN_BUFFER_COUNT, gRTVSize);
-    //    pDevice->CreateRenderTargetView(gOffscreenTarget.mpResource.Get(), nullptr, gOffscreenTarget.mViewRTV.HandleCPU);
-    //
-    //    /// Sobel Output 
-    //    success &= gComputeOutput.Create(L"SobelOutput", pDevice, width, height, 1, format, D3D12_RESOURCE_FLAG_ALLOW_UNORDERED_ACCESS, D3D12_RESOURCE_STATE_GENERIC_READ);
-    //    if (!success)
-    //        return false;
-    //
-    //    success &= gComputeOutput.InitSRV(pDevice, gSRVHeap);
-    //    if (!success)
-    //        return false;
-    //    
-    //    success &= gComputeOutput.InitUAV(pDevice, gSRVHeap);
-    //    if (!success)
-    //        return false;
-    //
-    //    return success;
-    //}
-
     bool CreateDepthStencilBuffer(ID3D12Device* pDevice, ID3D12GraphicsCommandList* pCommandList, ID3D12CommandQueue* pCommandQueue, int width, int height, Microsoft::WRL::ComPtr<ID3D12Resource>& out_depthStencilBuffer)
     {
         if (!pDevice || !pCommandList)
@@ -739,9 +696,6 @@ namespace Muon
 
         success &= CreateDescriptorHeaps(GetDevice(), gRTVHeap, gDSVHeap);
         CHECK_SUCCESS(success, "Error: Failed to create descriptor heaps!\n");
-
-        //success &= InitOffscreenTarget(GetDevice(), width, height, GetBackBufferFormat());
-        //CHECK_SUCCESS(success, "Error: Failed to init offscreen targetz!\n");
 
         success &= CreateRenderTargetView(GetDevice(), GetSwapChain(), gSwapChainBuffers);
         CHECK_SUCCESS(success, "Error: Failed to create render target view!\n");
