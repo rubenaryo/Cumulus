@@ -154,23 +154,23 @@ bool UploadBuffer::Allocate(UINT desiredSize, UINT alignment, void*& out_mappedP
 
 bool UploadBuffer::UploadToTexture(Texture& dstTexture, void* data, ID3D12GraphicsCommandList* pCommandList)
 {
-	if (!dstTexture.mpResource.Get())
+	if (!dstTexture.GetResource())
 		return false; // There is nowhere to copy to.
 
-	const size_t bitsPerPixel = DirectX::BitsPerPixel(dstTexture.mFormat);
+	const size_t bitsPerPixel = DirectX::BitsPerPixel(dstTexture.GetFormat());
 	const size_t bytesPerPixel = bitsPerPixel / 8;
 
 	// schedule a copy through the staging buffer into the main resource
 	D3D12_SUBRESOURCE_DATA subresourceData = {};
 	subresourceData.pData = data;
-	subresourceData.RowPitch = dstTexture.mWidth * bytesPerPixel; // bytes per row
-	subresourceData.SlicePitch = dstTexture.mWidth * dstTexture.mHeight * bytesPerPixel; // bytes per slice
+	subresourceData.RowPitch = dstTexture.GetWidth() * bytesPerPixel; // bytes per row
+	subresourceData.SlicePitch = dstTexture.GetWidth() * dstTexture.GetHeight() * bytesPerPixel; // bytes per slice
 
-	UpdateSubresources<1>(pCommandList, dstTexture.mpResource.Get(), this->GetResource(), 0, 0, 1, &subresourceData);
+	UpdateSubresources<1>(pCommandList, dstTexture.GetResource(), this->GetResource(), 0, 0, 1, &subresourceData);
 
 	// This barrier transitions the resource state to be srv-ready
 	CD3DX12_RESOURCE_BARRIER barrier = CD3DX12_RESOURCE_BARRIER::Transition(
-		dstTexture.mpResource.Get(),
+		dstTexture.GetResource(),
 		D3D12_RESOURCE_STATE_COPY_DEST,
 		D3D12_RESOURCE_STATE_PIXEL_SHADER_RESOURCE
 	);

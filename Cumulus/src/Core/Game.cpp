@@ -232,8 +232,8 @@ void Game::Render()
     MaterialID matId = fnv1a("Phong");
     const Muon::Material* pPhongMaterial = codex.GetMaterialType(matId);
     
-    const Texture* pOffscreenTarget = codex.GetTexture(fnv1a("OffscreenTarget"));
-    const Texture* pComputeOutput = codex.GetTexture(fnv1a("SobelOutput"));
+    Texture* pOffscreenTarget = codex.GetTexture(fnv1a("OffscreenTarget"));
+    Texture* pComputeOutput = codex.GetTexture(fnv1a("SobelOutput"));
     if (!pOffscreenTarget || !pComputeOutput)
     {
         Muon::Printf("Error: Game::Render Failed to fetch the offscreen target and compute output textures.\n");
@@ -274,30 +274,30 @@ void Game::Render()
 
     if (mSobelPass.Bind(pCommandList))
     {
-        pCommandList->ResourceBarrier(1, &CD3DX12_RESOURCE_BARRIER::Transition(pOffscreenTarget->mpResource.Get(),
+        pCommandList->ResourceBarrier(1, &CD3DX12_RESOURCE_BARRIER::Transition(pOffscreenTarget->GetResource(),
             D3D12_RESOURCE_STATE_RENDER_TARGET, D3D12_RESOURCE_STATE_GENERIC_READ));
 
         int32_t inIdx = mSobelPass.GetResourceRootIndex("gInput");
         if (inIdx != ROOTIDX_INVALID)
         {
-            pCommandList->SetComputeRootDescriptorTable(inIdx, pOffscreenTarget->mViewSRV.HandleGPU);
+            pCommandList->SetComputeRootDescriptorTable(inIdx, pOffscreenTarget->GetSRVHandleGPU());
         }
 
         int32_t outIdx = mSobelPass.GetResourceRootIndex("gOutput");
         if (outIdx != ROOTIDX_INVALID)
         {
 
-            pCommandList->SetComputeRootDescriptorTable(outIdx, pComputeOutput->mViewUAV.HandleGPU);
+            pCommandList->SetComputeRootDescriptorTable(outIdx, pComputeOutput->GetUAVHandleGPU());
         }
 
-        pCommandList->ResourceBarrier(1, &CD3DX12_RESOURCE_BARRIER::Transition(pComputeOutput->mpResource.Get(),
+        pCommandList->ResourceBarrier(1, &CD3DX12_RESOURCE_BARRIER::Transition(pComputeOutput->GetResource(),
             D3D12_RESOURCE_STATE_GENERIC_READ, D3D12_RESOURCE_STATE_UNORDERED_ACCESS));
 
-        UINT numGroupsX = (UINT)ceilf(pOffscreenTarget->mWidth  / 16.0f);
-        UINT numGroupsY = (UINT)ceilf(pOffscreenTarget->mHeight / 16.0f);
+        UINT numGroupsX = (UINT)ceilf(pOffscreenTarget->GetWidth()  / 16.0f);
+        UINT numGroupsY = (UINT)ceilf(pOffscreenTarget->GetHeight() / 16.0f);
         pCommandList->Dispatch(numGroupsX, numGroupsY, 1);
 
-        pCommandList->ResourceBarrier(1, &CD3DX12_RESOURCE_BARRIER::Transition(pComputeOutput->mpResource.Get(),
+        pCommandList->ResourceBarrier(1, &CD3DX12_RESOURCE_BARRIER::Transition(pComputeOutput->GetResource(),
             D3D12_RESOURCE_STATE_UNORDERED_ACCESS, D3D12_RESOURCE_STATE_GENERIC_READ));
 
         // Indicate a state transition on the resource usage.
@@ -313,13 +313,13 @@ void Game::Render()
         int32_t baseMapIdx = mCompositePass.GetResourceRootIndex("gBaseMap");
         if (baseMapIdx != ROOTIDX_INVALID)
         {
-            pCommandList->SetGraphicsRootDescriptorTable(baseMapIdx, pOffscreenTarget->mViewSRV.HandleGPU);
+            pCommandList->SetGraphicsRootDescriptorTable(baseMapIdx, pOffscreenTarget->GetSRVHandleGPU());
         }
 
         int32_t edgeMapIdx = mCompositePass.GetResourceRootIndex("gEdgeMap");
         if (edgeMapIdx != ROOTIDX_INVALID)
         {
-            pCommandList->SetGraphicsRootDescriptorTable(edgeMapIdx, pComputeOutput->mViewSRV.HandleGPU);
+            pCommandList->SetGraphicsRootDescriptorTable(edgeMapIdx, pComputeOutput->GetSRVHandleGPU());
         }
 
         // Draw fullscreen quad

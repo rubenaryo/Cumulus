@@ -112,6 +112,8 @@ void ResourceCodex::Destroy()
     gCodexInstance->m2DTextureStagingBuffer.Destroy();
     gCodexInstance->m3DTextureStagingBuffer.Destroy();
 
+    Muon::SetOffscreenTarget(nullptr); // offscreen target destruction now owned by the codex
+
     delete gCodexInstance;
     gCodexInstance = nullptr;
 }
@@ -157,6 +159,14 @@ const Material* ResourceCodex::GetMaterialType(MaterialID UID) const
 }
 
 const Texture* ResourceCodex::GetTexture(TextureID UID) const
+{
+    if (mTextureMap.find(UID) != mTextureMap.end())
+        return &mTextureMap.at(UID);
+    else
+        return nullptr;
+}
+
+Texture* ResourceCodex::GetTexture(TextureID UID)
 {
     if (mTextureMap.find(UID) != mTextureMap.end())
         return &mTextureMap.at(UID);

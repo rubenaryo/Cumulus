@@ -286,8 +286,8 @@ bool TextureFactory::CreateOffscreenRenderTarget(ID3D12Device* pDevice, UINT wid
         return false;
     }
 
-    offscreenTarget.mViewRTV.HandleCPU = CD3DX12_CPU_DESCRIPTOR_HANDLE(pRTVHeap->GetCPUDescriptorHandleForHeapStart(), Muon::GetSwapChainBufferCount(), Muon::GetRTVSize());
-    pDevice->CreateRenderTargetView(offscreenTarget.mpResource.Get(), nullptr, offscreenTarget.mViewRTV.HandleCPU);
+    offscreenTarget.SetRTVHandleCPU(CD3DX12_CPU_DESCRIPTOR_HANDLE(pRTVHeap->GetCPUDescriptorHandleForHeapStart(), Muon::GetSwapChainBufferCount(), Muon::GetRTVSize()));
+    pDevice->CreateRenderTargetView(offscreenTarget.GetResource(), nullptr, offscreenTarget.GetRTVHandleCPU());
 
     /// Sobel Output 
     success &= computeOutput.Create(COMPUTE_OUTPUT_NAME, pDevice, width, height, 1, rtvFormat, D3D12_RESOURCE_FLAG_ALLOW_UNORDERED_ACCESS, D3D12_RESOURCE_STATE_GENERIC_READ);

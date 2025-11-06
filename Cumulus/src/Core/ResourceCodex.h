@@ -46,6 +46,7 @@ public:
     const ComputeShader* GetComputeShader(ShaderID UID) const;
     const Material* GetMaterialType(MaterialID UID) const;
     const Texture* GetTexture(TextureID UID) const;
+    Texture* GetTexture(TextureID UID); // TODO: find some way to make this a const ptr again
     UploadBuffer& GetMeshStagingBuffer() { return mMeshStagingBuffer; }
     UploadBuffer& GetMatParamsStagingBuffer() { return mMaterialParamsStagingBuffer; }
     UploadBuffer& Get2DTextureStagingBuffer() { return m2DTextureStagingBuffer; }

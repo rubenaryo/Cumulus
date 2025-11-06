@@ -567,13 +567,13 @@ namespace Muon
         pCommandList->RSSetScissorRects(1, &gScissorRect);
 
         // Set offscreen target as the render output
-        pCommandList->ResourceBarrier(1, &CD3DX12_RESOURCE_BARRIER::Transition(gOffscreenTarget->mpResource.Get(), 
+        pCommandList->ResourceBarrier(1, &CD3DX12_RESOURCE_BARRIER::Transition(gOffscreenTarget->GetResource(), 
             D3D12_RESOURCE_STATE_GENERIC_READ, D3D12_RESOURCE_STATE_RENDER_TARGET));
         
-        pCommandList->OMSetRenderTargets(1, &gOffscreenTarget->mViewRTV.HandleCPU, FALSE, nullptr);
+        pCommandList->OMSetRenderTargets(1, &gOffscreenTarget->GetRTVHandleCPU(), FALSE, nullptr);
 
         // Clear the back buffer
-        pCommandList->ClearRenderTargetView(gOffscreenTarget->mViewRTV.HandleCPU, gClearValue.Color, 0, nullptr);
+        pCommandList->ClearRenderTargetView(gOffscreenTarget->GetRTVHandleCPU(), gClearValue.Color, 0, nullptr);
         
         // TODO: Clear depth stencil once we need that
 
