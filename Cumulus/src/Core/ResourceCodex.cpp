@@ -11,6 +11,7 @@ Description : Master Resource Distributor
 #include "Material.h"
 #include "Mesh.h"
 #include "Shader.h"
+#include <Core/Texture.h>
 
 #include <DirectXTex.h>
 
@@ -59,7 +60,8 @@ void ResourceCodex::Init()
     gCodexInstance = new ResourceCodex();
     gCodexInstance->mMeshStagingBuffer.Create(L"Mesh Staging Buffer", 64 * 1024 * 1024);
     gCodexInstance->mMaterialParamsStagingBuffer.Create(L"Material Params Staging Buffer", sizeof(cbMaterialParams));
-    gCodexInstance->m3DTextureStagingBuffer.Create(L"NVDF Staging Buffer", 512 * 512 * 128 * 4 * sizeof(float));
+    gCodexInstance->m2DTextureStagingBuffer.Create(L"2D Staging Buffer", 512 * 512 * 4 * sizeof(float) * 64); // 64 512x512 2D textures at once
+    gCodexInstance->m3DTextureStagingBuffer.Create(L"NVDF Staging Buffer", 512 * 512 * 128 * 4 * sizeof(float)); // one 512x512x128 3D texture (ie, noise)
 
     ShaderFactory::LoadAllShaders(*gCodexInstance);
     TextureFactory::LoadAllTextures(GetDevice(), GetCommandList(), *gCodexInstance);
@@ -107,7 +109,10 @@ void ResourceCodex::Destroy()
         tex.Destroy();
     }
     gCodexInstance->mTextureMap.clear();
+    gCodexInstance->m2DTextureStagingBuffer.Destroy();
     gCodexInstance->m3DTextureStagingBuffer.Destroy();
+
+    Muon::SetOffscreenTarget(nullptr); // offscreen target destruction now owned by the codex
 
     delete gCodexInstance;
     gCodexInstance = nullptr;
@@ -154,6 +159,14 @@ const Material* ResourceCodex::GetMaterialType(MaterialID UID) const
 }
 
 const Texture* ResourceCodex::GetTexture(TextureID UID) const
+{
+    if (mTextureMap.find(UID) != mTextureMap.end())
+        return &mTextureMap.at(UID);
+    else
+        return nullptr;
+}
+
+Texture* ResourceCodex::GetTexture(TextureID UID)
 {
     if (mTextureMap.find(UID) != mTextureMap.end())
         return &mTextureMap.at(UID);

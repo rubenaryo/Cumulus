@@ -42,14 +42,12 @@ project (APP_NAME)
     libdirs
     {
         "external/assimp/",
-        "external/dxtk12/%{cfg.buildcfg}/",
 		"external/directxtex/%{cfg.buildcfg}/"
     }
 
     links
     {
         "external/assimp/assimp",
-        "external/dxtk12/%{cfg.buildcfg}/DirectXTK12",
 		"external/directxtex/%{cfg.buildcfg}/DirectXTex"
     }
 

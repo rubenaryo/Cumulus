@@ -14,10 +14,8 @@
 // TextureFactory
 #include "Material.h"
 #include <filesystem>
-#include <DDSTextureLoader.h>
-#include <WICTextureLoader.h>
-#include <ResourceUploadBatch.h>
 #include <DirectXTex.h>
+#include <Core/Texture.h>
 
 #include <Core/DXCore.h>
 #include <Utils/Utils.h>
@@ -223,9 +221,6 @@ bool TextureFactory::Upload3DTextureFromData(const wchar_t* textureName, void* d
 {
     const size_t bitsPerPixel = DirectX::BitsPerPixel(fmt);
     const size_t bytesPerPixel = bitsPerPixel / 8;
-    const size_t floatsPerPixel = bytesPerPixel / sizeof(float);
-    assert(floatsPerPixel == 4); // any size is fine as long as it's 4
-
     const size_t dataSize = width * height * depth * bytesPerPixel;
 
     UploadBuffer& stagingBuffer = codex.Get3DTextureStagingBuffer();
@@ -234,52 +229,81 @@ bool TextureFactory::Upload3DTextureFromData(const wchar_t* textureName, void* d
     TextureID hash = fnv1a(textureName);
     Texture& tex = codex.InsertTexture(hash);
 
-    D3D12_RESOURCE_DESC texDesc = {};
-    texDesc.Dimension = D3D12_RESOURCE_DIMENSION_TEXTURE3D;
-    texDesc.Alignment = 0;
-    texDesc.Width = width;
-    texDesc.Height = height;
-    texDesc.DepthOrArraySize = depth;
-    texDesc.MipLevels = 1;
-    texDesc.Format = fmt;
-    texDesc.SampleDesc.Count = 1;
-    texDesc.SampleDesc.Quality = 0;
-    texDesc.Layout = D3D12_TEXTURE_LAYOUT_UNKNOWN;
-    texDesc.Flags = D3D12_RESOURCE_FLAG_NONE;
-
-    // Create default heap resource
-    HRESULT hr = pDevice->CreateCommittedResource(
-        &CD3DX12_HEAP_PROPERTIES(D3D12_HEAP_TYPE_DEFAULT),
-        D3D12_HEAP_FLAG_NONE,
-        &texDesc,
-        D3D12_RESOURCE_STATE_COPY_DEST,
-        nullptr,
-        IID_PPV_ARGS(&tex.pResource));
-    COM_EXCEPT(hr);
-
-    if (FAILED(hr))
+    if (!tex.Create(textureName, pDevice, width, height, depth, fmt, D3D12_RESOURCE_FLAG_NONE, D3D12_RESOURCE_STATE_COPY_DEST))
     {
         Muon::Printf(L"Error: Failed to create default heap resource for 3d texture %s!\n", textureName);
         return false;
     }
 
-    // schedule a copy through the staging buffer into the main resource
-    D3D12_SUBRESOURCE_DATA subresourceData = {};
-    subresourceData.pData = data;
-    subresourceData.RowPitch = width * floatsPerPixel * sizeof(float); // bytes per row
-    subresourceData.SlicePitch = width * height * floatsPerPixel * sizeof(float); // bytes per slice
+    if (!stagingBuffer.UploadToTexture(tex, data, pCommandList))
+    {
+        Muon::Printf(L"Error: Failed to create default heap resource for 3d texture %s!\n", textureName);
+        return false;
+    }
 
-    UpdateSubresources<1>(pCommandList, tex.pResource.Get(), stagingBuffer.GetResource(), 0, 0, 1, &subresourceData);
-    
-    // This barrier transitions the resource state to be srv-ready
-    CD3DX12_RESOURCE_BARRIER barrier = CD3DX12_RESOURCE_BARRIER::Transition(
-        tex.pResource.Get(),
-        D3D12_RESOURCE_STATE_COPY_DEST,
-        D3D12_RESOURCE_STATE_PIXEL_SHADER_RESOURCE
-    );
-    pCommandList->ResourceBarrier(1, &barrier);
+    if (!tex.InitSRV(pDevice, Muon::GetSRVHeap()))
+    {
+        Muon::Printf(L"Error: Failed to create create D3D12 Resource and SRV for 3d texture %s!\n", textureName);
+        return false;
+    }
 
-    return CreateSRV(pDevice, tex.pResource.Get(), D3D12_SRV_DIMENSION_TEXTURE3D, tex);
+    return true;
+}
+
+bool TextureFactory::CreateOffscreenRenderTarget(ID3D12Device* pDevice, UINT width, UINT height)
+{
+    DescriptorHeap* pSRVHeap = Muon::GetSRVHeap();
+    ID3D12DescriptorHeap* pRTVHeap = Muon::GetRTVHeap();
+    DXGI_FORMAT rtvFormat = Muon::GetRTVFormat();
+
+    if (!pSRVHeap || !pRTVHeap)
+        return false;
+
+    bool success = true;
+
+    D3D12_CLEAR_VALUE& clearValue = Muon::GetGlobalClearValue();
+    clearValue.Format = rtvFormat;
+    clearValue.Color[0] = 0.0f;
+    clearValue.Color[1] = 0.2f;
+    clearValue.Color[2] = 0.4f;
+    clearValue.Color[3] = 1.0f;
+
+    const wchar_t* OFFSCREEN_TARGET_NAME = L"OffscreenTarget";
+    const wchar_t* COMPUTE_OUTPUT_NAME = L"SobelOutput";
+
+    ResourceCodex& codex = ResourceCodex::GetSingleton();
+    Texture& offscreenTarget = codex.InsertTexture(fnv1a(OFFSCREEN_TARGET_NAME));
+    Texture& computeOutput = codex.InsertTexture(fnv1a(COMPUTE_OUTPUT_NAME));
+
+    success &= offscreenTarget.Create(OFFSCREEN_TARGET_NAME, pDevice, width, height, 1, rtvFormat, D3D12_RESOURCE_FLAG_ALLOW_RENDER_TARGET, D3D12_RESOURCE_STATE_GENERIC_READ, &clearValue);
+    if (!success)
+        return false;
+
+    success &= offscreenTarget.InitSRV(pDevice, pSRVHeap);
+    if (!success)
+    {
+        Printf("Error: Failed to allocate on the SRV heap for offscreen render target!\n");
+        return false;
+    }
+
+    offscreenTarget.SetRTVHandleCPU(CD3DX12_CPU_DESCRIPTOR_HANDLE(pRTVHeap->GetCPUDescriptorHandleForHeapStart(), Muon::GetSwapChainBufferCount(), Muon::GetRTVSize()));
+    pDevice->CreateRenderTargetView(offscreenTarget.GetResource(), nullptr, offscreenTarget.GetRTVHandleCPU());
+
+    /// Sobel Output 
+    success &= computeOutput.Create(COMPUTE_OUTPUT_NAME, pDevice, width, height, 1, rtvFormat, D3D12_RESOURCE_FLAG_ALLOW_UNORDERED_ACCESS, D3D12_RESOURCE_STATE_GENERIC_READ);
+    if (!success)
+        return false;
+
+    success &= computeOutput.InitSRV(pDevice, pSRVHeap);
+    if (!success)
+        return false;
+
+    success &= computeOutput.InitUAV(pDevice, pSRVHeap);
+    if (!success)
+        return false;
+
+    Muon::SetOffscreenTarget(&offscreenTarget); // taking addr of a reference returns the address of the original object
+    return success;
 }
 
 // Loads all the textures from the directory and returns them as out params to the ResourceCodex
@@ -293,10 +317,7 @@ void TextureFactory::LoadAllTextures(ID3D12Device* pDevice, ID3D12GraphicsComman
         throw std::exception("Textures folder doesn't exist!");
 #endif
 
-    // NOTE: This has a known memory leak in the DXTK
-    DirectX::ResourceUploadBatch* pResourceUpload = new DirectX::ResourceUploadBatch(pDevice);
-
-    pResourceUpload->Begin();
+    UploadBuffer& stagingBuffer = codex.Get2DTextureStagingBuffer();
 
     for (const auto& entry : fs::directory_iterator(texturePath))
     {
@@ -316,31 +337,33 @@ void TextureFactory::LoadAllTextures(ID3D12Device* pDevice, ID3D12GraphicsComman
         TextureID tid = fnv1a(name.c_str());
         Texture& tex = codex.InsertTexture(tid);
 
-        HRESULT hr = DirectX::CreateWICTextureFromFile(
-            pDevice,
-            *pResourceUpload,
-            path.c_str(),
-            tex.pResource.GetAddressOf()
-        );
-
+        DirectX::ScratchImage scratchImg;
+        HRESULT hr = DirectX::LoadFromWICFile(path.c_str(), DirectX::WIC_FLAGS_NONE, nullptr, scratchImg, nullptr);
         if (FAILED(hr))
         {
             Muon::Printf(L"Error: Failed to load texture %s: 0x%08X\n", path.c_str(), hr);
             continue;
         }
 
-        if (!CreateSRV(pDevice, tex.pResource.Get(), D3D12_SRV_DIMENSION_TEXTURE2D, tex))
+        const DirectX::Image* pImage = scratchImg.GetImage(0, 0, 0);
+        if (!pImage || !tex.Create(name.c_str(), pDevice, pImage->width, pImage->height, 1, pImage->format, D3D12_RESOURCE_FLAG_NONE, D3D12_RESOURCE_STATE_COPY_DEST))
+        {
+            Muon::Printf(L"Error: Failed to create texture on default heap %s: 0x%08X\n", path.c_str(), hr);
+            continue;
+        }
+
+        if (!stagingBuffer.UploadToTexture(tex, pImage->pixels, pCommandList))
+        {
+            Muon::Printf(L"Error: Failed to upload data to texture %s: 0x%08X\n", path.c_str(), hr);
+            continue;
+        }
+
+        if (!tex.InitSRV(pDevice, Muon::GetSRVHeap()))
         {
             Muon::Printf(L"Error: Failed to create D3D12 Resource and SRV for %s!\n", path.c_str());
             continue;
         }
     }
-
-    auto uploadResourcesFinished = pResourceUpload->End(Muon::GetCommandQueue());
-    uploadResourcesFinished.wait();
-
-    delete pResourceUpload;
-    FlushCommandQueue();
 }
 
 // Extracts index from tga file name. ie: field_data.#.tga
@@ -522,34 +545,6 @@ void TextureFactory::LoadAllNVDF(ID3D12Device* pDevice, ID3D12GraphicsCommandLis
 
         LoadTexturesForNVDF(entry.path(), pDevice, pCommandList, codex);
     }
-}
-
-bool TextureFactory::CreateSRV(ID3D12Device* pDevice, ID3D12Resource* pResource, D3D12_SRV_DIMENSION dim, Texture& outTexture)
-{
-    if (!pResource)
-        return false;
-
-    // Allocate descriptor
-    DescriptorHeap* pSRVHeap = Muon::GetSRVHeap();
-    if (!pSRVHeap || !pSRVHeap->Allocate(outTexture.CPUHandle, outTexture.GPUHandle))
-        return false;
-
-    D3D12_RESOURCE_DESC resourceDesc = pResource->GetDesc();
-    outTexture.Width = static_cast<UINT>(resourceDesc.Width);
-    outTexture.Height = resourceDesc.Height;
-    outTexture.Depth = resourceDesc.DepthOrArraySize;
-    outTexture.Format = resourceDesc.Format;
-
-    D3D12_SHADER_RESOURCE_VIEW_DESC srvDesc = {};
-    srvDesc.Shader4ComponentMapping = D3D12_DEFAULT_SHADER_4_COMPONENT_MAPPING;
-    srvDesc.Format = resourceDesc.Format;
-    srvDesc.ViewDimension = dim;
-    srvDesc.Texture2D.MipLevels = resourceDesc.MipLevels;
-    srvDesc.Texture2D.MostDetailedMip = 0;
-
-    pDevice->CreateShaderResourceView(pResource, &srvDesc, outTexture.CPUHandle);
-
-    return true;
 }
 
 bool MaterialFactory::CreateAllMaterials(ResourceCodex& codex)

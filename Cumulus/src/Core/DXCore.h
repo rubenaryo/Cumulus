@@ -19,7 +19,7 @@ Description : Holds all the central DX12 Data structures
 namespace Muon
 {
 class DescriptorHeap;
-class MuonTexture;
+class Texture;
 }
 
 namespace Muon
@@ -30,13 +30,17 @@ namespace Muon
 	ID3D12CommandAllocator* GetCommandAllocator();
 	ID3D12Fence* GetFence();
 	DXGI_FORMAT GetRTVFormat();
+	UINT GetRTVSize();
 	DescriptorHeap* GetSRVHeap();
+	ID3D12DescriptorHeap* GetRTVHeap();
 	ID3D12Resource* GetCurrentBackBuffer();
+	int GetSwapChainBufferCount();
 	D3D12_CPU_DESCRIPTOR_HANDLE GetCurrentBackBufferView();
 	D3D12_CPU_DESCRIPTOR_HANDLE GetDepthStencilView();
+	D3D12_CLEAR_VALUE& GetGlobalClearValue();
 
-	MuonTexture& GetOffscreenTarget();
-	MuonTexture& GetComputeOutput();
+	Texture* GetOffscreenTarget();
+	void SetOffscreenTarget(Texture* pOffscreenTarget);
 
 	bool ResetCommandList(ID3D12PipelineState* pInitialPipelineState);
 	bool CloseCommandList();

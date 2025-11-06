@@ -28,30 +28,6 @@ struct TextureFactory;
 namespace Muon
 {
 
-struct Texture
-{
-    Microsoft::WRL::ComPtr<ID3D12Resource> pResource;
-    D3D12_CPU_DESCRIPTOR_HANDLE CPUHandle = { 0 };
-    D3D12_GPU_DESCRIPTOR_HANDLE GPUHandle = { 0 };
-
-    UINT Width = 0;
-    UINT Height = 0;
-    UINT Depth = 0;
-    DXGI_FORMAT Format = DXGI_FORMAT_UNKNOWN;
-
-    bool IsValid() const { return pResource != nullptr && GPUHandle.ptr != 0; }
-    void Destroy()
-    {     
-        pResource.Reset();
-        CPUHandle = { 0 };
-        GPUHandle = { 0 };
-        Width = 0;
-        Height = 0;
-        Depth = 0;
-        Format = DXGI_FORMAT_UNKNOWN;
-    }
-};
-
 class alignas(8) ResourceCodex
 {
 public:
@@ -70,8 +46,10 @@ public:
     const ComputeShader* GetComputeShader(ShaderID UID) const;
     const Material* GetMaterialType(MaterialID UID) const;
     const Texture* GetTexture(TextureID UID) const;
+    Texture* GetTexture(TextureID UID); // TODO: find some way to make this a const ptr again
     UploadBuffer& GetMeshStagingBuffer() { return mMeshStagingBuffer; }
     UploadBuffer& GetMatParamsStagingBuffer() { return mMaterialParamsStagingBuffer; }
+    UploadBuffer& Get2DTextureStagingBuffer() { return m2DTextureStagingBuffer; }
     UploadBuffer& Get3DTextureStagingBuffer() { return m3DTextureStagingBuffer; }
 
 private:
@@ -85,6 +63,7 @@ private:
     // An intermediate upload buffer used for uploading vertex/index data to the GPU
     UploadBuffer mMeshStagingBuffer;
     UploadBuffer mMaterialParamsStagingBuffer;
+    UploadBuffer m2DTextureStagingBuffer;
     UploadBuffer m3DTextureStagingBuffer;
 
 private:
@@ -92,7 +71,6 @@ private:
     Texture& InsertTexture(TextureID hash);
 
     friend struct MaterialFactory;
-    //MaterialIndex PushMaterial(const Material& material);
     Material* InsertMaterialType(const wchar_t* name);
 
     friend struct ShaderFactory;
