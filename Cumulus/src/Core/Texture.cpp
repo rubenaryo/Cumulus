@@ -9,7 +9,7 @@ Description : Wraps texture resource management
 namespace Muon
 {
 
-bool MuonTexture::Create(const wchar_t* name, ID3D12Device* pDevice, UINT width, UINT height, UINT depth,
+bool Texture::Create(const wchar_t* name, ID3D12Device* pDevice, UINT width, UINT height, UINT depth,
     DXGI_FORMAT format, D3D12_RESOURCE_FLAGS flags, D3D12_RESOURCE_STATES initialState,
     D3D12_CLEAR_VALUE* pClearValue)
 {
@@ -49,7 +49,7 @@ bool MuonTexture::Create(const wchar_t* name, ID3D12Device* pDevice, UINT width,
     return true;
 }
 
-bool MuonTexture::Destroy()
+bool Texture::Destroy()
 {
     mpResource.Reset();
     mName = std::wstring();

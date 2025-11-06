@@ -58,8 +58,8 @@ namespace Muon
     Microsoft::WRL::ComPtr<ID3D12Resource> gDepthStencilBuffer;
 
     // TODO: Rather than live here, they should be manual entries in the codex
-    MuonTexture gOffscreenTarget;
-    MuonTexture gComputeOutput;
+    Texture gOffscreenTarget;
+    Texture gComputeOutput;
 
     D3D12_VIEWPORT gViewport = { 0 };
 
@@ -92,8 +92,8 @@ namespace Muon
     ID3D12GraphicsCommandList* GetCommandList() { return gCommandList.Get(); }
     ID3D12CommandAllocator* GetCommandAllocator() { return gCommandAllocator.Get(); }
     IDXGISwapChain3* GetSwapChain() { return gSwapChain.Get(); }
-    MuonTexture& GetOffscreenTarget() { return gOffscreenTarget; }
-    MuonTexture& GetComputeOutput() { return gComputeOutput; }
+    Texture& GetOffscreenTarget() { return gOffscreenTarget; }
+    Texture& GetComputeOutput() { return gComputeOutput; }
     DXGI_FORMAT GetBackBufferFormat() { return BackBufferFormat; }
     DXGI_FORMAT GetDepthStencilFormat() { return DepthStencilFormat; }
 

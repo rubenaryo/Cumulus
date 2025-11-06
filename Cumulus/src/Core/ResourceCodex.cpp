@@ -105,7 +105,7 @@ void ResourceCodex::Destroy()
 
     for (auto& t : gCodexInstance->mTextureMap)
     {
-        MuonTexture& tex = t.second;
+        Texture& tex = t.second;
         tex.Destroy();
     }
     gCodexInstance->mTextureMap.clear();
@@ -156,7 +156,7 @@ const Material* ResourceCodex::GetMaterialType(MaterialID UID) const
         return nullptr;
 }
 
-const MuonTexture* ResourceCodex::GetTexture(TextureID UID) const
+const Texture* ResourceCodex::GetTexture(TextureID UID) const
 {
     if (mTextureMap.find(UID) != mTextureMap.end())
         return &mTextureMap.at(UID);
@@ -179,7 +179,7 @@ void ResourceCodex::AddComputeShader(ShaderID hash, const wchar_t* path)
     mComputeShaders.emplace(hash, path);
 }
 
-MuonTexture& ResourceCodex::InsertTexture(TextureID hash)
+Texture& ResourceCodex::InsertTexture(TextureID hash)
 {
     if (mTextureMap.find(hash) != mTextureMap.end())
     {

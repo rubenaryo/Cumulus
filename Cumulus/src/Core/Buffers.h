@@ -51,7 +51,7 @@ struct UploadBuffer : Buffer
     bool CanAllocate(UINT desiredSize, UINT alignment);
     bool Allocate(UINT desiredSize, UINT alignment, void*& out_mappedPtr, D3D12_GPU_VIRTUAL_ADDRESS& out_gpuAddr, UINT& out_offset);
 
-    bool UploadToTexture(MuonTexture& dstTexture, void* data, ID3D12GraphicsCommandList* pCommandList);
+    bool UploadToTexture(Texture& dstTexture, void* data, ID3D12GraphicsCommandList* pCommandList);
 
 private:
     UINT8* mMappedPtr = nullptr;

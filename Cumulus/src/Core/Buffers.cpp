@@ -152,7 +152,7 @@ bool UploadBuffer::Allocate(UINT desiredSize, UINT alignment, void*& out_mappedP
 	return true;
 }
 
-bool UploadBuffer::UploadToTexture(MuonTexture& dstTexture, void* data, ID3D12GraphicsCommandList* pCommandList)
+bool UploadBuffer::UploadToTexture(Texture& dstTexture, void* data, ID3D12GraphicsCommandList* pCommandList)
 {
 	if (!dstTexture.mpResource.Get())
 		return false; // There is nowhere to copy to.

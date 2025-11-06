@@ -227,7 +227,7 @@ bool TextureFactory::Upload3DTextureFromData(const wchar_t* textureName, void* d
     assert(dataSize <= stagingBuffer.GetBufferSize());
 
     TextureID hash = fnv1a(textureName);
-    MuonTexture& tex = codex.InsertTexture(hash);
+    Texture& tex = codex.InsertTexture(hash);
 
     if (!tex.Create(textureName, pDevice, width, height, depth, fmt, D3D12_RESOURCE_FLAG_NONE, D3D12_RESOURCE_STATE_COPY_DEST))
     {
@@ -273,7 +273,7 @@ void TextureFactory::LoadAllTextures(ID3D12Device* pDevice, ID3D12GraphicsComman
             continue;
 
         TextureID tid = fnv1a(name.c_str());
-        MuonTexture& tex = codex.InsertTexture(tid);
+        Texture& tex = codex.InsertTexture(tid);
 
         DirectX::ScratchImage scratchImg;
         HRESULT hr = DirectX::LoadFromWICFile(path.c_str(), DirectX::WIC_FLAGS_NONE, nullptr, scratchImg, nullptr);
@@ -485,7 +485,7 @@ void TextureFactory::LoadAllNVDF(ID3D12Device* pDevice, ID3D12GraphicsCommandLis
     }
 }
 
-bool TextureFactory::CreateSRV(ID3D12Device* pDevice, ID3D12Resource* pResource, D3D12_SRV_DIMENSION dim, MuonTexture& outTexture)
+bool TextureFactory::CreateSRV(ID3D12Device* pDevice, ID3D12Resource* pResource, D3D12_SRV_DIMENSION dim, Texture& outTexture)
 {
     if (!pResource)
         return false;

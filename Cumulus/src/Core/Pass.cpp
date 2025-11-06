@@ -141,7 +141,7 @@ bool Pass::BindMaterial(const Material& material, ID3D12GraphicsCommandList* pCo
     for (auto texPair : textureParams)
     {
         TextureID texId = texPair.second;
-        const MuonTexture* pTex = codex.GetTexture(texId);
+        const Texture* pTex = codex.GetTexture(texId);
         if (!pTex || !pTex->mpResource.Get())
             continue;
 

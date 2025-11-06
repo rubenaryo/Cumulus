@@ -264,8 +264,8 @@ void Game::Render()
     }
 
     // Change offscreen texture to be used as an input.
-    MuonTexture& offscreenTarget = GetOffscreenTarget();
-    MuonTexture& computeOutput = GetComputeOutput();
+    Texture& offscreenTarget = GetOffscreenTarget();
+    Texture& computeOutput = GetComputeOutput();
     if (mSobelPass.Bind(pCommandList))
     {
 
