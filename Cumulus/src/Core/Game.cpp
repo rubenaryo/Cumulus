@@ -49,6 +49,7 @@ bool Game::Init(HWND window, int width, int height)
     const VertexShader* pPhongVS = codex.GetVertexShader(kPhongVSID);
     const PixelShader* pPhongPS = codex.GetPixelShader(kPhongPSID);
     const ComputeShader* pSobelCS = codex.GetComputeShader(kSobelCSID);
+    const ComputeShader* pRaymarchCS = codex.GetComputeShader(kRaymarchCSID);
     const VertexShader* pCompositeVS = codex.GetVertexShader(kCompositeVSID);
     const PixelShader*  pCompositePS = codex.GetPixelShader(kCompositePSID);
 
@@ -70,6 +71,14 @@ bool Game::Init(HWND window, int width, int height)
 
         if (!mSobelPass.Generate())
             Printf(L"Warning: %s failed to generate!\n", mSobelPass.GetName());
+    }
+
+    // Assemble raymarch pass
+    {
+        mRaymarchPass.SetComputeShader(pRaymarchCS);
+
+        if (!mRaymarchPass.Generate())
+            Printf(L"Warning: %s failed to generate!\n", mRaymarchPass.GetName());
     }
 
     // Assemble composite render pass
@@ -274,7 +283,42 @@ void Game::Render()
         mCube.Draw(Muon::GetCommandList());
     }
 
-    if (mSobelPass.Bind(pCommandList))
+    if (mRaymarchPass.Bind(pCommandList))
+    {
+        pCommandList->ResourceBarrier(1, &CD3DX12_RESOURCE_BARRIER::Transition(pOffscreenTarget->GetResource(),
+            D3D12_RESOURCE_STATE_RENDER_TARGET, D3D12_RESOURCE_STATE_GENERIC_READ));
+
+        int32_t inIdx = mRaymarchPass.GetResourceRootIndex("gInput");
+        if (inIdx != ROOTIDX_INVALID)
+        {
+            pCommandList->SetComputeRootDescriptorTable(inIdx, pOffscreenTarget->GetSRVHandleGPU());
+        }
+
+        int32_t outIdx = mRaymarchPass.GetResourceRootIndex("gOutput");
+        if (outIdx != ROOTIDX_INVALID)
+        {
+            pCommandList->SetComputeRootDescriptorTable(outIdx, pComputeOutput->GetUAVHandleGPU());
+        }
+
+        pCommandList->ResourceBarrier(1, &CD3DX12_RESOURCE_BARRIER::Transition(pComputeOutput->GetResource(),
+            D3D12_RESOURCE_STATE_GENERIC_READ, D3D12_RESOURCE_STATE_UNORDERED_ACCESS));
+
+        UINT numGroupsX = (UINT)ceilf(pOffscreenTarget->GetWidth() / 16.0f);
+        UINT numGroupsY = (UINT)ceilf(pOffscreenTarget->GetHeight() / 16.0f);
+        pCommandList->Dispatch(numGroupsX, numGroupsY, 1);
+
+        pCommandList->ResourceBarrier(1, &CD3DX12_RESOURCE_BARRIER::Transition(pComputeOutput->GetResource(),
+            D3D12_RESOURCE_STATE_UNORDERED_ACCESS, D3D12_RESOURCE_STATE_GENERIC_READ));
+
+        // Indicate a state transition on the resource usage.
+        pCommandList->ResourceBarrier(1, &CD3DX12_RESOURCE_BARRIER::Transition(GetCurrentBackBuffer(),
+            D3D12_RESOURCE_STATE_PRESENT, D3D12_RESOURCE_STATE_RENDER_TARGET));
+
+        // Specify the buffers we are going to render to.
+        pCommandList->OMSetRenderTargets(1, &GetCurrentBackBufferView(), true, &GetDepthStencilView());
+    }
+
+    if (0 && mSobelPass.Bind(pCommandList))
     {
         pCommandList->ResourceBarrier(1, &CD3DX12_RESOURCE_BARRIER::Transition(pOffscreenTarget->GetResource(),
             D3D12_RESOURCE_STATE_RENDER_TARGET, D3D12_RESOURCE_STATE_GENERIC_READ));
@@ -309,6 +353,7 @@ void Game::Render()
         // Specify the buffers we are going to render to.
         pCommandList->OMSetRenderTargets(1, &GetCurrentBackBufferView(), true, &GetDepthStencilView());
     }
+
 
     if (mCompositePass.Bind(pCommandList))
     {
