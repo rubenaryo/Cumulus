@@ -13,9 +13,10 @@ namespace Muon
 {
 struct Mesh
 {
-    bool Create(const wchar_t* name, UINT vtxDataSize, UINT vtxStride, UINT idxDataSize = 0, UINT idxCount = 0, DXGI_FORMAT idxFormat = DXGI_FORMAT_UNKNOWN);
+    bool Create(const wchar_t* name, UINT vtxDataSize, UINT vtxStride, UINT vtxCount, UINT idxDataSize = 0, UINT idxCount = 0, DXGI_FORMAT idxFormat = DXGI_FORMAT_UNKNOWN);
     bool Destroy();
     bool Draw(ID3D12GraphicsCommandList* pCommandList) const;
+    bool DrawIndexed(ID3D12GraphicsCommandList* pCommandList) const;
 
     ID3D12Resource* GetVertexBuffer() { return mpVertexBuffer.Get(); }
     ID3D12Resource* GetIndexBuffer() { return mpIndexBuffer.Get(); }
@@ -27,6 +28,7 @@ protected:
     Microsoft::WRL::ComPtr<ID3D12Resource> mpIndexBuffer;
     D3D12_VERTEX_BUFFER_VIEW VertexBufferView = {0};
     D3D12_INDEX_BUFFER_VIEW IndexBufferView = {0};
+    UINT VertexCount = 0;
     UINT IndexCount = 0;
     UINT Stride = 0;
 };

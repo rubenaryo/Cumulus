@@ -124,7 +124,7 @@ MeshID MeshFactory::CreateMesh(const wchar_t* fileName, const VertexBufferDescri
             UINT idxDataSize = sizeof(unsigned int) * numIndices;
             UINT idxCount = numIndices;
 
-            bool success = out_mesh.Create(fileName, vtxDataSize, vtxStride, idxDataSize, idxCount, DXGI_FORMAT_R32_UINT);
+            bool success = out_mesh.Create(fileName, vtxDataSize, vtxStride, numVertices, idxDataSize, idxCount, DXGI_FORMAT_R32_UINT);
             if (!success)
                 Muon::Printf(L"Error: Failed to create mesh: %s\n", fileName);
 

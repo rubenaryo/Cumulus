@@ -165,7 +165,8 @@ bool Game::Init(HWND window, int width, int height)
     float aspectRatio = width / (float)height;
 
     Muon::UploadBuffer& stagingBuffer = codex.GetMeshStagingBuffer();
-    mCube.Create(L"TestCube", sizeof(cubeVertices), sizeof(PhongVertex), sizeof(cubeIndices), sizeof(cubeIndices) / sizeof(uint32_t), DXGI_FORMAT_R32_UINT);
+    UINT numVerts = sizeof(cubeVertices) / sizeof(PhongVertex);
+    mCube.Create(L"TestCube", sizeof(cubeVertices), sizeof(PhongVertex), numVerts, sizeof(cubeIndices), sizeof(cubeIndices) / sizeof(uint32_t), DXGI_FORMAT_R32_UINT);
     stagingBuffer.UploadToMesh(Muon::GetCommandList(), mCube, cubeVertices, sizeof(cubeVertices), cubeIndices, sizeof(cubeIndices));
 
     mWorldMatrixBuffer.Create(L"world matrix buffer", sizeof(cbPerEntity));
@@ -275,10 +276,10 @@ void Game::Render()
         //const Mesh* pCube = codex.GetMesh(fnv1a(L"cube.obj"));
         //if (pCube)
         //{
-        //    pCube->Draw(pCommandList);
+        //    pCube->DrawIndexed(pCommandList);
         //}
 
-        mCube.Draw(pCommandList);
+        mCube.DrawIndexed(pCommandList);
     }
 
     if (mRaymarchPass.Bind(pCommandList))

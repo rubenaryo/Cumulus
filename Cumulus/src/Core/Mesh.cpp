@@ -14,7 +14,7 @@ Description : Mesh initialization logic, for DX12
 namespace Muon
 {
 
-bool Mesh::Create(const wchar_t* name, UINT vtxDataSize, UINT vtxStride, UINT idxDataSize, UINT idxCount, DXGI_FORMAT idxFormat)
+bool Mesh::Create(const wchar_t* name, UINT vtxDataSize, UINT vtxStride, UINT vtxCount, UINT idxDataSize, UINT idxCount, DXGI_FORMAT idxFormat)
 {
     if (!Muon::GetDevice() || vtxDataSize == 0)
         return false;
@@ -46,6 +46,8 @@ bool Mesh::Create(const wchar_t* name, UINT vtxDataSize, UINT vtxStride, UINT id
         VertexBufferView.BufferLocation = mpVertexBuffer->GetGPUVirtualAddress();
         VertexBufferView.StrideInBytes = vtxStride;
         VertexBufferView.SizeInBytes = vtxDataSize;
+
+        VertexCount = vtxCount;
     }
 
     if (idxDataSize > 0)
@@ -92,10 +94,16 @@ bool Mesh::Draw(ID3D12GraphicsCommandList* pCommandList) const
 {
     pCommandList->IASetPrimitiveTopology(D3D_PRIMITIVE_TOPOLOGY_TRIANGLELIST);
     pCommandList->IASetVertexBuffers(0, 1, &VertexBufferView);
-    pCommandList->IASetIndexBuffer(&IndexBufferView);
-    //pCommandList->DrawInstanced(3, 1, 0, 0);
-    pCommandList->DrawIndexedInstanced(IndexCount, 1, 0, 0, 0);
+    pCommandList->DrawInstanced(VertexCount, 1, 0, 0);
+    return true;
+}
 
+bool Mesh::DrawIndexed(ID3D12GraphicsCommandList* pCommandList) const
+{
+    pCommandList->IASetPrimitiveTopology(D3D_PRIMITIVE_TOPOLOGY_TRIANGLELIST);
+    pCommandList->IASetVertexBuffers(0, 1, &VertexBufferView);
+    pCommandList->IASetIndexBuffer(&IndexBufferView);
+    pCommandList->DrawIndexedInstanced(IndexCount, 1, 0, 0, 0);
     return true;
 }
 
