@@ -153,10 +153,13 @@ void Camera::Rotate(XMVECTOR quatRotation)
 void Camera::UpdateConstantBuffer()
 {
     DirectX::XMMATRIX viewProj = XMMatrixMultiply(mView, mProjection);
+
     cbCamera cb;
     XMStoreFloat4x4(&cb.viewProj, viewProj);
     XMStoreFloat4x4(&cb.view, mView);
     XMStoreFloat4x4(&cb.proj, mProjection);
+    XMStoreFloat4x4(&cb.invView, DirectX::XMMatrixInverse(nullptr, mView));
+    XMStoreFloat4x4(&cb.invProj, DirectX::XMMatrixInverse(nullptr, mProjection));
 
     void* pMappedMemory = mConstantBuffer.Map();
     memcpy(pMappedMemory, &cb, mConstantBuffer.GetBufferSize());

@@ -23,7 +23,8 @@ Game::Game() :
     mCamera(),
     mOpaquePass(L"OpaquePass"),
     mSobelPass(L"SobelPass"),
-    mCompositePass(L"CompositePass")
+    mRaymarchPass(L"RaymarchPass"),
+    mPostProcessPass(L"PostProcessPass")
 {
     mTimer.SetFixedTimeStep(false);
 }
@@ -42,14 +43,23 @@ bool Game::Init(HWND window, int width, int height)
     const ShaderID kPhongVSID = fnv1a(L"Phong.vs");
     const ShaderID kPhongPSID = fnv1a(L"Phong.ps");    
     const ShaderID kSobelCSID = fnv1a(L"Sobel.cs");
+    const ShaderID kRaymarchCSID = fnv1a(L"Raymarch.cs");
     const ShaderID kCompositeVSID = fnv1a(L"Composite.vs");
     const ShaderID kCompositePSID = fnv1a(L"Composite.ps");
+    const ShaderID kPassthroughVSID = fnv1a(L"Passthrough.vs");
+    const ShaderID kPassthroughPSID = fnv1a(L"Passthrough.ps");
+    
     const VertexShader* pPhongVS = codex.GetVertexShader(kPhongVSID);
     const PixelShader* pPhongPS = codex.GetPixelShader(kPhongPSID);
+    
     const ComputeShader* pSobelCS = codex.GetComputeShader(kSobelCSID);
+    const ComputeShader* pRaymarchCS = codex.GetComputeShader(kRaymarchCSID);
+    
     const VertexShader* pCompositeVS = codex.GetVertexShader(kCompositeVSID);
     const PixelShader*  pCompositePS = codex.GetPixelShader(kCompositePSID);
-
+    
+    const VertexShader* pPassthroughVS = codex.GetVertexShader(kPassthroughVSID);
+    const PixelShader*  pPassthroughPS = codex.GetPixelShader (kPassthroughPSID);
 
     mCamera.Init(DirectX::XMFLOAT3(3.0, 3.0, 3.0), width / (float)height, 0.1f, 1000.0f);
 
@@ -70,13 +80,21 @@ bool Game::Init(HWND window, int width, int height)
             Printf(L"Warning: %s failed to generate!\n", mSobelPass.GetName());
     }
 
-    // Assemble composite render pass
+    // Assemble raymarch pass
     {
-        mCompositePass.SetVertexShader(pCompositeVS);
-        mCompositePass.SetPixelShader(pCompositePS);
+        mRaymarchPass.SetComputeShader(pRaymarchCS);
 
-        if (!mCompositePass.Generate())
-            Printf(L"Warning: %s failed to generate!\n", mCompositePass.GetName());
+        if (!mRaymarchPass.Generate())
+            Printf(L"Warning: %s failed to generate!\n", mRaymarchPass.GetName());
+    }
+
+    // Assemble post-process render pass
+    {
+        mPostProcessPass.SetVertexShader(pPassthroughVS);
+        mPostProcessPass.SetPixelShader (pPassthroughPS);
+
+        if (!mPostProcessPass.Generate())
+            Printf(L"Warning: %s failed to generate!\n", mPostProcessPass.GetName());
     }
 
     struct Vertex
@@ -170,7 +188,9 @@ bool Game::Init(HWND window, int width, int height)
     mWorldMatrixBuffer.Create(L"world matrix buffer", sizeof(cbPerEntity));
     void* mapped = mWorldMatrixBuffer.Map();
     cbPerEntity entity;
-    DirectX::XMStoreFloat4x4(&entity.world, DirectX::XMMatrixIdentity());
+    DirectX::XMMATRIX entityWorld = DirectX::XMMatrixTranslation(0, 1, 0);
+    DirectX::XMStoreFloat4x4(&entity.world, entityWorld);
+    DirectX::XMStoreFloat4x4(&entity.invWorld, DirectX::XMMatrixInverse(nullptr, entityWorld));
     memcpy(mapped, &entity, sizeof(entity));
     mWorldMatrixBuffer.Unmap(0, mWorldMatrixBuffer.GetBufferSize());
 
@@ -272,28 +292,34 @@ void Game::Render()
         mCube.Draw(Muon::GetCommandList());
     }
 
-    if (mSobelPass.Bind(pCommandList))
+    if (mRaymarchPass.Bind(pCommandList))
     {
         pCommandList->ResourceBarrier(1, &CD3DX12_RESOURCE_BARRIER::Transition(pOffscreenTarget->GetResource(),
             D3D12_RESOURCE_STATE_RENDER_TARGET, D3D12_RESOURCE_STATE_GENERIC_READ));
 
-        int32_t inIdx = mSobelPass.GetResourceRootIndex("gInput");
+        // Bind the Camera's Upload Buffer to the root index known by the material
+        int32_t cameraRootIdx = mRaymarchPass.GetResourceRootIndex("VSCamera");
+        if (cameraRootIdx != ROOTIDX_INVALID)
+        {
+            pCommandList->SetComputeRootConstantBufferView(cameraRootIdx, mCamera.GetGPUVirtualAddress());
+        }
+
+        int32_t inIdx = mRaymarchPass.GetResourceRootIndex("gInput");
         if (inIdx != ROOTIDX_INVALID)
         {
             pCommandList->SetComputeRootDescriptorTable(inIdx, pOffscreenTarget->GetSRVHandleGPU());
         }
 
-        int32_t outIdx = mSobelPass.GetResourceRootIndex("gOutput");
+        int32_t outIdx = mRaymarchPass.GetResourceRootIndex("gOutput");
         if (outIdx != ROOTIDX_INVALID)
         {
-
             pCommandList->SetComputeRootDescriptorTable(outIdx, pComputeOutput->GetUAVHandleGPU());
         }
 
         pCommandList->ResourceBarrier(1, &CD3DX12_RESOURCE_BARRIER::Transition(pComputeOutput->GetResource(),
             D3D12_RESOURCE_STATE_GENERIC_READ, D3D12_RESOURCE_STATE_UNORDERED_ACCESS));
 
-        UINT numGroupsX = (UINT)ceilf(pOffscreenTarget->GetWidth()  / 16.0f);
+        UINT numGroupsX = (UINT)ceilf(pOffscreenTarget->GetWidth() / 16.0f);
         UINT numGroupsY = (UINT)ceilf(pOffscreenTarget->GetHeight() / 16.0f);
         pCommandList->Dispatch(numGroupsX, numGroupsY, 1);
 
@@ -308,15 +334,9 @@ void Game::Render()
         pCommandList->OMSetRenderTargets(1, &GetCurrentBackBufferView(), true, &GetDepthStencilView());
     }
 
-    if (mCompositePass.Bind(pCommandList))
+    if (mPostProcessPass.Bind(pCommandList))
     {
-        int32_t baseMapIdx = mCompositePass.GetResourceRootIndex("gBaseMap");
-        if (baseMapIdx != ROOTIDX_INVALID)
-        {
-            pCommandList->SetGraphicsRootDescriptorTable(baseMapIdx, pOffscreenTarget->GetSRVHandleGPU());
-        }
-
-        int32_t edgeMapIdx = mCompositePass.GetResourceRootIndex("gEdgeMap");
+        int32_t edgeMapIdx = mPostProcessPass.GetResourceRootIndex("gInput");
         if (edgeMapIdx != ROOTIDX_INVALID)
         {
             pCommandList->SetGraphicsRootDescriptorTable(edgeMapIdx, pComputeOutput->GetSRVHandleGPU());
@@ -358,7 +378,8 @@ Game::~Game()
     mInput.Destroy();
     mOpaquePass.Destroy();
     mSobelPass.Destroy();
-    mCompositePass.Destroy();
+    mRaymarchPass.Destroy();
+    mPostProcessPass.Destroy();
 
     Muon::ResourceCodex::Destroy();
     Muon::DestroyDX12();

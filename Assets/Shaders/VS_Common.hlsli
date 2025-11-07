@@ -12,12 +12,15 @@ cbuffer VSCamera : register(b10)
     float4x4 view;
     float4x4 proj;
     float4x4 viewProj;
+    float4x4 invView;
+    float4x4 invProj;
 }
 
 // Values changed for every entity
 cbuffer VSWorld: register(b11)
 {
     float4x4 world;
+    float4x4 invWorld;
 }
 
 #endif

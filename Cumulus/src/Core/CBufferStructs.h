@@ -17,11 +17,14 @@ struct alignas(16) cbCamera
     DirectX::XMFLOAT4X4 view;
     DirectX::XMFLOAT4X4 proj;
     DirectX::XMFLOAT4X4 viewProj;
+    DirectX::XMFLOAT4X4 invView;
+    DirectX::XMFLOAT4X4 invProj;
 };
 
 struct alignas(16) cbPerEntity
 {
     DirectX::XMFLOAT4X4 world;
+    DirectX::XMFLOAT4X4 invWorld;
 };
 
 struct alignas(16) DirectionalLight

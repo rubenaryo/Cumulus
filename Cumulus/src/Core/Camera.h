@@ -45,6 +45,7 @@ public:
     void UpdateProjection(float aspectRatio);
 
     void Bind(int32_t rootParamIndex, ID3D12GraphicsCommandList* pCommandList) const;
+    D3D12_GPU_VIRTUAL_ADDRESS GetGPUVirtualAddress() const { return mConstantBuffer.GetGPUVirtualAddress(); }
 
     DirectX::XMMATRIX   GetView()           const  { return mView;         }
     DirectX::XMMATRIX   GetProjection()     const  { return mProjection;   }
