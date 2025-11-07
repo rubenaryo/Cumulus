@@ -24,7 +24,7 @@ Game::Game() :
     mOpaquePass(L"OpaquePass"),
     mSobelPass(L"SobelPass"),
     mRaymarchPass(L"RaymarchPass"),
-    mCompositePass(L"CompositePass")
+    mPostProcessPass(L"PostProcessPass")
 {
     mTimer.SetFixedTimeStep(false);
 }
@@ -46,13 +46,20 @@ bool Game::Init(HWND window, int width, int height)
     const ShaderID kRaymarchCSID = fnv1a(L"Raymarch.cs");
     const ShaderID kCompositeVSID = fnv1a(L"Composite.vs");
     const ShaderID kCompositePSID = fnv1a(L"Composite.ps");
+    const ShaderID kPassthroughVSID = fnv1a(L"Passthrough.vs");
+    const ShaderID kPassthroughPSID = fnv1a(L"Passthrough.ps");
+    
     const VertexShader* pPhongVS = codex.GetVertexShader(kPhongVSID);
     const PixelShader* pPhongPS = codex.GetPixelShader(kPhongPSID);
+    
     const ComputeShader* pSobelCS = codex.GetComputeShader(kSobelCSID);
     const ComputeShader* pRaymarchCS = codex.GetComputeShader(kRaymarchCSID);
+    
     const VertexShader* pCompositeVS = codex.GetVertexShader(kCompositeVSID);
     const PixelShader*  pCompositePS = codex.GetPixelShader(kCompositePSID);
-
+    
+    const VertexShader* pPassthroughVS = codex.GetVertexShader(kPassthroughVSID);
+    const PixelShader*  pPassthroughPS = codex.GetPixelShader (kPassthroughPSID);
 
     mCamera.Init(DirectX::XMFLOAT3(3.0, 3.0, 3.0), width / (float)height, 0.1f, 1000.0f);
 
@@ -81,13 +88,13 @@ bool Game::Init(HWND window, int width, int height)
             Printf(L"Warning: %s failed to generate!\n", mRaymarchPass.GetName());
     }
 
-    // Assemble composite render pass
+    // Assemble post-process render pass
     {
-        mCompositePass.SetVertexShader(pCompositeVS);
-        mCompositePass.SetPixelShader(pCompositePS);
+        mPostProcessPass.SetVertexShader(pPassthroughVS);
+        mPostProcessPass.SetPixelShader (pPassthroughPS);
 
-        if (!mCompositePass.Generate())
-            Printf(L"Warning: %s failed to generate!\n", mCompositePass.GetName());
+        if (!mPostProcessPass.Generate())
+            Printf(L"Warning: %s failed to generate!\n", mPostProcessPass.GetName());
     }
 
     struct Vertex
@@ -355,15 +362,9 @@ void Game::Render()
     }
 
 
-    if (mCompositePass.Bind(pCommandList))
+    if (mPostProcessPass.Bind(pCommandList))
     {
-        int32_t baseMapIdx = mCompositePass.GetResourceRootIndex("gBaseMap");
-        if (baseMapIdx != ROOTIDX_INVALID)
-        {
-            pCommandList->SetGraphicsRootDescriptorTable(baseMapIdx, pOffscreenTarget->GetSRVHandleGPU());
-        }
-
-        int32_t edgeMapIdx = mCompositePass.GetResourceRootIndex("gEdgeMap");
+        int32_t edgeMapIdx = mPostProcessPass.GetResourceRootIndex("gInput");
         if (edgeMapIdx != ROOTIDX_INVALID)
         {
             pCommandList->SetGraphicsRootDescriptorTable(edgeMapIdx, pComputeOutput->GetSRVHandleGPU());
@@ -406,7 +407,7 @@ Game::~Game()
     mOpaquePass.Destroy();
     mSobelPass.Destroy();
     mRaymarchPass.Destroy();
-    mCompositePass.Destroy();
+    mPostProcessPass.Destroy();
 
     Muon::ResourceCodex::Destroy();
     Muon::DestroyDX12();
