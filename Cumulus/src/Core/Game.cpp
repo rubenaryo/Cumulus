@@ -165,8 +165,8 @@ bool Game::Init(HWND window, int width, int height)
     float aspectRatio = width / (float)height;
 
     Muon::UploadBuffer& stagingBuffer = codex.GetMeshStagingBuffer();
-    mCube.Create(L"TestCube", sizeof(cubeVertices), sizeof(PhongVertex), sizeof(cubeIndices), sizeof(cubeIndices) / sizeof(uint32_t), DXGI_FORMAT_R32_UINT);
-    stagingBuffer.UploadToMesh(Muon::GetCommandList(), mCube, cubeVertices, sizeof(cubeVertices), cubeIndices, sizeof(cubeIndices));
+    //mCube.Create(L"TestCube", sizeof(cubeVertices), sizeof(PhongVertex), sizeof(cubeIndices), sizeof(cubeIndices) / sizeof(uint32_t), DXGI_FORMAT_R32_UINT);
+    //stagingBuffer.UploadToMesh(Muon::GetCommandList(), mCube, cubeVertices, sizeof(cubeVertices), cubeIndices, sizeof(cubeIndices));
 
     mWorldMatrixBuffer.Create(L"world matrix buffer", sizeof(cbPerEntity));
     void* mapped = mWorldMatrixBuffer.Map();
@@ -271,8 +271,11 @@ void Game::Render()
             pCommandList->SetGraphicsRootConstantBufferView(lightsRootIdx, mLightBuffer.GetGPUVirtualAddress());
         }
 
-        // Bind VBO/IBO and Draw
-        mCube.Draw(Muon::GetCommandList());
+        const Mesh* pCube = codex.GetMesh(fnv1a(L"cube.obj"));
+        if (pCube)
+        {
+            pCube->Draw(pCommandList);
+        }
     }
 
     if (mRaymarchPass.Bind(pCommandList))

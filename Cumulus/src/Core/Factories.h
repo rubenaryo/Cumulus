@@ -32,7 +32,7 @@ struct TextureFactory final
 
 struct MeshFactory final
 {
-    static MeshID CreateMesh(const wchar_t* fileName, const VertexBufferDescription* vertAttr, Mesh& out_meshDX12);
+    static MeshID CreateMesh(const wchar_t* fileName, const VertexBufferDescription* vertAttr, UploadBuffer& stagingBuffer, Mesh& out_meshDX12);
     static void LoadAllMeshes(ResourceCodex& codex);
 };
 

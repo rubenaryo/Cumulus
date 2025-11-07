@@ -27,7 +27,7 @@ MeshID ResourceCodex::AddMeshFromFile(const wchar_t* fileName, const VertexBuffe
 
     Mesh mesh;
 
-    MeshID id = MeshFactory::CreateMesh(fileName, vertAttr, mesh);
+    MeshID id = MeshFactory::CreateMesh(fileName, vertAttr, codexInstance.GetMeshStagingBuffer(), mesh);
     auto& hashtable = codexInstance.mMeshMap;
     
     if (hashtable.find(id) == hashtable.end())
