@@ -13,6 +13,11 @@ Description : Interface for GPU  Buffers
 
 namespace Muon
 {
+struct Mesh;
+}
+
+namespace Muon
+{
 
 struct Buffer
 {
@@ -52,6 +57,7 @@ struct UploadBuffer : Buffer
     bool Allocate(UINT desiredSize, UINT alignment, void*& out_mappedPtr, D3D12_GPU_VIRTUAL_ADDRESS& out_gpuAddr, UINT& out_offset);
 
     bool UploadToTexture(Texture& dstTexture, void* data, ID3D12GraphicsCommandList* pCommandList);
+    bool UploadToMesh(Mesh& dstMesh, void* data, ID3D12GraphicsCommandList* pCommandList);
 
 private:
     UINT8* mMappedPtr = nullptr;

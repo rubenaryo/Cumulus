@@ -181,8 +181,8 @@ bool Game::Init(HWND window, int width, int height)
     Muon::UploadBuffer& stagingBuffer = codex.GetMeshStagingBuffer();
     stagingBuffer.Map();
     Muon::MeshFactory::LoadAllMeshes(codex);
-    mTriangle.Init(triangleVertices, sizeof(triangleVertices), sizeof(Vertex), nullptr, 0, 0, DXGI_FORMAT_R32_UINT);
-    mCube.Init(cubeVertices, sizeof(cubeVertices), sizeof(PhongVertex), cubeIndices, sizeof(cubeIndices), sizeof(cubeIndices) / sizeof(uint32_t), DXGI_FORMAT_R32_UINT);
+    mTriangle.Init(L"TestTriangle", triangleVertices, sizeof(triangleVertices), sizeof(Vertex), nullptr, 0, 0, DXGI_FORMAT_R32_UINT, Muon::GetDevice());
+    mCube.Init(L"TestCube", cubeVertices, sizeof(cubeVertices), sizeof(PhongVertex), cubeIndices, sizeof(cubeIndices), sizeof(cubeIndices) / sizeof(uint32_t), DXGI_FORMAT_R32_UINT, Muon::GetDevice());
     stagingBuffer.Unmap(0, stagingBuffer.GetBufferSize());
 
     mWorldMatrixBuffer.Create(L"world matrix buffer", sizeof(cbPerEntity));

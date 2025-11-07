@@ -6,6 +6,8 @@ Description : Utility functions
 
 #include <Utils/Utils.h>
 #include <stdio.h>
+#include <locale>
+#include <codecvt>
 
 namespace Muon
 {
@@ -37,6 +39,18 @@ namespace Muon
 		vswprintf(buffer, 256, format, ap);
 		va_end(ap);
 		Print(buffer);
+	}
+
+	std::string FromWideStr(const std::wstring& wstr)
+	{
+		std::wstring_convert<std::codecvt_utf8_utf16<wchar_t>> conv;
+		return conv.to_bytes(wstr);
+	}
+
+	std::wstring FromStr(const std::string& str)
+	{
+		std::wstring_convert<std::codecvt_utf8_utf16<wchar_t>> conv;
+		return conv.from_bytes(str);
 	}
 
 	UINT AlignToBoundary(UINT size, UINT alignment)

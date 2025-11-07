@@ -21,7 +21,7 @@ namespace Muon
 {
 static ResourceCodex* gCodexInstance = nullptr;
 
-MeshID ResourceCodex::AddMeshFromFile(const char* fileName, const VertexBufferDescription* vertAttr)
+MeshID ResourceCodex::AddMeshFromFile(const wchar_t* fileName, const VertexBufferDescription* vertAttr)
 {
     ResourceCodex& codexInstance = GetSingleton();
 
@@ -39,7 +39,7 @@ MeshID ResourceCodex::AddMeshFromFile(const char* fileName, const VertexBufferDe
         #if defined(MN_DEBUG)
             Muon::Print("ERROR: Tried to insert repeat mesh\n");
         #endif
-        assert(false);
+        //assert(false);
     }
     return id;
 }

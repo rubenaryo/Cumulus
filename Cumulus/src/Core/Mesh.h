@@ -13,7 +13,7 @@ namespace Muon
 {
 struct Mesh
 {
-    bool Init(void* vertexData, UINT vertexDataSize, UINT vertexStride, void* indexData, UINT indexDataSize, UINT indexCount, DXGI_FORMAT indexFormat);
+    bool Init(const wchar_t* name, void* vertexData, UINT vertexDataSize, UINT vertexStride, void* indexData, UINT indexDataSize, UINT indexCount, DXGI_FORMAT indexFormat, ID3D12Device* pDevice);
     bool Release();
     bool PopulateBuffers(void* vertexData, UINT vertexDataSize, UINT vertexStride, void* indexData, UINT indexDataSize, UINT indexCount);
     bool Draw(ID3D12GraphicsCommandList* pCommandList) const;

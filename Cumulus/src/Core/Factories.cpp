@@ -24,14 +24,16 @@
 namespace Muon
 {
 
-MeshID MeshFactory::CreateMesh(const char* fileName, const VertexBufferDescription* vertAttr, Mesh& out_mesh)
+MeshID MeshFactory::CreateMesh(const wchar_t* fileName, const VertexBufferDescription* vertAttr, Mesh& out_mesh)
 {
     Assimp::Importer Importer;
     MeshID meshId = fnv1a(fileName);
+   
+    std::string pathStr = Muon::FromWideStr(GetModelPathFromFile_W(fileName));
 
     // Load assimpScene with proper flags
     const aiScene* pScene = Importer.ReadFile(
-        GetModelPathFromFile(fileName),
+        pathStr,
         aiProcess_Triangulate           |
         aiProcess_JoinIdenticalVertices |   // Remove unnecessary duplicate information
         aiProcess_GenNormals            |   // Ensure normals are generated
@@ -117,7 +119,7 @@ MeshID MeshFactory::CreateMesh(const char* fileName, const VertexBufferDescripti
                 indices[ind++] = face.mIndices[2];
             }
             
-            bool success = out_mesh.Init(reinterpret_cast<void*>(vertices), vertDesc.ByteSize * numVertices, vertDesc.ByteSize, reinterpret_cast<void*>(indices), sizeof(unsigned int) * numIndices, numIndices, DXGI_FORMAT_R32_UINT);
+            bool success = out_mesh.Init(fileName, reinterpret_cast<void*>(vertices), vertDesc.ByteSize * numVertices, vertDesc.ByteSize, reinterpret_cast<void*>(indices), sizeof(unsigned int) * numIndices, numIndices, DXGI_FORMAT_R32_UINT, Muon::GetDevice());
             if (!success)
                 Muon::Print("Failed to init mesh!\n");
 
@@ -129,24 +131,24 @@ MeshID MeshFactory::CreateMesh(const char* fileName, const VertexBufferDescripti
     else
     {
         char buf[256];
-        sprintf_s(buf, "Error parsing '%s': '%s'\n", fileName, Importer.GetErrorString());
+        sprintf_s(buf, "Error parsing '%s': '%s'\n", pathStr.c_str(), Importer.GetErrorString());
         throw std::exception(buf);
         return 0;
     }
-
-    std::string vbName;
+    
+    std::wstring vbName;
     vbName.append(fileName);
-    vbName.append("_VertexBuffer");
+    vbName.append(L"_VertexBuffer");
         
     HRESULT hr = out_mesh.VertexBuffer->SetPrivateData(WKPDID_D3DDebugObjectName, (UINT)vbName.size(), vbName.c_str());
     COM_EXCEPT(hr);
-
+    
     if (out_mesh.IndexBuffer)
     {
-        std::string ibName;
+        std::wstring ibName;
         ibName.append(fileName);
-        ibName.append("_IndexBuffer");
-
+        ibName.append(L"_IndexBuffer");
+    
         hr = out_mesh.IndexBuffer->SetPrivateData(WKPDID_D3DDebugObjectName, (UINT)ibName.size(), ibName.c_str());
         COM_EXCEPT(hr);
     }
@@ -175,7 +177,7 @@ void MeshFactory::LoadAllMeshes(ResourceCodex& codex)
     // Iterate through folder and load models
     for (const auto& entry : fs::directory_iterator(modelPath))
     {
-        std::string& name = entry.path().filename().generic_string();
+        std::wstring& name = entry.path().filename().wstring();
         codex.AddMeshFromFile(name.c_str(), pVertDesc);
     }
 }

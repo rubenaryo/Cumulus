@@ -54,7 +54,7 @@ bool Mesh::Release()
     return released;
 }
 
-bool Mesh::Init(void* vertexData, UINT vertexDataSize, UINT vertexStride, void* indexData, UINT indexDataSize, UINT indexCount, DXGI_FORMAT indexFormat)
+bool Mesh::Init(const wchar_t* name, void* vertexData, UINT vertexDataSize, UINT vertexStride, void* indexData, UINT indexDataSize, UINT indexCount, DXGI_FORMAT indexFormat, ID3D12Device* pDevice)
 {
     vertexDataSize = Muon::AlignToBoundary(vertexDataSize, 16);
 

@@ -179,6 +179,11 @@ bool UploadBuffer::UploadToTexture(Texture& dstTexture, void* data, ID3D12Graphi
 	return true;
 }
 
+bool UploadBuffer::UploadToMesh(Mesh& dstMesh, void* data, ID3D12GraphicsCommandList* pCommandList)
+{
+	return false;
+}
+
 
 ////////////////////////////////////////////////////////////////
 
