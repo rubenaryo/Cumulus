@@ -13,15 +13,15 @@ namespace Muon
 {
 struct Mesh
 {
-    bool Init(const wchar_t* name, void* vertexData, UINT vertexDataSize, UINT vertexStride, void* indexData, UINT indexDataSize, UINT indexCount, DXGI_FORMAT indexFormat);
     bool Create(const wchar_t* name, UINT vtxDataSize, UINT vtxStride, UINT idxDataSize = 0, UINT idxCount = 0, DXGI_FORMAT idxFormat = DXGI_FORMAT_UNKNOWN);
-    bool Release();
-    bool PopulateBuffers(void* vertexData, UINT vertexDataSize, UINT vertexStride, void* indexData, UINT indexDataSize, UINT indexCount);
+    bool Destroy();
     bool Draw(ID3D12GraphicsCommandList* pCommandList) const;
 
-    ID3D12Resource* VertexBuffer = nullptr;
-    ID3D12Resource* IndexBuffer = nullptr;
+    ID3D12Resource* GetVertexBuffer() { return mpVertexBuffer.Get(); }
+    ID3D12Resource* GetIndexBuffer() { return mpIndexBuffer.Get(); }
+    const wchar_t* GetName() const { return mName.c_str(); }
 
+protected:
     std::wstring mName;
     Microsoft::WRL::ComPtr<ID3D12Resource> mpVertexBuffer;
     Microsoft::WRL::ComPtr<ID3D12Resource> mpIndexBuffer;

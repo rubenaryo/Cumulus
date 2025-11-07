@@ -7,6 +7,7 @@ Description : Implementation of GPU Buffers
 #include <d3dx12.h>
 #include <Core/DXCore.h>
 #include <Core/Buffers.h>
+#include <Core/Mesh.h>
 #include <Core/Texture.h>
 #include <Core/ThrowMacros.h>
 #include <Utils/Utils.h>
@@ -179,9 +180,56 @@ bool UploadBuffer::UploadToTexture(Texture& dstTexture, void* data, ID3D12Graphi
 	return true;
 }
 
-bool UploadBuffer::UploadToMesh(Mesh& dstMesh, void* data, ID3D12GraphicsCommandList* pCommandList)
+bool UploadBuffer::UploadToMesh(ID3D12GraphicsCommandList* pCommandList, Mesh& dstMesh, void* vtxData, UINT vtxDataSize, void* idxData, UINT idxDataSize)
 {
-	return false;
+	assert(vtxDataSize + idxDataSize <= this->GetBufferSize());
+	if ((vtxDataSize + idxDataSize) > this->GetBufferSize())
+	{
+		Muon::Printf(L"Error: UploadBuffer %s failed to create index buffer for mesh: %s\n", GetName(), dstMesh.GetName());
+		return false;
+	}
+
+	bool hasIndex = (idxData && idxDataSize > 0);
+
+	D3D12_SUBRESOURCE_DATA vtxSub = {};
+	vtxSub.pData = vtxData;
+	vtxSub.RowPitch = vtxDataSize;
+	vtxSub.SlicePitch = vtxDataSize;
+
+	UINT64 uploadOffset = 0; // running offset into upload heap
+
+	pCommandList->ResourceBarrier(1,
+		&CD3DX12_RESOURCE_BARRIER::Transition(dstMesh.GetVertexBuffer(),
+			D3D12_RESOURCE_STATE_COMMON, D3D12_RESOURCE_STATE_COPY_DEST));
+
+	UpdateSubresources(pCommandList, dstMesh.GetVertexBuffer(), GetResource(),
+		uploadOffset, 0, 1, &vtxSub);
+	uploadOffset += vtxDataSize; // advance upload heap pointer
+
+	pCommandList->ResourceBarrier(1,
+		&CD3DX12_RESOURCE_BARRIER::Transition(dstMesh.GetVertexBuffer(),
+			D3D12_RESOURCE_STATE_COPY_DEST, D3D12_RESOURCE_STATE_VERTEX_AND_CONSTANT_BUFFER));
+
+	if (hasIndex)
+	{
+		D3D12_SUBRESOURCE_DATA idxSub = {};
+		idxSub.pData = idxData;
+		idxSub.RowPitch = idxDataSize;
+		idxSub.SlicePitch = idxDataSize;
+
+		pCommandList->ResourceBarrier(1,
+			&CD3DX12_RESOURCE_BARRIER::Transition(dstMesh.GetIndexBuffer(),
+				D3D12_RESOURCE_STATE_COMMON, D3D12_RESOURCE_STATE_COPY_DEST));
+
+		UpdateSubresources(pCommandList, dstMesh.GetIndexBuffer(), GetResource(),
+			uploadOffset, 0, 1, &idxSub);
+
+		pCommandList->ResourceBarrier(1,
+			&CD3DX12_RESOURCE_BARRIER::Transition(dstMesh.GetIndexBuffer(),
+				D3D12_RESOURCE_STATE_COPY_DEST, D3D12_RESOURCE_STATE_INDEX_BUFFER));
+	}
+
+	return true;
 }
 
 

@@ -97,12 +97,6 @@ bool Game::Init(HWND window, int width, int height)
             Printf(L"Warning: %s failed to generate!\n", mPostProcessPass.GetName());
     }
 
-    struct Vertex
-    {
-        float Pos[4];
-        float Col[4];
-    };
-
     struct PhongVertex
     {
         float position[3];  // POSITION
@@ -170,20 +164,12 @@ bool Game::Init(HWND window, int width, int height)
     };
 
     float aspectRatio = width / (float)height;
-    Vertex triangleVertices[] =
-    {
-        { { 0.0f, 0.25f * aspectRatio, 0.0f, 1.0f }, { 1.0f, 0.0f, 0.0f, 1.0f } },
-        { { 0.25f, -0.25f * aspectRatio, 0.0f, 1.0f }, { 0.0f, 1.0f, 0.0f, 1.0f } },
-        { { -0.25f, -0.25f * aspectRatio, 0.0f, 1.0f}, { 0.0f, 0.0f, 1.0f, 1.0f } }
-    };
 
     //Muon::ResetCommandList(mPSO.GetPipelineState());
     Muon::UploadBuffer& stagingBuffer = codex.GetMeshStagingBuffer();
-    stagingBuffer.Map();
     Muon::MeshFactory::LoadAllMeshes(codex);
-    mTriangle.Init(L"TestTriangle", triangleVertices, sizeof(triangleVertices), sizeof(Vertex), nullptr, 0, 0, DXGI_FORMAT_R32_UINT);
-    mCube.Init(L"TestCube", cubeVertices, sizeof(cubeVertices), sizeof(PhongVertex), cubeIndices, sizeof(cubeIndices), sizeof(cubeIndices) / sizeof(uint32_t), DXGI_FORMAT_R32_UINT);
-    stagingBuffer.Unmap(0, stagingBuffer.GetBufferSize());
+    mCube.Create(L"TestCube", sizeof(cubeVertices), sizeof(PhongVertex), sizeof(cubeIndices), sizeof(cubeIndices) / sizeof(uint32_t), DXGI_FORMAT_R32_UINT);
+    stagingBuffer.UploadToMesh(Muon::GetCommandList(), mCube, cubeVertices, sizeof(cubeVertices), cubeIndices, sizeof(cubeIndices));
 
     mWorldMatrixBuffer.Create(L"world matrix buffer", sizeof(cbPerEntity));
     void* mapped = mWorldMatrixBuffer.Map();
@@ -370,8 +356,7 @@ void Game::CreateWindowSizeDependentResources(int newWidth, int newHeight)
 
 Game::~Game()
 { 
-    mTriangle.Release();
-    mCube.Release();
+    mCube.Destroy();
     mWorldMatrixBuffer.Destroy();
     mLightBuffer.Destroy();
     mCamera.Destroy();

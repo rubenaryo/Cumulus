@@ -39,7 +39,7 @@ MeshID ResourceCodex::AddMeshFromFile(const wchar_t* fileName, const VertexBuffe
         #if defined(MN_DEBUG)
             Muon::Print("ERROR: Tried to insert repeat mesh\n");
         #endif
-        //assert(false);
+        assert(false);
     }
     return id;
 }
@@ -74,7 +74,7 @@ void ResourceCodex::Destroy()
     for (auto& m : gCodexInstance->mMeshMap)
     {
         Mesh& mesh = m.second;
-        mesh.Release();
+        mesh.Destroy();
     }
     gCodexInstance->mMeshMap.clear();
 
