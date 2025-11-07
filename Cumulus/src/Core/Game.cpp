@@ -188,7 +188,9 @@ bool Game::Init(HWND window, int width, int height)
     mWorldMatrixBuffer.Create(L"world matrix buffer", sizeof(cbPerEntity));
     void* mapped = mWorldMatrixBuffer.Map();
     cbPerEntity entity;
-    DirectX::XMStoreFloat4x4(&entity.world, DirectX::XMMatrixIdentity());
+    DirectX::XMMATRIX entityWorld = DirectX::XMMatrixTranslation(0, 1, 0);
+    DirectX::XMStoreFloat4x4(&entity.world, entityWorld);
+    DirectX::XMStoreFloat4x4(&entity.invWorld, DirectX::XMMatrixInverse(nullptr, entityWorld));
     memcpy(mapped, &entity, sizeof(entity));
     mWorldMatrixBuffer.Unmap(0, mWorldMatrixBuffer.GetBufferSize());
 
@@ -294,6 +296,13 @@ void Game::Render()
     {
         pCommandList->ResourceBarrier(1, &CD3DX12_RESOURCE_BARRIER::Transition(pOffscreenTarget->GetResource(),
             D3D12_RESOURCE_STATE_RENDER_TARGET, D3D12_RESOURCE_STATE_GENERIC_READ));
+
+        // Bind the Camera's Upload Buffer to the root index known by the material
+        int32_t cameraRootIdx = mRaymarchPass.GetResourceRootIndex("VSCamera");
+        if (cameraRootIdx != ROOTIDX_INVALID)
+        {
+            pCommandList->SetComputeRootConstantBufferView(cameraRootIdx, mCamera.GetGPUVirtualAddress());
+        }
 
         int32_t inIdx = mRaymarchPass.GetResourceRootIndex("gInput");
         if (inIdx != ROOTIDX_INVALID)
