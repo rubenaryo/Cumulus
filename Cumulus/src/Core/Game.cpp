@@ -334,43 +334,6 @@ void Game::Render()
         pCommandList->OMSetRenderTargets(1, &GetCurrentBackBufferView(), true, &GetDepthStencilView());
     }
 
-    if (0 && mSobelPass.Bind(pCommandList))
-    {
-        pCommandList->ResourceBarrier(1, &CD3DX12_RESOURCE_BARRIER::Transition(pOffscreenTarget->GetResource(),
-            D3D12_RESOURCE_STATE_RENDER_TARGET, D3D12_RESOURCE_STATE_GENERIC_READ));
-
-        int32_t inIdx = mSobelPass.GetResourceRootIndex("gInput");
-        if (inIdx != ROOTIDX_INVALID)
-        {
-            pCommandList->SetComputeRootDescriptorTable(inIdx, pOffscreenTarget->GetSRVHandleGPU());
-        }
-
-        int32_t outIdx = mSobelPass.GetResourceRootIndex("gOutput");
-        if (outIdx != ROOTIDX_INVALID)
-        {
-
-            pCommandList->SetComputeRootDescriptorTable(outIdx, pComputeOutput->GetUAVHandleGPU());
-        }
-
-        pCommandList->ResourceBarrier(1, &CD3DX12_RESOURCE_BARRIER::Transition(pComputeOutput->GetResource(),
-            D3D12_RESOURCE_STATE_GENERIC_READ, D3D12_RESOURCE_STATE_UNORDERED_ACCESS));
-
-        UINT numGroupsX = (UINT)ceilf(pOffscreenTarget->GetWidth()  / 16.0f);
-        UINT numGroupsY = (UINT)ceilf(pOffscreenTarget->GetHeight() / 16.0f);
-        pCommandList->Dispatch(numGroupsX, numGroupsY, 1);
-
-        pCommandList->ResourceBarrier(1, &CD3DX12_RESOURCE_BARRIER::Transition(pComputeOutput->GetResource(),
-            D3D12_RESOURCE_STATE_UNORDERED_ACCESS, D3D12_RESOURCE_STATE_GENERIC_READ));
-
-        // Indicate a state transition on the resource usage.
-        pCommandList->ResourceBarrier(1, &CD3DX12_RESOURCE_BARRIER::Transition(GetCurrentBackBuffer(),
-            D3D12_RESOURCE_STATE_PRESENT, D3D12_RESOURCE_STATE_RENDER_TARGET));
-
-        // Specify the buffers we are going to render to.
-        pCommandList->OMSetRenderTargets(1, &GetCurrentBackBufferView(), true, &GetDepthStencilView());
-    }
-
-
     if (mPostProcessPass.Bind(pCommandList))
     {
         int32_t edgeMapIdx = mPostProcessPass.GetResourceRootIndex("gInput");
