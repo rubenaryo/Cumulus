@@ -118,88 +118,17 @@ MeshID MeshFactory::CreateMesh(const wchar_t* fileName, const VertexBufferDescri
                 indices[ind++] = face.mIndices[1];
                 indices[ind++] = face.mIndices[2];
             }
-
-            struct PhongVertex
-            {
-                float position[3];  // POSITION
-                float normal[3];    // NORMAL
-                float uv[2];        // TEXCOORD
-                float tangent[3];   // TANGENT
-                float binormal[3];  // BINORMAL
-            };
-
-            // Generate a cube centered at origin with side length 1.0f
-            PhongVertex cubeVertices[] =
-            {
-                // Front face (Z+)
-                { { -0.5f, -0.5f,  0.5f }, {  0.0f,  0.0f,  1.0f }, { 0.0f, 1.0f }, {  1.0f,  0.0f,  0.0f }, {  0.0f,  1.0f,  0.0f } },
-                { {  0.5f, -0.5f,  0.5f }, {  0.0f,  0.0f,  1.0f }, { 1.0f, 1.0f }, {  1.0f,  0.0f,  0.0f }, {  0.0f,  1.0f,  0.0f } },
-                { {  0.5f,  0.5f,  0.5f }, {  0.0f,  0.0f,  1.0f }, { 1.0f, 0.0f }, {  1.0f,  0.0f,  0.0f }, {  0.0f,  1.0f,  0.0f } },
-                { { -0.5f,  0.5f,  0.5f }, {  0.0f,  0.0f,  1.0f }, { 0.0f, 0.0f }, {  1.0f,  0.0f,  0.0f }, {  0.0f,  1.0f,  0.0f } },
-
-                // Back face (Z-)
-                { {  0.5f, -0.5f, -0.5f }, {  0.0f,  0.0f, -1.0f }, { 0.0f, 1.0f }, { -1.0f,  0.0f,  0.0f }, {  0.0f,  1.0f,  0.0f } },
-                { { -0.5f, -0.5f, -0.5f }, {  0.0f,  0.0f, -1.0f }, { 1.0f, 1.0f }, { -1.0f,  0.0f,  0.0f }, {  0.0f,  1.0f,  0.0f } },
-                { { -0.5f,  0.5f, -0.5f }, {  0.0f,  0.0f, -1.0f }, { 1.0f, 0.0f }, { -1.0f,  0.0f,  0.0f }, {  0.0f,  1.0f,  0.0f } },
-                { {  0.5f,  0.5f, -0.5f }, {  0.0f,  0.0f, -1.0f }, { 0.0f, 0.0f }, { -1.0f,  0.0f,  0.0f }, {  0.0f,  1.0f,  0.0f } },
-
-                // Top face (Y+)
-                { { -0.5f,  0.5f,  0.5f }, {  0.0f,  1.0f,  0.0f }, { 0.0f, 1.0f }, {  1.0f,  0.0f,  0.0f }, {  0.0f,  0.0f, -1.0f } },
-                { {  0.5f,  0.5f,  0.5f }, {  0.0f,  1.0f,  0.0f }, { 1.0f, 1.0f }, {  1.0f,  0.0f,  0.0f }, {  0.0f,  0.0f, -1.0f } },
-                { {  0.5f,  0.5f, -0.5f }, {  0.0f,  1.0f,  0.0f }, { 1.0f, 0.0f }, {  1.0f,  0.0f,  0.0f }, {  0.0f,  0.0f, -1.0f } },
-                { { -0.5f,  0.5f, -0.5f }, {  0.0f,  1.0f,  0.0f }, { 0.0f, 0.0f }, {  1.0f,  0.0f,  0.0f }, {  0.0f,  0.0f, -1.0f } },
-
-                // Bottom face (Y-)
-                { { -0.5f, -0.5f, -0.5f }, {  0.0f, -1.0f,  0.0f }, { 0.0f, 1.0f }, {  1.0f,  0.0f,  0.0f }, {  0.0f,  0.0f,  1.0f } },
-                { {  0.5f, -0.5f, -0.5f }, {  0.0f, -1.0f,  0.0f }, { 1.0f, 1.0f }, {  1.0f,  0.0f,  0.0f }, {  0.0f,  0.0f,  1.0f } },
-                { {  0.5f, -0.5f,  0.5f }, {  0.0f, -1.0f,  0.0f }, { 1.0f, 0.0f }, {  1.0f,  0.0f,  0.0f }, {  0.0f,  0.0f,  1.0f } },
-                { { -0.5f, -0.5f,  0.5f }, {  0.0f, -1.0f,  0.0f }, { 0.0f, 0.0f }, {  1.0f,  0.0f,  0.0f }, {  0.0f,  0.0f,  1.0f } },
-
-                // Right face (X+)
-                { {  0.5f, -0.5f,  0.5f }, {  1.0f,  0.0f,  0.0f }, { 0.0f, 1.0f }, {  0.0f,  0.0f, -1.0f }, {  0.0f,  1.0f,  0.0f } },
-                { {  0.5f, -0.5f, -0.5f }, {  1.0f,  0.0f,  0.0f }, { 1.0f, 1.0f }, {  0.0f,  0.0f, -1.0f }, {  0.0f,  1.0f,  0.0f } },
-                { {  0.5f,  0.5f, -0.5f }, {  1.0f,  0.0f,  0.0f }, { 1.0f, 0.0f }, {  0.0f,  0.0f, -1.0f }, {  0.0f,  1.0f,  0.0f } },
-                { {  0.5f,  0.5f,  0.5f }, {  1.0f,  0.0f,  0.0f }, { 0.0f, 0.0f }, {  0.0f,  0.0f, -1.0f }, {  0.0f,  1.0f,  0.0f } },
-
-                // Left face (X-)
-                { { -0.5f, -0.5f, -0.5f }, { -1.0f,  0.0f,  0.0f }, { 0.0f, 1.0f }, {  0.0f,  0.0f,  1.0f }, {  0.0f,  1.0f,  0.0f } },
-                { { -0.5f, -0.5f,  0.5f }, { -1.0f,  0.0f,  0.0f }, { 1.0f, 1.0f }, {  0.0f,  0.0f,  1.0f }, {  0.0f,  1.0f,  0.0f } },
-                { { -0.5f,  0.5f,  0.5f }, { -1.0f,  0.0f,  0.0f }, { 1.0f, 0.0f }, {  0.0f,  0.0f,  1.0f }, {  0.0f,  1.0f,  0.0f } },
-                { { -0.5f,  0.5f, -0.5f }, { -1.0f,  0.0f,  0.0f }, { 0.0f, 0.0f }, {  0.0f,  0.0f,  1.0f }, {  0.0f,  1.0f,  0.0f } },
-            };
-
-
-            // Index buffer for the cube (36 indices = 12 triangles)
-            uint32_t cubeIndices[] =
-            {
-                // Front face
-                0, 1, 2,    0, 2, 3,
-                // Back face
-                4, 5, 6,    4, 6, 7,
-                // Top face
-                8, 9, 10,   8, 10, 11,
-                // Bottom face
-                12, 13, 14, 12, 14, 15,
-                // Right face
-                16, 17, 18, 16, 18, 19,
-                // Left face
-                20, 21, 22, 20, 22, 23
-            };
             
-            //UINT vtxDataSize = vertDesc.ByteSize * numVertices;
-            //UINT vtxStride = vertDesc.ByteSize;
-            UINT vtxDataSize = sizeof(cubeVertices);
-            UINT vtxStride = sizeof(PhongVertex);
-            //UINT idxDataSize = sizeof(unsigned int) * numIndices;
-            UINT idxDataSize = sizeof(cubeIndices);
-            UINT idxCount = sizeof(cubeIndices) / sizeof(uint32_t);
-            //UINT idxCount = numIndices;
+            UINT vtxDataSize = vertDesc.ByteSize * numVertices;
+            UINT vtxStride = vertDesc.ByteSize;
+            UINT idxDataSize = sizeof(unsigned int) * numIndices;
+            UINT idxCount = numIndices;
 
             bool success = out_mesh.Create(fileName, vtxDataSize, vtxStride, idxDataSize, idxCount, DXGI_FORMAT_R32_UINT);
             if (!success)
                 Muon::Printf(L"Error: Failed to create mesh: %s\n", fileName);
 
-            success = stagingBuffer.UploadToMesh(Muon::GetCommandList(), out_mesh, cubeVertices, vtxDataSize, cubeIndices, idxDataSize);
+            success = stagingBuffer.UploadToMesh(Muon::GetCommandList(), out_mesh, vertices, vtxDataSize, indices, idxDataSize);
             if (!success)
                 Muon::Printf(L"Error: Failed to upload mesh: %s\n", fileName);
 
