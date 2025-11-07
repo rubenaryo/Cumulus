@@ -64,6 +64,7 @@ void ResourceCodex::Init()
     gCodexInstance->m3DTextureStagingBuffer.Create(L"NVDF Staging Buffer", 512 * 512 * 128 * 4 * sizeof(float)); // one 512x512x128 3D texture (ie, noise)
 
     ShaderFactory::LoadAllShaders(*gCodexInstance);
+    MeshFactory::LoadAllMeshes(*gCodexInstance);
     TextureFactory::LoadAllTextures(GetDevice(), GetCommandList(), *gCodexInstance);
     TextureFactory::LoadAllNVDF(GetDevice(), GetCommandList(), *gCodexInstance);
     MaterialFactory::CreateAllMaterials(*gCodexInstance);

@@ -11,7 +11,6 @@ Description : Implementation of Game.h
 #include <Core/Camera.h>
 #include <Core/COMException.h>
 #include <Core/Factories.h>
-#include <Core/PipelineState.h>
 #include <Core/ResourceCodex.h>
 #include <Core/Shader.h>
 #include <Core/Texture.h>
@@ -165,9 +164,7 @@ bool Game::Init(HWND window, int width, int height)
 
     float aspectRatio = width / (float)height;
 
-    //Muon::ResetCommandList(mPSO.GetPipelineState());
     Muon::UploadBuffer& stagingBuffer = codex.GetMeshStagingBuffer();
-    Muon::MeshFactory::LoadAllMeshes(codex);
     mCube.Create(L"TestCube", sizeof(cubeVertices), sizeof(PhongVertex), sizeof(cubeIndices), sizeof(cubeIndices) / sizeof(uint32_t), DXGI_FORMAT_R32_UINT);
     stagingBuffer.UploadToMesh(Muon::GetCommandList(), mCube, cubeVertices, sizeof(cubeVertices), cubeIndices, sizeof(cubeIndices));
 
