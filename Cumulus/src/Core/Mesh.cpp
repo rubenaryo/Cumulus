@@ -54,8 +54,9 @@ bool Mesh::Release()
     return released;
 }
 
-bool Mesh::Init(const wchar_t* name, void* vertexData, UINT vertexDataSize, UINT vertexStride, void* indexData, UINT indexDataSize, UINT indexCount, DXGI_FORMAT indexFormat, ID3D12Device* pDevice)
+bool Mesh::Init(const wchar_t* name, void* vertexData, UINT vertexDataSize, UINT vertexStride, void* indexData, UINT indexDataSize, UINT indexCount, DXGI_FORMAT indexFormat)
 {
+    mName = name;
     vertexDataSize = Muon::AlignToBoundary(vertexDataSize, 16);
 
     if (!vertexData || !CreateBuffer(vertexData, vertexDataSize, this->VertexBuffer))
@@ -88,6 +89,70 @@ bool Mesh::Init(const wchar_t* name, void* vertexData, UINT vertexDataSize, UINT
     }
 
     IndexCount = indexCount;
+
+    return true;
+}
+
+bool Mesh::Create(const wchar_t* name, UINT vtxDataSize, UINT vtxStride, UINT idxDataSize, UINT idxCount, DXGI_FORMAT idxFormat)
+{
+    if (!Muon::GetDevice() || vtxDataSize == 0)
+        return false;
+
+    mName = name;
+
+    {
+        // Creates as with default heap type. This is fast to read from the GPU but inaccessible from the CPU. 
+        // We need to go through a staging buffer (UploadBuffer) to get the data to it.
+        HRESULT hr = Muon::GetDevice()->CreateCommittedResource(
+            &CD3DX12_HEAP_PROPERTIES(D3D12_HEAP_TYPE_DEFAULT),
+            D3D12_HEAP_FLAG_NONE,
+            &CD3DX12_RESOURCE_DESC::Buffer(vtxDataSize),
+            D3D12_RESOURCE_STATE_COMMON,
+            nullptr,
+            IID_PPV_ARGS(&mpVertexBuffer)
+        );
+        COM_EXCEPT(hr);
+        if (FAILED(hr) || mpVertexBuffer.Get() == nullptr)
+        {
+            Muon::Printf(L"Error: Failed to create vertex buffer for mesh: %s\n", mName.c_str());
+            return false;
+        }
+
+        std::wstring vtxName = mName + L"_VertexBuffer";
+        mpVertexBuffer->SetName(vtxName.c_str());
+
+        // Initialize vertex buffer view
+        VertexBufferView.BufferLocation = mpVertexBuffer->GetGPUVirtualAddress();
+        VertexBufferView.StrideInBytes = vtxStride;
+        VertexBufferView.SizeInBytes = vtxDataSize;
+    }
+
+    if (idxDataSize > 0)
+    {
+        HRESULT hr = Muon::GetDevice()->CreateCommittedResource(
+            &CD3DX12_HEAP_PROPERTIES(D3D12_HEAP_TYPE_DEFAULT),
+            D3D12_HEAP_FLAG_NONE,
+            &CD3DX12_RESOURCE_DESC::Buffer(idxDataSize),
+            D3D12_RESOURCE_STATE_COMMON,
+            nullptr,
+            IID_PPV_ARGS(&mpIndexBuffer)
+        );
+        COM_EXCEPT(hr);
+        if (FAILED(hr) || mpIndexBuffer.Get() == nullptr)
+        {
+            Muon::Printf(L"Error: Failed to create index buffer for mesh: %s\n", mName.c_str());
+            return false;
+        }
+
+        std::wstring idxName = mName + L"_IndexBuffer";
+        mpIndexBuffer->SetName(idxName.c_str());
+
+        IndexBufferView.BufferLocation = mpIndexBuffer->GetGPUVirtualAddress();
+        IndexBufferView.Format = idxFormat;
+        IndexBufferView.SizeInBytes = idxDataSize;
+
+        IndexCount = idxCount;
+    }
 
     return true;
 }

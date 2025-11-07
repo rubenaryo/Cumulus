@@ -119,7 +119,7 @@ MeshID MeshFactory::CreateMesh(const wchar_t* fileName, const VertexBufferDescri
                 indices[ind++] = face.mIndices[2];
             }
             
-            bool success = out_mesh.Init(fileName, reinterpret_cast<void*>(vertices), vertDesc.ByteSize * numVertices, vertDesc.ByteSize, reinterpret_cast<void*>(indices), sizeof(unsigned int) * numIndices, numIndices, DXGI_FORMAT_R32_UINT, Muon::GetDevice());
+            bool success = out_mesh.Create(fileName, vertDesc.ByteSize * numVertices, vertDesc.ByteSize, sizeof(unsigned int) * numIndices, numIndices, DXGI_FORMAT_R32_UINT);
             if (!success)
                 Muon::Print("Failed to init mesh!\n");
 
@@ -136,22 +136,6 @@ MeshID MeshFactory::CreateMesh(const wchar_t* fileName, const VertexBufferDescri
         return 0;
     }
     
-    std::wstring vbName;
-    vbName.append(fileName);
-    vbName.append(L"_VertexBuffer");
-        
-    HRESULT hr = out_mesh.VertexBuffer->SetPrivateData(WKPDID_D3DDebugObjectName, (UINT)vbName.size(), vbName.c_str());
-    COM_EXCEPT(hr);
-    
-    if (out_mesh.IndexBuffer)
-    {
-        std::wstring ibName;
-        ibName.append(fileName);
-        ibName.append(L"_IndexBuffer");
-    
-        hr = out_mesh.IndexBuffer->SetPrivateData(WKPDID_D3DDebugObjectName, (UINT)ibName.size(), ibName.c_str());
-        COM_EXCEPT(hr);
-    }
     #endif
     return meshId;
 }
