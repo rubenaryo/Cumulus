@@ -31,7 +31,7 @@ namespace Muon
 class alignas(8) ResourceCodex
 {
 public:
-    static MeshID AddMeshFromFile(const wchar_t* fileName, const VertexBufferDescription* vertAttr);
+    static MeshID AddMeshFromFile(const wchar_t* fileName);
     
     // Singleton Stuff
     static void Init();

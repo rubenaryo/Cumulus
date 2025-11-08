@@ -73,6 +73,12 @@ void UploadBuffer::Create(const wchar_t* name, size_t size)
 {
 	Destroy();
 	BaseCreate(name, size, D3D12_HEAP_TYPE_UPLOAD, D3D12_RESOURCE_STATE_GENERIC_READ);
+
+	HRESULT hr = mpResource->Map(0, &CD3DX12_RANGE(0, 0), reinterpret_cast<void**>(&mMappedPtr));
+	if (FAILED(hr))
+	{
+		Muon::Printf(L"Error: Failed to map upload buffer: %s\n", name);
+	}
 }
 
 void UploadBuffer::Destroy()
@@ -89,8 +95,8 @@ void* UploadBuffer::Map()
 {
 	if (mMappedPtr)
 	{
-		Print("Warning: Tried to Map() an already mapped upload buffer.");
-		return nullptr;
+		Muon::Printf(L"Warning: Tried to Map() an already mapped upload buffer: %s\n", GetName());
+		return mMappedPtr;
 	}
 
 	mpResource->Map(0, &CD3DX12_RANGE(0, mBufferSize), reinterpret_cast<void**>(&mMappedPtr));
@@ -182,47 +188,78 @@ bool UploadBuffer::UploadToTexture(Texture& dstTexture, void* data, ID3D12Graphi
 
 bool UploadBuffer::UploadToMesh(ID3D12GraphicsCommandList* pCommandList, Mesh& dstMesh, void* vtxData, UINT vtxDataSize, void* idxData, UINT idxDataSize)
 {
-	assert(vtxDataSize + idxDataSize <= this->GetBufferSize());
-	if ((vtxDataSize + idxDataSize) > this->GetBufferSize())
+	// DX12 needs 512-byte aligned insertions
+	const UINT necessaryAlignment = D3D12_TEXTURE_DATA_PLACEMENT_ALIGNMENT;
+
+	// Calculate aligned sizes
+	UINT alignedVtxSize = Muon::AlignToBoundary(vtxDataSize, necessaryAlignment);
+	UINT alignedIdxSize = idxDataSize > 0 ? Muon::AlignToBoundary(idxDataSize, necessaryAlignment) : 0;
+
+	// Check if we have enough space
+	UINT totalSize = alignedVtxSize + alignedIdxSize;
+	if (totalSize > this->GetBufferSize())
 	{
-		Muon::Printf(L"Error: UploadBuffer %s failed to create index buffer for mesh: %s\n", GetName(), dstMesh.GetName());
+		Muon::Printf(L"Error: UploadBuffer %s insufficient size for mesh: %s\n",
+			GetName(), dstMesh.GetName());
 		return false;
 	}
 
-	bool hasIndex = (idxData && idxDataSize > 0);
+	// Allocate space for vertex data
+	void* vtxMappedPtr = nullptr;
+	D3D12_GPU_VIRTUAL_ADDRESS vtxGpuAddr = 0;
+	UINT vtxOffset = 0;
 
-	D3D12_SUBRESOURCE_DATA vtxSub = {};
-	vtxSub.pData = vtxData;
-	vtxSub.RowPitch = vtxDataSize;
-	vtxSub.SlicePitch = vtxDataSize;
+	if (!Allocate(vtxDataSize, necessaryAlignment,
+		vtxMappedPtr, vtxGpuAddr, vtxOffset))
+	{
+		Muon::Printf(L"Error: Failed to allocate vertex data in upload buffer\n");
+		return false;
+	}
 
-	UINT64 uploadOffset = 0; // running offset into upload heap
+	// Copy to mapped ptr in upload heap
+	memcpy(vtxMappedPtr, vtxData, vtxDataSize);
 
 	pCommandList->ResourceBarrier(1,
 		&CD3DX12_RESOURCE_BARRIER::Transition(dstMesh.GetVertexBuffer(),
 			D3D12_RESOURCE_STATE_COMMON, D3D12_RESOURCE_STATE_COPY_DEST));
 
-	UpdateSubresources(pCommandList, dstMesh.GetVertexBuffer(), GetResource(),
-		uploadOffset, 0, 1, &vtxSub);
-	uploadOffset += vtxDataSize; // advance upload heap pointer
+	// Schedule a copy from our upload heap to the default heap
+	pCommandList->CopyBufferRegion(
+		dstMesh.GetVertexBuffer(), 0,
+		GetResource(), vtxOffset,
+		vtxDataSize);
 
+	// Mark ready for use
 	pCommandList->ResourceBarrier(1,
 		&CD3DX12_RESOURCE_BARRIER::Transition(dstMesh.GetVertexBuffer(),
 			D3D12_RESOURCE_STATE_COPY_DEST, D3D12_RESOURCE_STATE_VERTEX_AND_CONSTANT_BUFFER));
 
+	// Do the same for our index data.
+	bool hasIndex = (idxData && idxDataSize > 0);
 	if (hasIndex)
 	{
-		D3D12_SUBRESOURCE_DATA idxSub = {};
-		idxSub.pData = idxData;
-		idxSub.RowPitch = idxDataSize;
-		idxSub.SlicePitch = idxDataSize;
+		void* idxMappedPtr = nullptr;
+		D3D12_GPU_VIRTUAL_ADDRESS idxGpuAddr = 0;
+		UINT idxOffset = 0;
 
+		if (!Allocate(idxDataSize, D3D12_TEXTURE_DATA_PLACEMENT_ALIGNMENT,
+			idxMappedPtr, idxGpuAddr, idxOffset))
+		{
+			Muon::Printf(L"Error: Failed to allocate index data in upload buffer\n");
+			return false;
+		}
+
+		memcpy(idxMappedPtr, idxData, idxDataSize);
+
+		// Transition and copy index buffer
 		pCommandList->ResourceBarrier(1,
 			&CD3DX12_RESOURCE_BARRIER::Transition(dstMesh.GetIndexBuffer(),
 				D3D12_RESOURCE_STATE_COMMON, D3D12_RESOURCE_STATE_COPY_DEST));
 
-		UpdateSubresources(pCommandList, dstMesh.GetIndexBuffer(), GetResource(),
-			uploadOffset, 0, 1, &idxSub);
+		pCommandList->CopyBufferRegion(
+			dstMesh.GetIndexBuffer(), 0,
+			GetResource(), idxOffset,
+			idxDataSize);
 
 		pCommandList->ResourceBarrier(1,
 			&CD3DX12_RESOURCE_BARRIER::Transition(dstMesh.GetIndexBuffer(),
@@ -250,9 +287,11 @@ bool DefaultBuffer::Populate(void* data, size_t dataSize, UploadBuffer& stagingB
 	if (!pCommandList || !data || dataSize > mBufferSize)
 		return false;
 
-	void* mapped = stagingBuffer.Map();
+	UINT8* mapped = stagingBuffer.GetMappedPtr();
+	if (!mapped)
+		return false;
+
 	memcpy(mapped, data, mBufferSize);
-	stagingBuffer.Unmap(0, 0);
 
 	pCommandList->CopyBufferRegion(mpResource.Get(), 0, stagingBuffer.GetResource(), 0, mBufferSize);
 

@@ -572,7 +572,7 @@ namespace Muon
 
         if (gFence->GetCompletedValue() < currFence)
         {
-            HANDLE eventHandle = CreateEventEx(nullptr, false, false, EVENT_ALL_ACCESS);
+            HANDLE eventHandle = CreateEventEx(nullptr, nullptr, false, EVENT_ALL_ACCESS);
             if (!eventHandle)
             {
                 hr = HRESULT_FROM_WIN32(GetLastError());

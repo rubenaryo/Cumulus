@@ -5,6 +5,7 @@ Description : Implementation of Camera Class
 ----------------------------------------------*/
 #include "Camera.h"
 #include <DirectXMath.h>
+#include <Utils/Utils.h>
 
 namespace Muon 
 {
@@ -161,9 +162,14 @@ void Camera::UpdateConstantBuffer()
     XMStoreFloat4x4(&cb.invView, DirectX::XMMatrixInverse(nullptr, mView));
     XMStoreFloat4x4(&cb.invProj, DirectX::XMMatrixInverse(nullptr, mProjection));
 
-    void* pMappedMemory = mConstantBuffer.Map();
+    UINT8* pMappedMemory = mConstantBuffer.GetMappedPtr();
+    if (!pMappedMemory)
+    {
+        Muon::Printf(L"Error: Failed to set camera constant buffer because it was unmapped!: %s\n", mConstantBuffer.GetName());
+        return;
+    }
+    
     memcpy(pMappedMemory, &cb, mConstantBuffer.GetBufferSize());
-    mConstantBuffer.Unmap(0, mConstantBuffer.GetBufferSize());
 }
 
 }

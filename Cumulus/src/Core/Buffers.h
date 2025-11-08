@@ -53,7 +53,8 @@ struct UploadBuffer : Buffer
     void* Map();
     void Unmap(size_t begin, size_t end);
 
-    // TODO: Get rid of this crap
+    UINT8* GetMappedPtr() { return mMappedPtr; }
+
     bool CanAllocate(UINT desiredSize, UINT alignment);
     bool Allocate(UINT desiredSize, UINT alignment, void*& out_mappedPtr, D3D12_GPU_VIRTUAL_ADDRESS& out_gpuAddr, UINT& out_offset);
 

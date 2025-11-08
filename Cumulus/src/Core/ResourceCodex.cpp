@@ -21,13 +21,13 @@ namespace Muon
 {
 static ResourceCodex* gCodexInstance = nullptr;
 
-MeshID ResourceCodex::AddMeshFromFile(const wchar_t* fileName, const VertexBufferDescription* vertAttr)
+MeshID ResourceCodex::AddMeshFromFile(const wchar_t* fileName)
 {
     ResourceCodex& codexInstance = GetSingleton();
 
     Mesh mesh;
 
-    MeshID id = MeshFactory::CreateMesh(fileName, vertAttr, codexInstance.GetMeshStagingBuffer(), mesh);
+    MeshID id = MeshFactory::CreateMesh(fileName, codexInstance.GetMeshStagingBuffer(), mesh);
     auto& hashtable = codexInstance.mMeshMap;
     
     if (hashtable.find(id) == hashtable.end())
@@ -58,11 +58,18 @@ void ResourceCodex::Init()
     }
 
     gCodexInstance = new ResourceCodex();
-    gCodexInstance->mMeshStagingBuffer.Create(L"Mesh Staging Buffer", 64 * 1024 * 1024);
-    gCodexInstance->mMaterialParamsStagingBuffer.Create(L"Material Params Staging Buffer", sizeof(cbMaterialParams));
+    gCodexInstance->mMeshStagingBuffer.Create(L"Mesh Staging Buffer", 64 * 1024 * 1024); // 64MB of models can be staged at once
+    gCodexInstance->mMaterialParamsStagingBuffer.Create(L"Material Params Staging Buffer", sizeof(cbMaterialParams)); // Exactly one set of material params can be staged at once
     gCodexInstance->m2DTextureStagingBuffer.Create(L"2D Staging Buffer", 512 * 512 * 4 * sizeof(float) * 64); // 64 512x512 2D textures at once
-    gCodexInstance->m3DTextureStagingBuffer.Create(L"NVDF Staging Buffer", 512 * 512 * 128 * 4 * sizeof(float)); // one 512x512x128 3D texture (ie, noise)
+    gCodexInstance->m3DTextureStagingBuffer.Create(L"NVDF Staging Buffer",4 * (512 * 512 * 128 * 4 * sizeof(float))); // 4 512x512x128 3D textures at once 
 
+    // TODO: Optimization opportunity.
+    // Some of these load operations are CPU-heavy. 
+    // At the moment we do all the CPU load upfront, 
+    // only scheduling what to do in the GPU for later when the initialization command list is executed.
+    // Idea: We should open, schedule, then execute command lists intermittently so the GPU isn't idle while we
+    // do heavy CPU work (like loading models, or 3d textures, etc)
+    // Of note are model loading and 3D texture loading, which can be quite expensive. 
     ShaderFactory::LoadAllShaders(*gCodexInstance);
     MeshFactory::LoadAllMeshes(*gCodexInstance);
     TextureFactory::LoadAllTextures(GetDevice(), GetCommandList(), *gCodexInstance);
