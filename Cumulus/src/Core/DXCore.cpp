@@ -86,6 +86,8 @@ namespace Muon
     D3D12_CPU_DESCRIPTOR_HANDLE GetCurrentBackBufferView() { return CD3DX12_CPU_DESCRIPTOR_HANDLE(gRTVHeap->GetCPUDescriptorHandleForHeapStart(), CurrentBackBuffer, gRTVSize); }
     D3D12_CPU_DESCRIPTOR_HANDLE GetDepthStencilView() { return gDSVHeap->GetCPUDescriptorHandleForHeapStart(); }
     D3D12_CLEAR_VALUE& GetGlobalClearValue() { return gClearValue; }
+    HWND GetHwnd() { return gHwnd; }
+
     UINT GetRTVDescriptorSize() { return gRTVSize; }
     UINT GetDSVDescriptorSize() { return gDSVSize; }
     UINT GetCBVDescriptorSize() { return gCBVSize; }

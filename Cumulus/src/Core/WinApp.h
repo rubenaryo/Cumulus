@@ -46,6 +46,7 @@ by first defining macros that disable certain  features that go unused
 #define NOPROXYSTUB
 #define NOIMAGE
 #define NOTAPE
+#define _SILENCE_CXX17_CODECVT_HEADER_DEPRECATION_WARNING // For easier wstring conversion
 
 // Always include Windows.h at the very end
 #include <Windows.h>

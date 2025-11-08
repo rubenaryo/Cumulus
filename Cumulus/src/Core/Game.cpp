@@ -317,8 +317,8 @@ void Game::OnResize(int newWidth, int newHeight)
         }
         catch (std::exception const& e)
         {
-            //MessageBoxA(mDeviceResources.GetWindow(), e.what(), "Fatal Exception!", MB_OK | MB_ICONERROR | MB_SETFOREGROUND);
-            //DestroyWindow(mDeviceResources.GetWindow());
+            MessageBoxA(Muon::GetHwnd(), e.what(), "Fatal Exception on resize!", MB_OK | MB_ICONERROR | MB_SETFOREGROUND);
+            DestroyWindow(Muon::GetHwnd());
         }
     #else
         CreateWindowSizeDependentResources(newWidth, newHeight);

@@ -261,7 +261,7 @@ namespace Muon
             size_t length = 1 + strnlen_s(paramDesc.SemanticName, 256);
             char* buf = new CHAR[length];
             memset(buf, 0, length);
-            strncpy(buf, paramDesc.SemanticName, length);
+            strncpy_s(buf, length, paramDesc.SemanticName, length);
             inputParam.SemanticName = buf;
             inputParam.SemanticIndex = paramDesc.SemanticIndex;
             inputParam.InputSlotClass = slotClass;

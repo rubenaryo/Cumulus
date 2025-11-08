@@ -124,7 +124,7 @@ bool UploadBuffer::CanAllocate(UINT desiredSize, UINT alignment)
     }
 
     // Whether (after alignment) the requested size will be able to fit in the buffer
-    UINT aligned = Muon::AlignToBoundary(mOffset, alignment);
+    UINT aligned = Muon::AlignToBoundary((UINT)mOffset, alignment);
     return aligned + desiredSize <= mBufferSize;
 }
 
@@ -138,7 +138,7 @@ bool UploadBuffer::Allocate(UINT desiredSize, UINT alignment, void*& out_mappedP
     }
 
     // Puts the current offset on the next requested alignment boundary
-    UINT aligned = Muon::AlignToBoundary(mOffset, alignment);
+    UINT aligned = Muon::AlignToBoundary((UINT)mOffset, alignment);
 
     if (aligned + desiredSize > mBufferSize)
     {

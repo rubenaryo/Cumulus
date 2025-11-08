@@ -136,7 +136,7 @@ bool MeshFactory::LoadMesh(const wchar_t* fileName, UploadBuffer& stagingBuffer,
     // TODO: Support scenes with multiple meshes. These meshData's need to be merged.
     MeshData& data = meshesData.at(0);
     
-    bool success = outMesh.Create(fileName, data.vertexData.size(), data.vertexData.size() / data.vertexCount, data.vertexCount, data.indices.size() * sizeof(uint32_t), data.indices.size(), DXGI_FORMAT_R32_UINT);
+    bool success = outMesh.Create(fileName, (UINT)data.vertexData.size(), (UINT)data.vertexData.size() / data.vertexCount, (UINT)data.vertexCount, (UINT)data.indices.size() * sizeof(uint32_t), (UINT)data.indices.size(), DXGI_FORMAT_R32_UINT);
     if (!success)
     {
         Muon::Printf(L"Error: Failed to create mesh: %s\n", fileName);
@@ -144,7 +144,7 @@ bool MeshFactory::LoadMesh(const wchar_t* fileName, UploadBuffer& stagingBuffer,
         return false;
     }
     
-    success = stagingBuffer.UploadToMesh(Muon::GetCommandList(), outMesh, data.vertexData.data(), data.vertexData.size(), data.indices.data(), data.indices.size() * sizeof(uint32_t));
+    success = stagingBuffer.UploadToMesh(Muon::GetCommandList(), outMesh, data.vertexData.data(), (UINT)data.vertexData.size(), data.indices.data(), (UINT)data.indices.size() * sizeof(uint32_t));
     if (!success)
     {
         Muon::Printf(L"Error: Failed to upload mesh: %s\n", fileName);
@@ -225,7 +225,7 @@ bool TextureFactory::Upload3DTextureFromData(const wchar_t* textureName, void* d
 
     Texture& tex = codex.InsertTexture(GetResourceID(textureName));
 
-    if (!tex.Create(textureName, pDevice, width, height, depth, fmt, D3D12_RESOURCE_FLAG_NONE, D3D12_RESOURCE_STATE_COPY_DEST))
+    if (!tex.Create(textureName, pDevice, (UINT)width, (UINT)height, (UINT)depth, fmt, D3D12_RESOURCE_FLAG_NONE, D3D12_RESOURCE_STATE_COPY_DEST))
     {
         Muon::Printf(L"Error: Failed to create default heap resource for 3d texture %s!\n", textureName);
         return false;
@@ -342,7 +342,7 @@ void TextureFactory::LoadAllTextures(ID3D12Device* pDevice, ID3D12GraphicsComman
         }
 
         const DirectX::Image* pImage = scratchImg.GetImage(0, 0, 0);
-        if (!pImage || !tex.Create(name.c_str(), pDevice, pImage->width, pImage->height, 1, pImage->format, D3D12_RESOURCE_FLAG_NONE, D3D12_RESOURCE_STATE_COPY_DEST))
+        if (!pImage || !tex.Create(name.c_str(), pDevice, (UINT)pImage->width, (UINT)pImage->height, 1, pImage->format, D3D12_RESOURCE_FLAG_NONE, D3D12_RESOURCE_STATE_COPY_DEST))
         {
             Muon::Printf(L"Error: Failed to create texture on default heap %s: 0x%08X\n", path.c_str(), hr);
             continue;

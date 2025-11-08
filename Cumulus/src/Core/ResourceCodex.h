@@ -36,6 +36,7 @@ public:
 
     static ResourceCodex& GetSingleton();
 
+    // TODO: Extend Register*() functionality to the other resource types (especially Texture)
     bool RegisterMesh(Mesh& m);
     
     const VertexShader* GetVertexShader(ResourceID UID) const;
