@@ -5,6 +5,7 @@ Description : Utility functions
 ----------------------------------------------*/
 
 #include <Utils/Utils.h>
+#include <Utils/HashUtils.h>
 #include <stdio.h>
 #include <locale>
 #include <codecvt>
@@ -51,6 +52,12 @@ namespace Muon
 	{
 		std::wstring_convert<std::codecvt_utf8_utf16<wchar_t>> conv;
 		return conv.from_bytes(str);
+	}
+
+	// Central function to generate resourceIDs given a name.
+	ResourceID GetResourceID(const wchar_t* resName)
+	{
+		return (ResourceID)fnv1a(resName);
 	}
 
 	UINT AlignToBoundary(UINT size, UINT alignment)

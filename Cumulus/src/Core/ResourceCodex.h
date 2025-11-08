@@ -31,7 +31,7 @@ namespace Muon
 class alignas(8) ResourceCodex
 {
 public:
-    static MeshID AddMeshFromFile(const wchar_t* fileName);
+    static ResourceID AddMeshFromFile(const wchar_t* fileName);
     
     // Singleton Stuff
     static void Init();
@@ -39,26 +39,26 @@ public:
 
     static ResourceCodex& GetSingleton();
 
-    const Mesh* GetMesh(MeshID UID) const;
+    const Mesh* GetMesh(ResourceID UID) const;
     
-    const VertexShader* GetVertexShader(ShaderID UID) const;
-    const PixelShader* GetPixelShader(ShaderID UID) const;
-    const ComputeShader* GetComputeShader(ShaderID UID) const;
-    const Material* GetMaterialType(MaterialID UID) const;
-    const Texture* GetTexture(TextureID UID) const;
-    Texture* GetTexture(TextureID UID); // TODO: find some way to make this a const ptr again
+    const VertexShader* GetVertexShader(ResourceID UID) const;
+    const PixelShader* GetPixelShader(ResourceID UID) const;
+    const ComputeShader* GetComputeShader(ResourceID UID) const;
+    const Material* GetMaterialType(ResourceID UID) const;
+    const Texture* GetTexture(ResourceID UID) const;
+    Texture* GetTexture(ResourceID UID); // TODO: find some way to make this a const ptr again
     UploadBuffer& GetMeshStagingBuffer() { return mMeshStagingBuffer; }
     UploadBuffer& GetMatParamsStagingBuffer() { return mMaterialParamsStagingBuffer; }
     UploadBuffer& Get2DTextureStagingBuffer() { return m2DTextureStagingBuffer; }
     UploadBuffer& Get3DTextureStagingBuffer() { return m3DTextureStagingBuffer; }
 
 private:
-    std::unordered_map<ShaderID, VertexShader>  mVertexShaders;
-    std::unordered_map<ShaderID, PixelShader>   mPixelShaders;
-    std::unordered_map<ShaderID, ComputeShader> mComputeShaders;
-    std::unordered_map<MeshID, Mesh>            mMeshMap;
-    std::unordered_map<TextureID, Texture>      mTextureMap;
-    std::unordered_map<MaterialID, Material>    mMaterialMap;
+    std::unordered_map<ResourceID, VertexShader>  mVertexShaders;
+    std::unordered_map<ResourceID, PixelShader>   mPixelShaders;
+    std::unordered_map<ResourceID, ComputeShader> mComputeShaders;
+    std::unordered_map<ResourceID, Mesh>            mMeshMap;
+    std::unordered_map<ResourceID, Texture>      mTextureMap;
+    std::unordered_map<ResourceID, Material>    mMaterialMap;
 
     // An intermediate upload buffer used for uploading vertex/index data to the GPU
     UploadBuffer mMeshStagingBuffer;
@@ -68,15 +68,15 @@ private:
 
 private:
     friend struct TextureFactory;
-    Texture& InsertTexture(TextureID hash);
+    Texture& InsertTexture(ResourceID hash);
 
     friend struct MaterialFactory;
     Material* InsertMaterialType(const wchar_t* name);
 
     friend struct ShaderFactory;
-    void AddVertexShader(ShaderID hash, const wchar_t* path);
-    void AddPixelShader(ShaderID hash, const wchar_t* path);
-    void AddComputeShader(ShaderID hash, const wchar_t* path);
+    void AddVertexShader(ResourceID hash, const wchar_t* path);
+    void AddPixelShader(ResourceID hash, const wchar_t* path);
+    void AddComputeShader(ResourceID hash, const wchar_t* path);
 };
 }
 #endif

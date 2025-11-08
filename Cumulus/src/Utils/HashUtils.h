@@ -1,10 +1,10 @@
 /*----------------------------------------------
 Ruben Young (rubenaryo@gmail.com)
 Date : 2020/10
-Description : Material class for shader information
+Description : Utility functions for hashing
 ----------------------------------------------*/
-#ifndef EASEL_HASH_UTIL_H
-#define EASEL_HASH_UTIL_H
+#ifndef MUON_HASHUTILS_H
+#define MUON_HASHUTILS_H
 
 #include <stdint.h>
 

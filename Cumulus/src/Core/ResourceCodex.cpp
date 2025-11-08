@@ -15,19 +15,19 @@ Description : Master Resource Distributor
 
 #include <DirectXTex.h>
 
-#include "hash_util.h"
+#include <Utils/HashUtils.h>
 
 namespace Muon
 {
 static ResourceCodex* gCodexInstance = nullptr;
 
-MeshID ResourceCodex::AddMeshFromFile(const wchar_t* fileName)
+ResourceID ResourceCodex::AddMeshFromFile(const wchar_t* fileName)
 {
     ResourceCodex& codexInstance = GetSingleton();
 
     Mesh mesh;
 
-    MeshID id = MeshFactory::CreateMesh(fileName, codexInstance.GetMeshStagingBuffer(), mesh);
+    ResourceID id = MeshFactory::CreateMesh(fileName, codexInstance.GetMeshStagingBuffer(), mesh);
     auto& hashtable = codexInstance.mMeshMap;
     
     if (hashtable.find(id) == hashtable.end())
@@ -126,7 +126,7 @@ void ResourceCodex::Destroy()
     gCodexInstance = nullptr;
 }
 
-const Mesh* ResourceCodex::GetMesh(MeshID UID) const
+const Mesh* ResourceCodex::GetMesh(ResourceID UID) const
 {
     if(mMeshMap.find(UID) != mMeshMap.end())
         return &mMeshMap.at(UID);
@@ -134,7 +134,7 @@ const Mesh* ResourceCodex::GetMesh(MeshID UID) const
         return nullptr;
 }
 
-const VertexShader* ResourceCodex::GetVertexShader(ShaderID UID) const
+const VertexShader* ResourceCodex::GetVertexShader(ResourceID UID) const
 {
     if(mVertexShaders.find(UID) != mVertexShaders.end())
         return &mVertexShaders.at(UID);
@@ -142,7 +142,7 @@ const VertexShader* ResourceCodex::GetVertexShader(ShaderID UID) const
         return nullptr;
 }
 
-const PixelShader* ResourceCodex::GetPixelShader(ShaderID UID) const
+const PixelShader* ResourceCodex::GetPixelShader(ResourceID UID) const
 {
     if(mPixelShaders.find(UID) != mPixelShaders.end())
         return &mPixelShaders.at(UID);
@@ -150,7 +150,7 @@ const PixelShader* ResourceCodex::GetPixelShader(ShaderID UID) const
         return nullptr;
 }
 
-const ComputeShader* ResourceCodex::GetComputeShader(ShaderID UID) const
+const ComputeShader* ResourceCodex::GetComputeShader(ResourceID UID) const
 {
     if (mComputeShaders.find(UID) != mComputeShaders.end())
         return &mComputeShaders.at(UID);
@@ -158,7 +158,7 @@ const ComputeShader* ResourceCodex::GetComputeShader(ShaderID UID) const
         return nullptr;
 }
 
-const Material* ResourceCodex::GetMaterialType(MaterialID UID) const
+const Material* ResourceCodex::GetMaterialType(ResourceID UID) const
 {
     if (mMaterialMap.find(UID) != mMaterialMap.end())
         return &mMaterialMap.at(UID);
@@ -166,7 +166,7 @@ const Material* ResourceCodex::GetMaterialType(MaterialID UID) const
         return nullptr;
 }
 
-const Texture* ResourceCodex::GetTexture(TextureID UID) const
+const Texture* ResourceCodex::GetTexture(ResourceID UID) const
 {
     if (mTextureMap.find(UID) != mTextureMap.end())
         return &mTextureMap.at(UID);
@@ -174,7 +174,7 @@ const Texture* ResourceCodex::GetTexture(TextureID UID) const
         return nullptr;
 }
 
-Texture* ResourceCodex::GetTexture(TextureID UID)
+Texture* ResourceCodex::GetTexture(ResourceID UID)
 {
     if (mTextureMap.find(UID) != mTextureMap.end())
         return &mTextureMap.at(UID);
@@ -182,26 +182,26 @@ Texture* ResourceCodex::GetTexture(TextureID UID)
         return nullptr;
 }
 
-void ResourceCodex::AddVertexShader(ShaderID hash, const wchar_t* path)
+void ResourceCodex::AddVertexShader(ResourceID hash, const wchar_t* path)
 {   
     mVertexShaders.emplace(hash, path);
 }
 
-void ResourceCodex::AddPixelShader(ShaderID hash, const wchar_t* path)
+void ResourceCodex::AddPixelShader(ResourceID hash, const wchar_t* path)
 {   
     mPixelShaders.emplace(hash, path);
 }
 
-void ResourceCodex::AddComputeShader(ShaderID hash, const wchar_t* path)
+void ResourceCodex::AddComputeShader(ResourceID hash, const wchar_t* path)
 {
     mComputeShaders.emplace(hash, path);
 }
 
-Texture& ResourceCodex::InsertTexture(TextureID hash)
+Texture& ResourceCodex::InsertTexture(ResourceID hash)
 {
     if (mTextureMap.find(hash) != mTextureMap.end())
     {
-        Muon::Printf(L"Warninr: Attempted to insert duplicate textureID: 0x%08x!\n", hash);
+        Muon::Printf(L"Warninr: Attempted to insert duplicate ResourceID: 0x%08x!\n", hash);
     }
 
     return mTextureMap[hash];
@@ -212,7 +212,7 @@ Material* ResourceCodex::InsertMaterialType(const wchar_t* name)
     if (!name)
         return nullptr;
 
-    MaterialID typeId = fnv1a(name);
+    ResourceID typeId = GetResourceID(name);
     auto emplaceResult = mMaterialMap.emplace(typeId, name);
     if (emplaceResult.second == false)
         return nullptr;

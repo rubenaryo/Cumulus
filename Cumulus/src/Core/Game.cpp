@@ -14,7 +14,6 @@ Description : Implementation of Game.h
 #include <Core/ResourceCodex.h>
 #include <Core/Shader.h>
 #include <Core/Texture.h>
-#include <Core/hash_util.h>
 #include <Utils/Utils.h>
 
 Game::Game() :
@@ -46,8 +45,8 @@ bool Game::Init(HWND window, int width, int height)
 
     // Assemble opaque render pass
     {
-        mOpaquePass.SetVertexShader(codex.GetVertexShader(fnv1a(L"Phong.vs")));
-        mOpaquePass.SetPixelShader(codex.GetPixelShader(fnv1a(L"Phong.ps")));
+        mOpaquePass.SetVertexShader(codex.GetVertexShader(GetResourceID(L"Phong.vs")));
+        mOpaquePass.SetPixelShader(codex.GetPixelShader(GetResourceID(L"Phong.ps")));
 
         if (!mOpaquePass.Generate())
             Printf(L"Warning: %s failed to generate!\n", mOpaquePass.GetName());
@@ -55,7 +54,7 @@ bool Game::Init(HWND window, int width, int height)
 
     // Assemble compute filter pass
     {
-        mSobelPass.SetComputeShader(codex.GetComputeShader(fnv1a(L"Sobel.cs")));
+        mSobelPass.SetComputeShader(codex.GetComputeShader(GetResourceID(L"Sobel.cs")));
 
         if (!mSobelPass.Generate())
             Printf(L"Warning: %s failed to generate!\n", mSobelPass.GetName());
@@ -63,7 +62,7 @@ bool Game::Init(HWND window, int width, int height)
 
     // Assemble raymarch pass
     {
-        mRaymarchPass.SetComputeShader(codex.GetComputeShader(fnv1a(L"Raymarch.cs")));
+        mRaymarchPass.SetComputeShader(codex.GetComputeShader(GetResourceID(L"Raymarch.cs")));
 
         if (!mRaymarchPass.Generate())
             Printf(L"Warning: %s failed to generate!\n", mRaymarchPass.GetName());
@@ -71,8 +70,8 @@ bool Game::Init(HWND window, int width, int height)
 
     // Assemble post-process render pass
     {
-        mPostProcessPass.SetVertexShader(codex.GetVertexShader(fnv1a(L"Passthrough.vs")));
-        mPostProcessPass.SetPixelShader(codex.GetPixelShader(fnv1a(L"Passthrough.ps")));
+        mPostProcessPass.SetVertexShader(codex.GetVertexShader(GetResourceID(L"Passthrough.vs")));
+        mPostProcessPass.SetPixelShader(codex.GetPixelShader(GetResourceID(L"Passthrough.ps")));
 
         if (!mPostProcessPass.Generate())
             Printf(L"Warning: %s failed to generate!\n", mPostProcessPass.GetName());
@@ -147,11 +146,11 @@ void Game::Render()
 
     // Fetch the desired material from the codex
     ResourceCodex& codex = ResourceCodex::GetSingleton();
-    MaterialID matId = fnv1a("Phong");
+    ResourceID matId = GetResourceID(L"Phong");
     const Muon::Material* pPhongMaterial = codex.GetMaterialType(matId);
     
-    Texture* pOffscreenTarget = codex.GetTexture(fnv1a("OffscreenTarget"));
-    Texture* pComputeOutput = codex.GetTexture(fnv1a("SobelOutput"));
+    Texture* pOffscreenTarget = codex.GetTexture(GetResourceID(L"OffscreenTarget"));
+    Texture* pComputeOutput = codex.GetTexture(GetResourceID(L"SobelOutput"));
     if (!pOffscreenTarget || !pComputeOutput)
     {
         Muon::Printf("Error: Game::Render Failed to fetch the offscreen target and compute output textures.\n");
@@ -186,7 +185,7 @@ void Game::Render()
             pCommandList->SetGraphicsRootConstantBufferView(lightsRootIdx, mLightBuffer.GetGPUVirtualAddress());
         }
 
-        const Mesh* pMesh = codex.GetMesh(fnv1a(L"cylinder.obj"));
+        const Mesh* pMesh = codex.GetMesh(GetResourceID(L"cylinder.obj"));
         if (pMesh)
         {
             pMesh->DrawIndexed(pCommandList);

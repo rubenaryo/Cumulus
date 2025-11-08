@@ -37,13 +37,13 @@ public:
     void SetMaterialParams(cbMaterialParams& params) { mMaterialParams = params; }
     bool PopulateMaterialParams(UploadBuffer& stagingBuffer, ID3D12GraphicsCommandList* pCommandList);
 
-    bool SetTextureParam(const char* paramName, TextureID texId);
-    const std::unordered_map<std::string, TextureID>& GetTextureParams() const { return mTextureParams; }
+    bool SetTextureParam(const char* paramName, ResourceID texId);
+    const std::unordered_map<std::string, ResourceID>& GetTextureParams() const { return mTextureParams; }
 
     const DefaultBuffer& GetParamBuffer() const { return mMaterialParamsBuffer; }
 
 protected:
-    std::unordered_map<std::string, TextureID> mTextureParams;
+    std::unordered_map<std::string, ResourceID> mTextureParams;
     std::wstring mName;
 
     DefaultBuffer mMaterialParamsBuffer;

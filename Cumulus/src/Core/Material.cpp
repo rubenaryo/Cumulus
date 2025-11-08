@@ -25,7 +25,7 @@ bool Material::PopulateMaterialParams(UploadBuffer& stagingBuffer, ID3D12Graphic
     return mMaterialParamsBuffer.Populate(&mMaterialParams, sizeof(cbMaterialParams), stagingBuffer, pCommandList);
 }
 
-bool Material::SetTextureParam(const char* paramName, TextureID texId)
+bool Material::SetTextureParam(const char* paramName, ResourceID texId)
 {
     mTextureParams[paramName] = texId;
     return true;
