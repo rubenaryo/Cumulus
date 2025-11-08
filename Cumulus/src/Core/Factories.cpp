@@ -33,11 +33,10 @@ static unsigned int GetVertexSize(const aiMesh& mesh)
     return sz;
 }
 
-ResourceID MeshFactory::CreateMesh(const wchar_t* fileName, UploadBuffer& stagingBuffer, Mesh& out_mesh)
+bool MeshFactory::LoadMesh(const wchar_t* fileName, UploadBuffer& stagingBuffer, Mesh& outMesh)
 {
     using namespace DirectX;
     Assimp::Importer Importer;
-    ResourceID ResourceID = GetResourceID(fileName);
    
     std::string pathStr = Muon::FromWideStr(GetModelPathFromFile_W(fileName));
 
@@ -53,7 +52,7 @@ ResourceID MeshFactory::CreateMesh(const wchar_t* fileName, UploadBuffer& stagin
     if (!pScene || pScene->mFlags & AI_SCENE_FLAGS_INCOMPLETE || !pScene->mRootNode)
     {
         Muon::Printf("Error parsing '%s': '%s'\n", pathStr.c_str(), Importer.GetErrorString());
-        return 0;
+        return false;
     }
 
     struct MeshData
@@ -137,15 +136,23 @@ ResourceID MeshFactory::CreateMesh(const wchar_t* fileName, UploadBuffer& stagin
     // TODO: Support scenes with multiple meshes. These meshData's need to be merged.
     MeshData& data = meshesData.at(0);
     
-    bool success = out_mesh.Create(fileName, data.vertexData.size(), data.vertexData.size() / data.vertexCount, data.vertexCount, data.indices.size() * sizeof(uint32_t), data.indices.size(), DXGI_FORMAT_R32_UINT);
+    bool success = outMesh.Create(fileName, data.vertexData.size(), data.vertexData.size() / data.vertexCount, data.vertexCount, data.indices.size() * sizeof(uint32_t), data.indices.size(), DXGI_FORMAT_R32_UINT);
     if (!success)
+    {
         Muon::Printf(L"Error: Failed to create mesh: %s\n", fileName);
+        outMesh.Destroy();
+        return false;
+    }
     
-    success = stagingBuffer.UploadToMesh(Muon::GetCommandList(), out_mesh, data.vertexData.data(), data.vertexData.size(), data.indices.data(), data.indices.size() * sizeof(uint32_t));
+    success = stagingBuffer.UploadToMesh(Muon::GetCommandList(), outMesh, data.vertexData.data(), data.vertexData.size(), data.indices.data(), data.indices.size() * sizeof(uint32_t));
     if (!success)
+    {
         Muon::Printf(L"Error: Failed to upload mesh: %s\n", fileName);
+        outMesh.Destroy();
+        return false;
+    }
 
-    return ResourceID;
+    return true;
 }
 
 void MeshFactory::LoadAllMeshes(ResourceCodex& codex)
@@ -162,7 +169,11 @@ void MeshFactory::LoadAllMeshes(ResourceCodex& codex)
     for (const auto& entry : fs::directory_iterator(modelPath))
     {
         std::wstring& name = entry.path().filename().wstring();
-        codex.AddMeshFromFile(name.c_str());
+        Mesh temp;
+        if (!MeshFactory::LoadMesh(name.c_str(), codex.GetMeshStagingBuffer(), temp))
+            continue;
+
+        codex.RegisterMesh(temp);
     }
 }
 

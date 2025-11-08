@@ -31,7 +31,6 @@ namespace Muon
 class alignas(8) ResourceCodex
 {
 public:
-    static ResourceID AddMeshFromFile(const wchar_t* fileName);
     
     // Singleton Stuff
     static void Init();
@@ -40,6 +39,7 @@ public:
     static ResourceCodex& GetSingleton();
 
     const Mesh* GetMesh(ResourceID UID) const;
+    bool RegisterMesh(Mesh& m);
     
     const VertexShader* GetVertexShader(ResourceID UID) const;
     const PixelShader* GetPixelShader(ResourceID UID) const;
@@ -56,9 +56,9 @@ private:
     std::unordered_map<ResourceID, VertexShader>  mVertexShaders;
     std::unordered_map<ResourceID, PixelShader>   mPixelShaders;
     std::unordered_map<ResourceID, ComputeShader> mComputeShaders;
-    std::unordered_map<ResourceID, Mesh>            mMeshMap;
-    std::unordered_map<ResourceID, Texture>      mTextureMap;
-    std::unordered_map<ResourceID, Material>    mMaterialMap;
+    std::unordered_map<ResourceID, Mesh>          mMeshMap;
+    std::unordered_map<ResourceID, Texture>       mTextureMap;
+    std::unordered_map<ResourceID, Material>      mMaterialMap;
 
     // An intermediate upload buffer used for uploading vertex/index data to the GPU
     UploadBuffer mMeshStagingBuffer;
@@ -77,6 +77,7 @@ private:
     void AddVertexShader(ResourceID hash, const wchar_t* path);
     void AddPixelShader(ResourceID hash, const wchar_t* path);
     void AddComputeShader(ResourceID hash, const wchar_t* path);
+
 };
 }
 #endif

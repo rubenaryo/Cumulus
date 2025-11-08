@@ -21,27 +21,19 @@ namespace Muon
 {
 static ResourceCodex* gCodexInstance = nullptr;
 
-ResourceID ResourceCodex::AddMeshFromFile(const wchar_t* fileName)
+bool ResourceCodex::RegisterMesh(Mesh& m)
 {
-    ResourceCodex& codexInstance = GetSingleton();
+    ResourceID id = GetResourceID(m.GetName());   
 
-    Mesh mesh;
-
-    ResourceID id = MeshFactory::CreateMesh(fileName, codexInstance.GetMeshStagingBuffer(), mesh);
-    auto& hashtable = codexInstance.mMeshMap;
+    #if defined(MN_DEBUG)
+    if (mMeshMap.find(id) != mMeshMap.end())
+    {
+        Muon::Printf("ERROR: Tried to insert repeat mesh: %s\n", m.GetName());
+    }
+    #endif
     
-    if (hashtable.find(id) == hashtable.end())
-    {
-        codexInstance.mMeshMap.emplace(id, mesh);
-    }
-    else
-    {
-        #if defined(MN_DEBUG)
-            Muon::Print("ERROR: Tried to insert repeat mesh\n");
-        #endif
-        assert(false);
-    }
-    return id;
+    mMeshMap[id] = m;
+    return true;
 }
 
 ResourceCodex& ResourceCodex::GetSingleton()
@@ -201,7 +193,7 @@ Texture& ResourceCodex::InsertTexture(ResourceID hash)
 {
     if (mTextureMap.find(hash) != mTextureMap.end())
     {
-        Muon::Printf(L"Warninr: Attempted to insert duplicate ResourceID: 0x%08x!\n", hash);
+        Muon::Printf(L"Warning: Attempted to insert duplicate ResourceID: 0x%08x!\n", hash);
     }
 
     return mTextureMap[hash];
