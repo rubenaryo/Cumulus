@@ -1,7 +1,5 @@
 #include "Factories.h"
 
-#include "hash_util.h"
-
 // MeshFactory
 #include "Mesh.h"
 #include <assimp/Importer.hpp>
@@ -9,13 +7,13 @@
 #include <assimp/scene.h>
 
 // ShaderFactory
-#include "Shader.h"
+#include <Core/Shader.h>
 
 // TextureFactory
-#include "Material.h"
+#include <Core/Material.h>
+#include <Core/Texture.h>
 #include <filesystem>
 #include <DirectXTex.h>
-#include <Core/Texture.h>
 
 #include <Core/DXCore.h>
 #include <Utils/Utils.h>
@@ -24,134 +22,137 @@
 namespace Muon
 {
 
-MeshID MeshFactory::CreateMesh(const char* fileName, const VertexBufferDescription* vertAttr, Mesh& out_mesh)
+static unsigned int GetVertexSize(const aiMesh& mesh)
 {
+    unsigned int sz = 0;
+    if (mesh.HasPositions()) sz += sizeof(float) * 3;
+    if (mesh.HasNormals()) sz += sizeof(float) * 3;
+    if (mesh.HasTextureCoords(0)) sz += sizeof(float) * 2;  // vec2
+    if (mesh.HasTangentsAndBitangents())  sz += sizeof(float) * 6;  // vec3 tangent + vec3 bitangent
+    if (mesh.HasVertexColors(0)) sz += sizeof(float) * 4;  // vec4
+    return sz;
+}
+
+bool MeshFactory::LoadMesh(const wchar_t* fileName, UploadBuffer& stagingBuffer, Mesh& outMesh)
+{
+    using namespace DirectX;
     Assimp::Importer Importer;
-    MeshID meshId = fnv1a(fileName);
+   
+    std::string pathStr = Muon::FromWideStr(GetModelPathFromFile_W(fileName));
 
     // Load assimpScene with proper flags
     const aiScene* pScene = Importer.ReadFile(
-        GetModelPathFromFile(fileName),
+        pathStr,
         aiProcess_Triangulate           |
         aiProcess_JoinIdenticalVertices |   // Remove unnecessary duplicate information
         aiProcess_GenNormals            |   // Ensure normals are generated
         aiProcess_CalcTangentSpace          // Needed for normal mapping
     );
 
-    const VertexBufferDescription vertDesc = *vertAttr;
-
-    if (pScene)
+    if (!pScene || pScene->mFlags & AI_SCENE_FLAGS_INCOMPLETE || !pScene->mRootNode)
     {
-        using namespace DirectX;
+        Muon::Printf("Error parsing '%s': '%s'\n", pathStr.c_str(), Importer.GetErrorString());
+        return false;
+    }
 
-        // aiScenes may be composed of multiple submeshes,
-        // we want to coagulate this into a single vertex/index buffer
-        for (unsigned int i = 0; i != pScene->mNumMeshes; ++i)
+    struct MeshData
+    {
+        std::vector<uint8_t> vertexData;
+        std::vector<uint32_t> indices;
+        uint32_t vertexCount = 0;
+    };
+    std::vector<MeshData> meshesData;
+    meshesData.reserve(pScene->mNumMeshes);
+
+    auto WriteFloat2 = [](uint8_t*& writeHead, const aiVector3D& vec)
+    {
+        float data[2] = { vec.x, vec.y };
+        memcpy(writeHead, data, sizeof(data));
+        writeHead += sizeof(data);
+    };
+
+    auto WriteFloat3 = [](uint8_t*& writeHead, const aiVector3D& vec)
+    {
+        float data[3] = { vec.x, vec.y, vec.z };
+        memcpy(writeHead, data, sizeof(data));
+        writeHead += sizeof(data);
+    };
+
+    auto WriteFloat4 = [](uint8_t*& writeHead, const aiColor4D& color)
+    {
+        float data[4] = { color.r, color.g, color.b, color.a };
+        memcpy(writeHead, data, sizeof(data));
+        writeHead += sizeof(data);
+    };
+    
+    // aiScenes may be composed of multiple submeshes,
+    for (unsigned int i = 0; i != pScene->mNumMeshes; ++i)
+    {
+        const aiMesh* pMesh = pScene->mMeshes[i];
+
+        if (!pMesh)
         {
-            const aiMesh* pMesh = pScene->mMeshes[i];
-            const aiVector3D c_Zero(0.0f, 0.0f, 0.0f);
+            Muon::Printf("Warning: Model file contained null aiMesh: %s\n", pathStr.c_str());
+            continue;
+        }
 
-            const UINT numVertices = pMesh->mNumVertices;
-            BYTE* vertices = (BYTE*)malloc(vertDesc.ByteSize * numVertices);
+        const unsigned int vertexSize = GetVertexSize(*pMesh);
+        const unsigned int numVertices = pMesh->mNumVertices;
+        const unsigned int totalVBOSize = numVertices * vertexSize;
+        MeshData& meshData = meshesData.emplace_back();
+        meshData.vertexData.resize(totalVBOSize);
+        meshData.vertexCount = numVertices;
 
-            const unsigned int numIndices = pMesh->mNumFaces * 3;
-            uint32_t* indices  = (uint32_t*)malloc(sizeof(uint32_t) * numIndices);
+        uint8_t* bufferStart = meshData.vertexData.data();
+        uint8_t* writeHead = bufferStart;
 
-            // Process Vertices for this mesh
-            for (unsigned int j = 0; j != pMesh->mNumVertices; ++j)
-            {
-                // Assign needed vertex attributes
-                for (unsigned int k = 0; k != vertDesc.AttrCount; ++k)
-                {
-                    const unsigned int currByteOffset = vertDesc.ByteOffsets[k];
-                    const unsigned int nextByteOffset = (k+1) != vertDesc.AttrCount ? vertDesc.ByteOffsets[k+1] : vertDesc.ByteSize;
-                    const unsigned int numComponents = (nextByteOffset - currByteOffset) / sizeof(float);
-                    BYTE* copyLocation = (vertices + j*vertDesc.ByteSize) + currByteOffset;
+        // Process Vertices for this mesh
+        for (unsigned int j = 0; j != pMesh->mNumVertices; ++j)
+        {
+            if (pMesh->HasPositions()) WriteFloat3(writeHead, pMesh->mVertices[j]);
+            if (pMesh->HasNormals()) WriteFloat3(writeHead, pMesh->mNormals[j]);
+            if (pMesh->HasTextureCoords(0)) WriteFloat2(writeHead, pMesh->mTextureCoords[0][j]);
+            if (pMesh->HasTangentsAndBitangents()) { WriteFloat3(writeHead, pMesh->mTangents[j]); WriteFloat3(writeHead, pMesh->mBitangents[j]); }
+            if (pMesh->HasVertexColors(0)) WriteFloat4(writeHead, pMesh->mColors[0][j]);
+        }
 
-                    switch (vertDesc.SemanticsArr[k])
-                    {
-                        case Semantics::POSITION:
-                            assert(pMesh->HasPositions());
-                            memcpy(copyLocation, &(pMesh->mVertices[j]), sizeof(float) * numComponents);
-                            break;
-                        case Semantics::NORMAL:
-                            assert(pMesh->HasNormals());
-                            memcpy(copyLocation, &(pMesh->mNormals[j]), sizeof(float) * numComponents);
-                            break;
-                        case Semantics::TEXCOORD:
-                            assert(pMesh->HasTextureCoords(0));
-                            memcpy(copyLocation, &(pMesh->mTextureCoords[0][j]), sizeof(float) * numComponents);
-                            break;
-                        case Semantics::TANGENT:
-                            assert(pMesh->HasTangentsAndBitangents());
-                            memcpy(copyLocation, &(pMesh->mTangents[j]), sizeof(float) * numComponents);
-                            break;
-                        case Semantics::BINORMAL:
-                            assert(pMesh->HasTangentsAndBitangents());
-                            memcpy(copyLocation, &(pMesh->mBitangents[j]), sizeof(float) * numComponents);
-                            break;
-                        case Semantics::COLOR: // Lacks testing
-                            assert(pMesh->HasVertexColors(0));
-                            memcpy(copyLocation, &(pMesh->mColors[0][j]), sizeof(float) * numComponents);
-                            break;
-                        #if defined(MN_DEBUG)
-                        default:
-                            OutputDebugStringA("INFO: Unhandled Vertex Shader Input Semantic when parsing Mesh vertices\n");
-                        #endif
-                    }
-                }
-            }
+        meshData.indices.reserve(pMesh->mNumFaces * 3);
+    
+        // Process Indices next
+        for (unsigned int j = 0, ind = 0; j < pMesh->mNumFaces; ++j)
+        {
+            const aiFace& face = pMesh->mFaces[j];
+    
+            #if defined(MN_DEBUG)
+                assert(face.mNumIndices == 3); // Sanity check
+            #endif
 
-            // Process Indices next
-            for (unsigned int j = 0, ind = 0; j < pMesh->mNumFaces; ++j)
-            {
-                const aiFace& face = pMesh->mFaces[j];
-
-                #if defined(MN_DEBUG)
-                    assert(face.mNumIndices == 3); // Sanity check
-                #endif
-
-                // All the indices of this face are valid, add to list
-                indices[ind++] = face.mIndices[0];
-                indices[ind++] = face.mIndices[1];
-                indices[ind++] = face.mIndices[2];
-            }
-            
-            bool success = out_mesh.Init(reinterpret_cast<void*>(vertices), vertDesc.ByteSize * numVertices, vertDesc.ByteSize, reinterpret_cast<void*>(indices), sizeof(unsigned int) * numIndices, numIndices, DXGI_FORMAT_R32_UINT);
-            if (!success)
-                Muon::Print("Failed to init mesh!\n");
-
-            free(vertices);
-            free(indices);
+            meshData.indices.push_back(face.mIndices[0]);
+            meshData.indices.push_back(face.mIndices[1]);
+            meshData.indices.push_back(face.mIndices[2]);
         }
     }
-    #if defined(MN_DEBUG)
-    else
+
+    // TODO: Support scenes with multiple meshes. These meshData's need to be merged.
+    MeshData& data = meshesData.at(0);
+    
+    bool success = outMesh.Create(fileName, (UINT)data.vertexData.size(), (UINT)data.vertexData.size() / data.vertexCount, (UINT)data.vertexCount, (UINT)data.indices.size() * sizeof(uint32_t), (UINT)data.indices.size(), DXGI_FORMAT_R32_UINT);
+    if (!success)
     {
-        char buf[256];
-        sprintf_s(buf, "Error parsing '%s': '%s'\n", fileName, Importer.GetErrorString());
-        throw std::exception(buf);
-        return 0;
+        Muon::Printf(L"Error: Failed to create mesh: %s\n", fileName);
+        outMesh.Destroy();
+        return false;
+    }
+    
+    success = stagingBuffer.UploadToMesh(Muon::GetCommandList(), outMesh, data.vertexData.data(), (UINT)data.vertexData.size(), data.indices.data(), (UINT)data.indices.size() * sizeof(uint32_t));
+    if (!success)
+    {
+        Muon::Printf(L"Error: Failed to upload mesh: %s\n", fileName);
+        outMesh.Destroy();
+        return false;
     }
 
-    std::string vbName;
-    vbName.append(fileName);
-    vbName.append("_VertexBuffer");
-        
-    HRESULT hr = out_mesh.VertexBuffer->SetPrivateData(WKPDID_D3DDebugObjectName, (UINT)vbName.size(), vbName.c_str());
-    COM_EXCEPT(hr);
-
-    if (out_mesh.IndexBuffer)
-    {
-        std::string ibName;
-        ibName.append(fileName);
-        ibName.append("_IndexBuffer");
-
-        hr = out_mesh.IndexBuffer->SetPrivateData(WKPDID_D3DDebugObjectName, (UINT)ibName.size(), ibName.c_str());
-        COM_EXCEPT(hr);
-    }
-    #endif
-    return meshId;
+    return true;
 }
 
 void MeshFactory::LoadAllMeshes(ResourceCodex& codex)
@@ -164,19 +165,15 @@ void MeshFactory::LoadAllMeshes(ResourceCodex& codex)
         throw std::exception("Models folder doesn't exist!");
 #endif
 
-    // PhongVS will be comprehensive enough for now..
-    const ShaderID kPhongVSID = fnv1a(L"Phong.vs");
-    const VertexShader* pVS = codex.GetVertexShader(kPhongVSID);
-    if (!pVS)
-        return;
-
-    const VertexBufferDescription* pVertDesc = &(pVS->VertexDesc);
-
     // Iterate through folder and load models
     for (const auto& entry : fs::directory_iterator(modelPath))
     {
-        std::string& name = entry.path().filename().generic_string();
-        codex.AddMeshFromFile(name.c_str(), pVertDesc);
+        std::wstring& name = entry.path().filename().wstring();
+        Mesh temp;
+        if (!MeshFactory::LoadMesh(name.c_str(), codex.GetMeshStagingBuffer(), temp))
+            continue;
+
+        codex.RegisterMesh(temp);
     }
 }
 
@@ -198,7 +195,7 @@ void ShaderFactory::LoadAllShaders(ResourceCodex& codex)
         size_t pos = stem.find(L'.') + 1;
         std::wstring ext = stem.substr(pos);
 
-        ShaderID hash = fnv1a(stem.c_str());
+        ResourceID hash = GetResourceID(stem.c_str());
 
         // Parse file name to decide how to create this resource
         // TODO: This is stupid, maybe just put them all in the same map?
@@ -226,10 +223,9 @@ bool TextureFactory::Upload3DTextureFromData(const wchar_t* textureName, void* d
     UploadBuffer& stagingBuffer = codex.Get3DTextureStagingBuffer();
     assert(dataSize <= stagingBuffer.GetBufferSize());
 
-    TextureID hash = fnv1a(textureName);
-    Texture& tex = codex.InsertTexture(hash);
+    Texture& tex = codex.InsertTexture(GetResourceID(textureName));
 
-    if (!tex.Create(textureName, pDevice, width, height, depth, fmt, D3D12_RESOURCE_FLAG_NONE, D3D12_RESOURCE_STATE_COPY_DEST))
+    if (!tex.Create(textureName, pDevice, (UINT)width, (UINT)height, (UINT)depth, fmt, D3D12_RESOURCE_FLAG_NONE, D3D12_RESOURCE_STATE_COPY_DEST))
     {
         Muon::Printf(L"Error: Failed to create default heap resource for 3d texture %s!\n", textureName);
         return false;
@@ -272,8 +268,8 @@ bool TextureFactory::CreateOffscreenRenderTarget(ID3D12Device* pDevice, UINT wid
     const wchar_t* COMPUTE_OUTPUT_NAME = L"SobelOutput";
 
     ResourceCodex& codex = ResourceCodex::GetSingleton();
-    Texture& offscreenTarget = codex.InsertTexture(fnv1a(OFFSCREEN_TARGET_NAME));
-    Texture& computeOutput = codex.InsertTexture(fnv1a(COMPUTE_OUTPUT_NAME));
+    Texture& offscreenTarget = codex.InsertTexture(GetResourceID(OFFSCREEN_TARGET_NAME));
+    Texture& computeOutput = codex.InsertTexture(GetResourceID(COMPUTE_OUTPUT_NAME));
 
     success &= offscreenTarget.Create(OFFSCREEN_TARGET_NAME, pDevice, width, height, 1, rtvFormat, D3D12_RESOURCE_FLAG_ALLOW_RENDER_TARGET, D3D12_RESOURCE_STATE_GENERIC_READ, &clearValue);
     if (!success)
@@ -334,7 +330,7 @@ void TextureFactory::LoadAllTextures(ID3D12Device* pDevice, ID3D12GraphicsComman
         if (TexExt != L"png")
             continue;
 
-        TextureID tid = fnv1a(name.c_str());
+        ResourceID tid = GetResourceID(name.c_str());
         Texture& tex = codex.InsertTexture(tid);
 
         DirectX::ScratchImage scratchImg;
@@ -346,7 +342,7 @@ void TextureFactory::LoadAllTextures(ID3D12Device* pDevice, ID3D12GraphicsComman
         }
 
         const DirectX::Image* pImage = scratchImg.GetImage(0, 0, 0);
-        if (!pImage || !tex.Create(name.c_str(), pDevice, pImage->width, pImage->height, 1, pImage->format, D3D12_RESOURCE_FLAG_NONE, D3D12_RESOURCE_STATE_COPY_DEST))
+        if (!pImage || !tex.Create(name.c_str(), pDevice, (UINT)pImage->width, (UINT)pImage->height, 1, pImage->format, D3D12_RESOURCE_FLAG_NONE, D3D12_RESOURCE_STATE_COPY_DEST))
         {
             Muon::Printf(L"Error: Failed to create texture on default heap %s: 0x%08X\n", path.c_str(), hr);
             continue;
@@ -549,9 +545,9 @@ void TextureFactory::LoadAllNVDF(ID3D12Device* pDevice, ID3D12GraphicsCommandLis
 
 bool MaterialFactory::CreateAllMaterials(ResourceCodex& codex)
 {
-    const TextureID kRockDiffuseId = fnv1a(L"Rock_T.png");
-    const TextureID kRockNormalId = fnv1a(L"Rock_N.png");
-    const TextureID kTestNVDFId = fnv1a(L"StormbirdCloud_NVDF");
+    const ResourceID kRockDiffuseId = GetResourceID(L"Rock_T.png");
+    const ResourceID kRockNormalId = GetResourceID(L"Rock_N.png");
+    const ResourceID kTestNVDFId = GetResourceID(L"StormbirdCloud_NVDF");
     {
         const wchar_t* kPhongMaterialName = L"Phong";
         Material* pPhongMaterial = codex.InsertMaterialType(kPhongMaterialName);

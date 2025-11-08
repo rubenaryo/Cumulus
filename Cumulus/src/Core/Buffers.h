@@ -13,6 +13,11 @@ Description : Interface for GPU  Buffers
 
 namespace Muon
 {
+struct Mesh;
+}
+
+namespace Muon
+{
 
 struct Buffer
 {
@@ -22,6 +27,7 @@ struct Buffer
     void BaseCreate(const wchar_t* name, size_t size, D3D12_HEAP_TYPE heapType, D3D12_RESOURCE_STATES resourceState);
     void BaseDestroy();
 
+    const wchar_t* GetName() const { return mName.c_str(); }
     size_t GetBufferSize() const { return mBufferSize; }
     ID3D12Resource* GetResource() { return mpResource.Get(); }
 
@@ -47,11 +53,13 @@ struct UploadBuffer : Buffer
     void* Map();
     void Unmap(size_t begin, size_t end);
 
-    // TODO: Get rid of this crap
+    UINT8* GetMappedPtr() { return mMappedPtr; }
+
     bool CanAllocate(UINT desiredSize, UINT alignment);
     bool Allocate(UINT desiredSize, UINT alignment, void*& out_mappedPtr, D3D12_GPU_VIRTUAL_ADDRESS& out_gpuAddr, UINT& out_offset);
 
     bool UploadToTexture(Texture& dstTexture, void* data, ID3D12GraphicsCommandList* pCommandList);
+    bool UploadToMesh(ID3D12GraphicsCommandList* pCommandList, Mesh& dstMesh, void* vtxData, UINT vtxDataSize, void* idxData = nullptr, UINT idxDataSize = 0);
 
 private:
     UINT8* mMappedPtr = nullptr;

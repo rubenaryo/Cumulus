@@ -15,33 +15,25 @@ Description : Master Resource Distributor
 
 #include <DirectXTex.h>
 
-#include "hash_util.h"
+#include <Utils/HashUtils.h>
 
 namespace Muon
 {
 static ResourceCodex* gCodexInstance = nullptr;
 
-MeshID ResourceCodex::AddMeshFromFile(const char* fileName, const VertexBufferDescription* vertAttr)
+bool ResourceCodex::RegisterMesh(Mesh& m)
 {
-    ResourceCodex& codexInstance = GetSingleton();
+    ResourceID id = GetResourceID(m.GetName());   
 
-    Mesh mesh;
-
-    MeshID id = MeshFactory::CreateMesh(fileName, vertAttr, mesh);
-    auto& hashtable = codexInstance.mMeshMap;
+    #if defined(MN_DEBUG)
+    if (mMeshMap.find(id) != mMeshMap.end())
+    {
+        Muon::Printf("ERROR: Tried to insert repeat mesh: %s\n", m.GetName());
+    }
+    #endif
     
-    if (hashtable.find(id) == hashtable.end())
-    {
-        codexInstance.mMeshMap.emplace(id, mesh);
-    }
-    else
-    {
-        #if defined(MN_DEBUG)
-            Muon::Print("ERROR: Tried to insert repeat mesh\n");
-        #endif
-        assert(false);
-    }
-    return id;
+    mMeshMap[id] = m;
+    return true;
 }
 
 ResourceCodex& ResourceCodex::GetSingleton()
@@ -58,12 +50,20 @@ void ResourceCodex::Init()
     }
 
     gCodexInstance = new ResourceCodex();
-    gCodexInstance->mMeshStagingBuffer.Create(L"Mesh Staging Buffer", 64 * 1024 * 1024);
-    gCodexInstance->mMaterialParamsStagingBuffer.Create(L"Material Params Staging Buffer", sizeof(cbMaterialParams));
+    gCodexInstance->mMeshStagingBuffer.Create(L"Mesh Staging Buffer", 64 * 1024 * 1024); // 64MB of models can be staged at once
+    gCodexInstance->mMaterialParamsStagingBuffer.Create(L"Material Params Staging Buffer", sizeof(cbMaterialParams)); // Exactly one set of material params can be staged at once
     gCodexInstance->m2DTextureStagingBuffer.Create(L"2D Staging Buffer", 512 * 512 * 4 * sizeof(float) * 64); // 64 512x512 2D textures at once
-    gCodexInstance->m3DTextureStagingBuffer.Create(L"NVDF Staging Buffer", 512 * 512 * 128 * 4 * sizeof(float)); // one 512x512x128 3D texture (ie, noise)
+    gCodexInstance->m3DTextureStagingBuffer.Create(L"NVDF Staging Buffer",4 * (512 * 512 * 128 * 4 * sizeof(float))); // 4 512x512x128 3D textures at once 
 
+    // TODO: Optimization opportunity.
+    // Some of these load operations are CPU-heavy. 
+    // At the moment we do all the CPU load upfront, 
+    // only scheduling what to do in the GPU for later when the initialization command list is executed.
+    // Idea: We should open, schedule, then execute command lists intermittently so the GPU isn't idle while we
+    // do heavy CPU work (like loading models, or 3d textures, etc)
+    // Of note are model loading and 3D texture loading, which can be quite expensive. 
     ShaderFactory::LoadAllShaders(*gCodexInstance);
+    MeshFactory::LoadAllMeshes(*gCodexInstance);
     TextureFactory::LoadAllTextures(GetDevice(), GetCommandList(), *gCodexInstance);
     TextureFactory::LoadAllNVDF(GetDevice(), GetCommandList(), *gCodexInstance);
     MaterialFactory::CreateAllMaterials(*gCodexInstance);
@@ -74,7 +74,7 @@ void ResourceCodex::Destroy()
     for (auto& m : gCodexInstance->mMeshMap)
     {
         Mesh& mesh = m.second;
-        mesh.Release();
+        mesh.Destroy();
     }
     gCodexInstance->mMeshMap.clear();
 
@@ -118,7 +118,7 @@ void ResourceCodex::Destroy()
     gCodexInstance = nullptr;
 }
 
-const Mesh* ResourceCodex::GetMesh(MeshID UID) const
+const Mesh* ResourceCodex::GetMesh(ResourceID UID) const
 {
     if(mMeshMap.find(UID) != mMeshMap.end())
         return &mMeshMap.at(UID);
@@ -126,7 +126,7 @@ const Mesh* ResourceCodex::GetMesh(MeshID UID) const
         return nullptr;
 }
 
-const VertexShader* ResourceCodex::GetVertexShader(ShaderID UID) const
+const VertexShader* ResourceCodex::GetVertexShader(ResourceID UID) const
 {
     if(mVertexShaders.find(UID) != mVertexShaders.end())
         return &mVertexShaders.at(UID);
@@ -134,7 +134,7 @@ const VertexShader* ResourceCodex::GetVertexShader(ShaderID UID) const
         return nullptr;
 }
 
-const PixelShader* ResourceCodex::GetPixelShader(ShaderID UID) const
+const PixelShader* ResourceCodex::GetPixelShader(ResourceID UID) const
 {
     if(mPixelShaders.find(UID) != mPixelShaders.end())
         return &mPixelShaders.at(UID);
@@ -142,7 +142,7 @@ const PixelShader* ResourceCodex::GetPixelShader(ShaderID UID) const
         return nullptr;
 }
 
-const ComputeShader* ResourceCodex::GetComputeShader(ShaderID UID) const
+const ComputeShader* ResourceCodex::GetComputeShader(ResourceID UID) const
 {
     if (mComputeShaders.find(UID) != mComputeShaders.end())
         return &mComputeShaders.at(UID);
@@ -150,7 +150,7 @@ const ComputeShader* ResourceCodex::GetComputeShader(ShaderID UID) const
         return nullptr;
 }
 
-const Material* ResourceCodex::GetMaterialType(MaterialID UID) const
+const Material* ResourceCodex::GetMaterialType(ResourceID UID) const
 {
     if (mMaterialMap.find(UID) != mMaterialMap.end())
         return &mMaterialMap.at(UID);
@@ -158,7 +158,7 @@ const Material* ResourceCodex::GetMaterialType(MaterialID UID) const
         return nullptr;
 }
 
-const Texture* ResourceCodex::GetTexture(TextureID UID) const
+const Texture* ResourceCodex::GetTexture(ResourceID UID) const
 {
     if (mTextureMap.find(UID) != mTextureMap.end())
         return &mTextureMap.at(UID);
@@ -166,7 +166,7 @@ const Texture* ResourceCodex::GetTexture(TextureID UID) const
         return nullptr;
 }
 
-Texture* ResourceCodex::GetTexture(TextureID UID)
+Texture* ResourceCodex::GetTexture(ResourceID UID)
 {
     if (mTextureMap.find(UID) != mTextureMap.end())
         return &mTextureMap.at(UID);
@@ -174,26 +174,26 @@ Texture* ResourceCodex::GetTexture(TextureID UID)
         return nullptr;
 }
 
-void ResourceCodex::AddVertexShader(ShaderID hash, const wchar_t* path)
+void ResourceCodex::AddVertexShader(ResourceID hash, const wchar_t* path)
 {   
     mVertexShaders.emplace(hash, path);
 }
 
-void ResourceCodex::AddPixelShader(ShaderID hash, const wchar_t* path)
+void ResourceCodex::AddPixelShader(ResourceID hash, const wchar_t* path)
 {   
     mPixelShaders.emplace(hash, path);
 }
 
-void ResourceCodex::AddComputeShader(ShaderID hash, const wchar_t* path)
+void ResourceCodex::AddComputeShader(ResourceID hash, const wchar_t* path)
 {
     mComputeShaders.emplace(hash, path);
 }
 
-Texture& ResourceCodex::InsertTexture(TextureID hash)
+Texture& ResourceCodex::InsertTexture(ResourceID hash)
 {
     if (mTextureMap.find(hash) != mTextureMap.end())
     {
-        Muon::Printf(L"Warninr: Attempted to insert duplicate textureID: 0x%08x!\n", hash);
+        Muon::Printf(L"Warning: Attempted to insert duplicate ResourceID: 0x%08x!\n", hash);
     }
 
     return mTextureMap[hash];
@@ -204,7 +204,7 @@ Material* ResourceCodex::InsertMaterialType(const wchar_t* name)
     if (!name)
         return nullptr;
 
-    MaterialID typeId = fnv1a(name);
+    ResourceID typeId = GetResourceID(name);
     auto emplaceResult = mMaterialMap.emplace(typeId, name);
     if (emplaceResult.second == false)
         return nullptr;

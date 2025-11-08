@@ -11,11 +11,9 @@ Description : Implementation of Game.h
 #include <Core/Camera.h>
 #include <Core/COMException.h>
 #include <Core/Factories.h>
-#include <Core/PipelineState.h>
 #include <Core/ResourceCodex.h>
 #include <Core/Shader.h>
 #include <Core/Texture.h>
-#include <Core/hash_util.h>
 #include <Utils/Utils.h>
 
 Game::Game() :
@@ -34,39 +32,21 @@ bool Game::Init(HWND window, int width, int height)
     using namespace Muon;
 
     bool success = Muon::InitDX12(window, width, height);
-    
+
     Muon::ResetCommandList(nullptr);
     ResourceCodex::Init();
+
+    // TODO: Create the offscreen render target externally, but register it in the codex so it can manage its lifetime. 
     TextureFactory::CreateOffscreenRenderTarget(Muon::GetDevice(), width, height);
 
     ResourceCodex& codex = ResourceCodex::GetSingleton();
-    const ShaderID kPhongVSID = fnv1a(L"Phong.vs");
-    const ShaderID kPhongPSID = fnv1a(L"Phong.ps");    
-    const ShaderID kSobelCSID = fnv1a(L"Sobel.cs");
-    const ShaderID kRaymarchCSID = fnv1a(L"Raymarch.cs");
-    const ShaderID kCompositeVSID = fnv1a(L"Composite.vs");
-    const ShaderID kCompositePSID = fnv1a(L"Composite.ps");
-    const ShaderID kPassthroughVSID = fnv1a(L"Passthrough.vs");
-    const ShaderID kPassthroughPSID = fnv1a(L"Passthrough.ps");
-    
-    const VertexShader* pPhongVS = codex.GetVertexShader(kPhongVSID);
-    const PixelShader* pPhongPS = codex.GetPixelShader(kPhongPSID);
-    
-    const ComputeShader* pSobelCS = codex.GetComputeShader(kSobelCSID);
-    const ComputeShader* pRaymarchCS = codex.GetComputeShader(kRaymarchCSID);
-    
-    const VertexShader* pCompositeVS = codex.GetVertexShader(kCompositeVSID);
-    const PixelShader*  pCompositePS = codex.GetPixelShader(kCompositePSID);
-    
-    const VertexShader* pPassthroughVS = codex.GetVertexShader(kPassthroughVSID);
-    const PixelShader*  pPassthroughPS = codex.GetPixelShader (kPassthroughPSID);
 
     mCamera.Init(DirectX::XMFLOAT3(3.0, 3.0, 3.0), width / (float)height, 0.1f, 1000.0f);
 
     // Assemble opaque render pass
     {
-        mOpaquePass.SetVertexShader(pPhongVS);
-        mOpaquePass.SetPixelShader(pPhongPS);
+        mOpaquePass.SetVertexShader(codex.GetVertexShader(GetResourceID(L"Phong.vs")));
+        mOpaquePass.SetPixelShader(codex.GetPixelShader(GetResourceID(L"Phong.ps")));
 
         if (!mOpaquePass.Generate())
             Printf(L"Warning: %s failed to generate!\n", mOpaquePass.GetName());
@@ -74,7 +54,7 @@ bool Game::Init(HWND window, int width, int height)
 
     // Assemble compute filter pass
     {
-        mSobelPass.SetComputeShader(pSobelCS);
+        mSobelPass.SetComputeShader(codex.GetComputeShader(GetResourceID(L"Sobel.cs")));
 
         if (!mSobelPass.Generate())
             Printf(L"Warning: %s failed to generate!\n", mSobelPass.GetName());
@@ -82,7 +62,7 @@ bool Game::Init(HWND window, int width, int height)
 
     // Assemble raymarch pass
     {
-        mRaymarchPass.SetComputeShader(pRaymarchCS);
+        mRaymarchPass.SetComputeShader(codex.GetComputeShader(GetResourceID(L"Raymarch.cs")));
 
         if (!mRaymarchPass.Generate())
             Printf(L"Warning: %s failed to generate!\n", mRaymarchPass.GetName());
@@ -90,109 +70,25 @@ bool Game::Init(HWND window, int width, int height)
 
     // Assemble post-process render pass
     {
-        mPostProcessPass.SetVertexShader(pPassthroughVS);
-        mPostProcessPass.SetPixelShader (pPassthroughPS);
+        mPostProcessPass.SetVertexShader(codex.GetVertexShader(GetResourceID(L"Passthrough.vs")));
+        mPostProcessPass.SetPixelShader(codex.GetPixelShader(GetResourceID(L"Passthrough.ps")));
 
         if (!mPostProcessPass.Generate())
             Printf(L"Warning: %s failed to generate!\n", mPostProcessPass.GetName());
     }
 
-    struct Vertex
-    {
-        float Pos[4];
-        float Col[4];
-    };
-
-    struct PhongVertex
-    {
-        float position[3];  // POSITION
-        float normal[3];    // NORMAL
-        float uv[2];        // TEXCOORD
-        float tangent[3];   // TANGENT
-        float binormal[3];  // BINORMAL
-    };
-
-    // Generate a cube centered at origin with side length 1.0f
-    PhongVertex cubeVertices[] =
-    {
-        // Front face (Z+)
-        { { -0.5f, -0.5f,  0.5f }, {  0.0f,  0.0f,  1.0f }, { 0.0f, 1.0f }, {  1.0f,  0.0f,  0.0f }, {  0.0f,  1.0f,  0.0f } },
-        { {  0.5f, -0.5f,  0.5f }, {  0.0f,  0.0f,  1.0f }, { 1.0f, 1.0f }, {  1.0f,  0.0f,  0.0f }, {  0.0f,  1.0f,  0.0f } },
-        { {  0.5f,  0.5f,  0.5f }, {  0.0f,  0.0f,  1.0f }, { 1.0f, 0.0f }, {  1.0f,  0.0f,  0.0f }, {  0.0f,  1.0f,  0.0f } },
-        { { -0.5f,  0.5f,  0.5f }, {  0.0f,  0.0f,  1.0f }, { 0.0f, 0.0f }, {  1.0f,  0.0f,  0.0f }, {  0.0f,  1.0f,  0.0f } },
-
-        // Back face (Z-)
-        { {  0.5f, -0.5f, -0.5f }, {  0.0f,  0.0f, -1.0f }, { 0.0f, 1.0f }, { -1.0f,  0.0f,  0.0f }, {  0.0f,  1.0f,  0.0f } },
-        { { -0.5f, -0.5f, -0.5f }, {  0.0f,  0.0f, -1.0f }, { 1.0f, 1.0f }, { -1.0f,  0.0f,  0.0f }, {  0.0f,  1.0f,  0.0f } },
-        { { -0.5f,  0.5f, -0.5f }, {  0.0f,  0.0f, -1.0f }, { 1.0f, 0.0f }, { -1.0f,  0.0f,  0.0f }, {  0.0f,  1.0f,  0.0f } },
-        { {  0.5f,  0.5f, -0.5f }, {  0.0f,  0.0f, -1.0f }, { 0.0f, 0.0f }, { -1.0f,  0.0f,  0.0f }, {  0.0f,  1.0f,  0.0f } },
-
-        // Top face (Y+)
-        { { -0.5f,  0.5f,  0.5f }, {  0.0f,  1.0f,  0.0f }, { 0.0f, 1.0f }, {  1.0f,  0.0f,  0.0f }, {  0.0f,  0.0f, -1.0f } },
-        { {  0.5f,  0.5f,  0.5f }, {  0.0f,  1.0f,  0.0f }, { 1.0f, 1.0f }, {  1.0f,  0.0f,  0.0f }, {  0.0f,  0.0f, -1.0f } },
-        { {  0.5f,  0.5f, -0.5f }, {  0.0f,  1.0f,  0.0f }, { 1.0f, 0.0f }, {  1.0f,  0.0f,  0.0f }, {  0.0f,  0.0f, -1.0f } },
-        { { -0.5f,  0.5f, -0.5f }, {  0.0f,  1.0f,  0.0f }, { 0.0f, 0.0f }, {  1.0f,  0.0f,  0.0f }, {  0.0f,  0.0f, -1.0f } },
-
-        // Bottom face (Y-)
-        { { -0.5f, -0.5f, -0.5f }, {  0.0f, -1.0f,  0.0f }, { 0.0f, 1.0f }, {  1.0f,  0.0f,  0.0f }, {  0.0f,  0.0f,  1.0f } },
-        { {  0.5f, -0.5f, -0.5f }, {  0.0f, -1.0f,  0.0f }, { 1.0f, 1.0f }, {  1.0f,  0.0f,  0.0f }, {  0.0f,  0.0f,  1.0f } },
-        { {  0.5f, -0.5f,  0.5f }, {  0.0f, -1.0f,  0.0f }, { 1.0f, 0.0f }, {  1.0f,  0.0f,  0.0f }, {  0.0f,  0.0f,  1.0f } },
-        { { -0.5f, -0.5f,  0.5f }, {  0.0f, -1.0f,  0.0f }, { 0.0f, 0.0f }, {  1.0f,  0.0f,  0.0f }, {  0.0f,  0.0f,  1.0f } },
-
-        // Right face (X+)
-        { {  0.5f, -0.5f,  0.5f }, {  1.0f,  0.0f,  0.0f }, { 0.0f, 1.0f }, {  0.0f,  0.0f, -1.0f }, {  0.0f,  1.0f,  0.0f } },
-        { {  0.5f, -0.5f, -0.5f }, {  1.0f,  0.0f,  0.0f }, { 1.0f, 1.0f }, {  0.0f,  0.0f, -1.0f }, {  0.0f,  1.0f,  0.0f } },
-        { {  0.5f,  0.5f, -0.5f }, {  1.0f,  0.0f,  0.0f }, { 1.0f, 0.0f }, {  0.0f,  0.0f, -1.0f }, {  0.0f,  1.0f,  0.0f } },
-        { {  0.5f,  0.5f,  0.5f }, {  1.0f,  0.0f,  0.0f }, { 0.0f, 0.0f }, {  0.0f,  0.0f, -1.0f }, {  0.0f,  1.0f,  0.0f } },
-
-        // Left face (X-)
-        { { -0.5f, -0.5f, -0.5f }, { -1.0f,  0.0f,  0.0f }, { 0.0f, 1.0f }, {  0.0f,  0.0f,  1.0f }, {  0.0f,  1.0f,  0.0f } },
-        { { -0.5f, -0.5f,  0.5f }, { -1.0f,  0.0f,  0.0f }, { 1.0f, 1.0f }, {  0.0f,  0.0f,  1.0f }, {  0.0f,  1.0f,  0.0f } },
-        { { -0.5f,  0.5f,  0.5f }, { -1.0f,  0.0f,  0.0f }, { 1.0f, 0.0f }, {  0.0f,  0.0f,  1.0f }, {  0.0f,  1.0f,  0.0f } },
-        { { -0.5f,  0.5f, -0.5f }, { -1.0f,  0.0f,  0.0f }, { 0.0f, 0.0f }, {  0.0f,  0.0f,  1.0f }, {  0.0f,  1.0f,  0.0f } },
-    };
-
-    // Index buffer for the cube (36 indices = 12 triangles)
-    uint32_t cubeIndices[] =
-    {
-        // Front face
-        0, 1, 2,    0, 2, 3,
-        // Back face
-        4, 5, 6,    4, 6, 7,
-        // Top face
-        8, 9, 10,   8, 10, 11,
-        // Bottom face
-        12, 13, 14, 12, 14, 15,
-        // Right face
-        16, 17, 18, 16, 18, 19,
-        // Left face
-        20, 21, 22, 20, 22, 23
-    };
-
-    float aspectRatio = width / (float)height;
-    Vertex triangleVertices[] =
-    {
-        { { 0.0f, 0.25f * aspectRatio, 0.0f, 1.0f }, { 1.0f, 0.0f, 0.0f, 1.0f } },
-        { { 0.25f, -0.25f * aspectRatio, 0.0f, 1.0f }, { 0.0f, 1.0f, 0.0f, 1.0f } },
-        { { -0.25f, -0.25f * aspectRatio, 0.0f, 1.0f}, { 0.0f, 0.0f, 1.0f, 1.0f } }
-    };
-
-    //Muon::ResetCommandList(mPSO.GetPipelineState());
-    Muon::UploadBuffer& stagingBuffer = codex.GetMeshStagingBuffer();
-    stagingBuffer.Map();
-    Muon::MeshFactory::LoadAllMeshes(codex);
-    mTriangle.Init(triangleVertices, sizeof(triangleVertices), sizeof(Vertex), nullptr, 0, 0, DXGI_FORMAT_R32_UINT);
-    mCube.Init(cubeVertices, sizeof(cubeVertices), sizeof(PhongVertex), cubeIndices, sizeof(cubeIndices), sizeof(cubeIndices) / sizeof(uint32_t), DXGI_FORMAT_R32_UINT);
-    stagingBuffer.Unmap(0, stagingBuffer.GetBufferSize());
 
     mWorldMatrixBuffer.Create(L"world matrix buffer", sizeof(cbPerEntity));
-    void* mapped = mWorldMatrixBuffer.Map();
-    cbPerEntity entity;
-    DirectX::XMMATRIX entityWorld = DirectX::XMMatrixTranslation(0, 1, 0);
-    DirectX::XMStoreFloat4x4(&entity.world, entityWorld);
-    DirectX::XMStoreFloat4x4(&entity.invWorld, DirectX::XMMatrixInverse(nullptr, entityWorld));
-    memcpy(mapped, &entity, sizeof(entity));
-    mWorldMatrixBuffer.Unmap(0, mWorldMatrixBuffer.GetBufferSize());
+    UINT8* mapped = mWorldMatrixBuffer.GetMappedPtr();
+    assert(mapped);
+    if (mapped)
+    {
+        cbPerEntity entity;
+        DirectX::XMMATRIX entityWorld = DirectX::XMMatrixTranslation(0, 1, 0);
+        DirectX::XMStoreFloat4x4(&entity.world, entityWorld);
+        DirectX::XMStoreFloat4x4(&entity.invWorld, DirectX::XMMatrixInverse(nullptr, entityWorld));
+        memcpy(mapped, &entity, sizeof(entity));
+    }
 
     mLightBuffer.Create(L"Light Buffer", sizeof(cbLights));
 
@@ -229,9 +125,10 @@ void Game::Update(Muon::StepTimer const& timer)
 
     DirectX::XMStoreFloat3(&lights.cameraWorldPos, mCamera.GetPosition());
 
-    void* mapped = mLightBuffer.Map();
-    memcpy(mapped, &lights, sizeof(Muon::cbLights));
-    mLightBuffer.Unmap(0, mLightBuffer.GetBufferSize());
+    UINT8* mapped = mLightBuffer.GetMappedPtr();
+    
+    if (mapped)
+        memcpy(mapped, &lights, sizeof(Muon::cbLights));
 }
 
 void Game::Render()
@@ -249,11 +146,11 @@ void Game::Render()
 
     // Fetch the desired material from the codex
     ResourceCodex& codex = ResourceCodex::GetSingleton();
-    MaterialID matId = fnv1a("Phong");
+    ResourceID matId = GetResourceID(L"Phong");
     const Muon::Material* pPhongMaterial = codex.GetMaterialType(matId);
     
-    Texture* pOffscreenTarget = codex.GetTexture(fnv1a("OffscreenTarget"));
-    Texture* pComputeOutput = codex.GetTexture(fnv1a("SobelOutput"));
+    Texture* pOffscreenTarget = codex.GetTexture(GetResourceID(L"OffscreenTarget"));
+    Texture* pComputeOutput = codex.GetTexture(GetResourceID(L"SobelOutput"));
     if (!pOffscreenTarget || !pComputeOutput)
     {
         Muon::Printf("Error: Game::Render Failed to fetch the offscreen target and compute output textures.\n");
@@ -288,8 +185,11 @@ void Game::Render()
             pCommandList->SetGraphicsRootConstantBufferView(lightsRootIdx, mLightBuffer.GetGPUVirtualAddress());
         }
 
-        // Bind VBO/IBO and Draw
-        mCube.Draw(Muon::GetCommandList());
+        const Mesh* pMesh = codex.GetMesh(GetResourceID(L"cylinder.obj"));
+        if (pMesh)
+        {
+            pMesh->DrawIndexed(pCommandList);
+        }
     }
 
     if (mRaymarchPass.Bind(pCommandList))
@@ -370,8 +270,7 @@ void Game::CreateWindowSizeDependentResources(int newWidth, int newHeight)
 
 Game::~Game()
 { 
-    mTriangle.Release();
-    mCube.Release();
+    mCube.Destroy();
     mWorldMatrixBuffer.Destroy();
     mLightBuffer.Destroy();
     mCamera.Destroy();
@@ -418,8 +317,8 @@ void Game::OnResize(int newWidth, int newHeight)
         }
         catch (std::exception const& e)
         {
-            //MessageBoxA(mDeviceResources.GetWindow(), e.what(), "Fatal Exception!", MB_OK | MB_ICONERROR | MB_SETFOREGROUND);
-            //DestroyWindow(mDeviceResources.GetWindow());
+            MessageBoxA(Muon::GetHwnd(), e.what(), "Fatal Exception on resize!", MB_OK | MB_ICONERROR | MB_SETFOREGROUND);
+            DestroyWindow(Muon::GetHwnd());
         }
     #else
         CreateWindowSizeDependentResources(newWidth, newHeight);

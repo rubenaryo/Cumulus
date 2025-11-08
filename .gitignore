@@ -44,7 +44,6 @@ Generated\ Files/
 *.meta
 *.iobj
 *.pch
-*.pdb
 *.ipdb
 *.pgc
 *.pgd

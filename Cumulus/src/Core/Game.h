@@ -56,7 +56,6 @@ private:
     Muon::GraphicsPass mPostProcessPass;
 
     // TEMP: For testing
-    Muon::Mesh mTriangle;
     Muon::Mesh mCube;
 
     Muon::UploadBuffer mWorldMatrixBuffer;
