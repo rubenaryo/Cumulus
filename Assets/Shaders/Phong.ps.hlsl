@@ -35,6 +35,12 @@ float4 main(VertexOut input) : SV_TARGET
     // Sample diffuse texture, normal map(unpacked)
     float3 surfaceColor = diffuseTexture.Sample(samplerOptions, input.uv).rgb;
     
+    // TEST NVDF
+    float zSlice = float(12) / float(64 - 1);
+    float3 uvw = float3(input.uv, zSlice);
+    float4 sliceValue = test3d.Sample(samplerOptions, uvw);
+    surfaceColor.rgb = sliceValue.rgb;
+    
     // Normalize normal vector
     input.normal = normalize(input.normal);
     
