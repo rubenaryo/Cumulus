@@ -168,12 +168,20 @@ void MeshFactory::LoadAllMeshes(ResourceCodex& codex)
     // Iterate through folder and load models
     for (const auto& entry : fs::directory_iterator(modelPath))
     {
+        Muon::ResetCommandList(nullptr);
+
         std::wstring& name = entry.path().filename().wstring();
         Mesh temp;
         if (!MeshFactory::LoadMesh(name.c_str(), codex.GetMeshStagingBuffer(), temp))
+        {
+            Muon::CloseCommandList();
             continue;
+        }
 
         codex.RegisterMesh(temp);
+
+        Muon::CloseCommandList();
+        Muon::ExecuteCommandList();
     }
 }
 
@@ -319,20 +327,23 @@ void TextureFactory::LoadAllTextures(ID3D12Device* pDevice, ID3D12GraphicsComman
     {
         std::wstring path = entry.path().c_str();
         std::wstring name = entry.path().filename().c_str();
-
+    
         size_t pos = name.find(L'_');
         const std::wstring TexName = name.substr(0, pos++);
         const std::wstring TexType = name.substr(pos, 1);
-
+    
         pos = name.find(L'.') + 1;
         const std::wstring TexExt = name.substr(pos);
-
-        if (TexExt != L"png")
+    
+        if (!entry.is_regular_file() || (TexExt != L"png" && TexExt != L"jpg"))
+        {
             continue;
-
+        }
+    
         ResourceID tid = GetResourceID(name.c_str());
         Texture& tex = codex.InsertTexture(tid);
-
+    
+        Muon::ResetCommandList(nullptr);
         DirectX::ScratchImage scratchImg;
         HRESULT hr = DirectX::LoadFromWICFile(path.c_str(), DirectX::WIC_FLAGS_NONE, nullptr, scratchImg, nullptr);
         if (FAILED(hr))
@@ -340,25 +351,31 @@ void TextureFactory::LoadAllTextures(ID3D12Device* pDevice, ID3D12GraphicsComman
             Muon::Printf(L"Error: Failed to load texture %s: 0x%08X\n", path.c_str(), hr);
             continue;
         }
-
+    
         const DirectX::Image* pImage = scratchImg.GetImage(0, 0, 0);
         if (!pImage || !tex.Create(name.c_str(), pDevice, (UINT)pImage->width, (UINT)pImage->height, 1, pImage->format, D3D12_RESOURCE_FLAG_NONE, D3D12_RESOURCE_STATE_COPY_DEST))
         {
             Muon::Printf(L"Error: Failed to create texture on default heap %s: 0x%08X\n", path.c_str(), hr);
+            CloseCommandList();
             continue;
         }
-
-        if (!stagingBuffer.UploadToTexture(tex, pImage->pixels, pCommandList))
+    
+        if (!stagingBuffer.UploadToTexture(tex, pImage->pixels, GetCommandList()))
         {
             Muon::Printf(L"Error: Failed to upload data to texture %s: 0x%08X\n", path.c_str(), hr);
+            CloseCommandList();
             continue;
         }
-
+    
         if (!tex.InitSRV(pDevice, Muon::GetSRVHeap()))
         {
             Muon::Printf(L"Error: Failed to create D3D12 Resource and SRV for %s!\n", path.c_str());
+            CloseCommandList();
             continue;
         }
+    
+        Muon::CloseCommandList();
+        Muon::ExecuteCommandList();
     }
 }
 
@@ -372,7 +389,7 @@ size_t extractNumber(const std::filesystem::path& p)
     return std::stoul(stem.substr(dotPos + 1));
 }
 
-void TextureFactory::LoadTexturesForNVDF(std::filesystem::path directoryPath, ID3D12Device* pDevice, ID3D12GraphicsCommandList* pCommandList, ResourceCodex& codex)
+bool TextureFactory::LoadTexturesForNVDF(std::filesystem::path directoryPath, ID3D12Device* pDevice, ID3D12GraphicsCommandList* pCommandList, ResourceCodex& codex)
 {
     namespace fs = std::filesystem;
 
@@ -412,7 +429,7 @@ void TextureFactory::LoadTexturesForNVDF(std::filesystem::path directoryPath, ID
     }
 
     if (fieldFiles.empty())
-        return;
+        return false;
 
     using namespace DirectX;
 
@@ -429,11 +446,11 @@ void TextureFactory::LoadTexturesForNVDF(std::filesystem::path directoryPath, ID
         HRESULT hr = LoadFromTGAFile(fieldFiles.at(0).c_str(), nullptr, image);
         COM_EXCEPT(hr);
         if (FAILED(hr))
-            return;
+            return false;
         
         const Image* pImage = image.GetImage(0,0,0);
         if (!pImage)
-            return;
+            return false;
 
         width = pImage->width;
         height = pImage->height;
@@ -451,13 +468,13 @@ void TextureFactory::LoadTexturesForNVDF(std::filesystem::path directoryPath, ID
         if (FAILED(LoadFromTGAFile(fieldFile.c_str(), nullptr, fieldImg)))
         {
             Printf(L"Error: Failed to load %s\n", fieldFile.filename().wstring().c_str());
-            return;
+            return false;
         }
 
         if (FAILED(LoadFromTGAFile(modelFile.c_str(), nullptr, modelImg)))
         {
             Printf(L"Error: Failed to load %s\n", modelFile.filename().wstring().c_str());
-            return;
+            return false;
         }
 
         const Image* fImg = fieldImg.GetImage(0, 0, 0);
@@ -468,7 +485,7 @@ void TextureFactory::LoadTexturesForNVDF(std::filesystem::path directoryPath, ID
             Printf(L"Error: Slice Dimensions Mismatch. %s and %s\n", 
                 fieldFile.filename().wstring().c_str(), 
                 modelFile.filename().wstring().c_str());
-            return;
+            return false;
         }
 
         DXGI_FORMAT fFmt = fImg->format;
@@ -484,7 +501,7 @@ void TextureFactory::LoadTexturesForNVDF(std::filesystem::path directoryPath, ID
         {
             Printf(L"Error: File %s has an unexpected number of bytes per pixel! %ull\n",
                 modelFile.filename().wstring().c_str(), mBytes);
-            return;
+            return false;
         }
 
         size_t sliceOffset = i * width * height * CHANNELS_PER_VOXEL;
@@ -514,7 +531,7 @@ void TextureFactory::LoadTexturesForNVDF(std::filesystem::path directoryPath, ID
     std::wstring lookupName = directoryPath.filename().c_str();
     lookupName += L"_NVDF";
 
-    Upload3DTextureFromData(lookupName.c_str(), outData.data(),
+    return Upload3DTextureFromData(lookupName.c_str(), outData.data(),
         width, height, depth, DXGI_FORMAT_R32G32B32A32_FLOAT, 
         pDevice, pCommandList, codex);
 }
@@ -747,7 +764,16 @@ void TextureFactory::LoadAllNVDF(ID3D12Device* pDevice, ID3D12GraphicsCommandLis
         if (!entry.is_directory())
             continue;
 
-        LoadTexturesForNVDF(entry.path(), pDevice, pCommandList, codex);
+        Muon::ResetCommandList(nullptr);
+        
+        if (!LoadTexturesForNVDF(entry.path(), pDevice, pCommandList, codex))
+        {
+            Muon::CloseCommandList();
+            continue;
+        }
+        
+        Muon::CloseCommandList();
+        Muon::ExecuteCommandList();
     }
 }
 
@@ -782,7 +808,7 @@ void TextureFactory::LoadAll3DTextures(ID3D12Device* pDevice, ID3D12GraphicsComm
 
 bool MaterialFactory::CreateAllMaterials(ResourceCodex& codex)
 {
-    const ResourceID kRockDiffuseId = GetResourceID(L"Rock_T.png");
+    const ResourceID kRockDiffuseId = GetResourceID(L"Bark_T.png");
     const ResourceID kRockNormalId = GetResourceID(L"Rock_N.png");
     const ResourceID kTestNVDFId = GetResourceID(L"StormbirdCloud_NVDF");
     const ResourceID kTest3DTexId = GetResourceID(L"Test_3D");
@@ -799,7 +825,12 @@ bool MaterialFactory::CreateAllMaterials(ResourceCodex& codex)
         phongMaterialParams.colorTint = DirectX::XMFLOAT4(1, 1, 1, 1);
         phongMaterialParams.specularExp = 32.0f;
 
+        Muon::ResetCommandList(nullptr);
+
         pPhongMaterial->PopulateMaterialParams(codex.GetMatParamsStagingBuffer(), Muon::GetCommandList());
+
+        Muon::CloseCommandList();
+        Muon::ExecuteCommandList();
 
         pPhongMaterial->SetTextureParam("diffuseTexture", kRockDiffuseId);
         pPhongMaterial->SetTextureParam("normalMap",      kRockNormalId);
