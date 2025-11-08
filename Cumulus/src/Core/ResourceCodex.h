@@ -28,25 +28,25 @@ struct TextureFactory;
 namespace Muon
 {
 
-class alignas(8) ResourceCodex
+class ResourceCodex
 {
 public:
-    
-    // Singleton Stuff
     static void Init();
     static void Destroy();
 
     static ResourceCodex& GetSingleton();
 
-    const Mesh* GetMesh(ResourceID UID) const;
     bool RegisterMesh(Mesh& m);
     
     const VertexShader* GetVertexShader(ResourceID UID) const;
     const PixelShader* GetPixelShader(ResourceID UID) const;
     const ComputeShader* GetComputeShader(ResourceID UID) const;
-    const Material* GetMaterialType(ResourceID UID) const;
+    const Mesh* GetMesh(ResourceID UID) const;
     const Texture* GetTexture(ResourceID UID) const;
+    const Material* GetMaterialType(ResourceID UID) const;
+
     Texture* GetTexture(ResourceID UID); // TODO: find some way to make this a const ptr again
+
     UploadBuffer& GetMeshStagingBuffer() { return mMeshStagingBuffer; }
     UploadBuffer& GetMatParamsStagingBuffer() { return mMaterialParamsStagingBuffer; }
     UploadBuffer& Get2DTextureStagingBuffer() { return m2DTextureStagingBuffer; }
@@ -60,7 +60,7 @@ private:
     std::unordered_map<ResourceID, Texture>       mTextureMap;
     std::unordered_map<ResourceID, Material>      mMaterialMap;
 
-    // An intermediate upload buffer used for uploading vertex/index data to the GPU
+    // Intermediate upload buffers used for uploading resource data to the GPU
     UploadBuffer mMeshStagingBuffer;
     UploadBuffer mMaterialParamsStagingBuffer;
     UploadBuffer m2DTextureStagingBuffer;
