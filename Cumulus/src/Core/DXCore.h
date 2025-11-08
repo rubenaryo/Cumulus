@@ -38,6 +38,7 @@ namespace Muon
 	D3D12_CPU_DESCRIPTOR_HANDLE GetCurrentBackBufferView();
 	D3D12_CPU_DESCRIPTOR_HANDLE GetDepthStencilView();
 	D3D12_CLEAR_VALUE& GetGlobalClearValue();
+	HWND GetHwnd();
 
 	Texture* GetOffscreenTarget();
 	void SetOffscreenTarget(Texture* pOffscreenTarget);

@@ -11,13 +11,10 @@ Description : Common header to hold shared types
 namespace Muon
 {
     typedef uint32_t id_type;
-    typedef id_type ShaderID;
-    typedef id_type MeshID;
-    typedef id_type TextureID;
-    typedef id_type MaterialID;
+    typedef id_type ResourceID;
 
     static const id_type IDTYPE_MAX = UINT32_MAX;
-    static const TextureID TEXTUREID_INVALID = IDTYPE_MAX;
+    static const ResourceID ResourceID_INVALID = IDTYPE_MAX;
 
     static const int32_t ROOTIDX_INVALID = -1;
 }

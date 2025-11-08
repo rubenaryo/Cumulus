@@ -129,7 +129,7 @@ bool Pass::Generate()
 bool Pass::BindMaterial(const Material& material, ID3D12GraphicsCommandList* pCommandList) const
 {
     const DefaultBuffer& paramBuffer = material.GetParamBuffer();
-    const std::unordered_map<std::string, TextureID>& textureParams = material.GetTextureParams();
+    const std::unordered_map<std::string, ResourceID>& textureParams = material.GetTextureParams();
 
     int32_t materialParamsRootIndex = GetResourceRootIndex("PSPerMaterial");
     if (materialParamsRootIndex != ROOTIDX_INVALID)
@@ -140,7 +140,7 @@ bool Pass::BindMaterial(const Material& material, ID3D12GraphicsCommandList* pCo
     ResourceCodex& codex = ResourceCodex::GetSingleton();
     for (auto texPair : textureParams)
     {
-        TextureID texId = texPair.second;
+        ResourceID texId = texPair.second;
         const Texture* pTex = codex.GetTexture(texId);
         if (!pTex || !pTex->GetResource())
             continue;
