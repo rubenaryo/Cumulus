@@ -62,12 +62,18 @@ void ResourceCodex::Init()
     // Idea: We should open, schedule, then execute command lists intermittently so the GPU isn't idle while we
     // do heavy CPU work (like loading models, or 3d textures, etc)
     // Of note are model loading and 3D texture loading, which can be quite expensive. 
+    
+    Muon::ResetCommandList(nullptr);
     ShaderFactory::LoadAllShaders(*gCodexInstance);
     MeshFactory::LoadAllMeshes(*gCodexInstance);
     TextureFactory::LoadAllTextures(GetDevice(), GetCommandList(), *gCodexInstance);
     TextureFactory::LoadAllNVDF(GetDevice(), GetCommandList(), *gCodexInstance);
-    TextureFactory::LoadAll3DTextures(GetDevice(), GetCommandList(), *gCodexInstance);
     MaterialFactory::CreateAllMaterials(*gCodexInstance);
+    Muon::CloseCommandList();
+    Muon::ExecuteCommandList();
+
+    // Command List is now closed. It will be executed within this function.
+    TextureFactory::LoadAll3DTextures(GetDevice(), GetCommandList(), *gCodexInstance);
 }
 
 void ResourceCodex::Destroy()

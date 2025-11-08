@@ -33,9 +33,9 @@ bool Game::Init(HWND window, int width, int height)
 
     bool success = Muon::InitDX12(window, width, height);
 
-    Muon::ResetCommandList(nullptr);
     ResourceCodex::Init();
 
+    Muon::ResetCommandList(nullptr);
     // TODO: Create the offscreen render target externally, but register it in the codex so it can manage its lifetime. 
     TextureFactory::CreateOffscreenRenderTarget(Muon::GetDevice(), width, height);
 
@@ -185,7 +185,7 @@ void Game::Render()
             pCommandList->SetGraphicsRootConstantBufferView(lightsRootIdx, mLightBuffer.GetGPUVirtualAddress());
         }
 
-        const Mesh* pMesh = codex.GetMesh(GetResourceID(L"cylinder.obj"));
+        const Mesh* pMesh = codex.GetMesh(GetResourceID(L"cube.obj"));
         if (pMesh)
         {
             pMesh->DrawIndexed(pCommandList);

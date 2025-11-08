@@ -761,21 +761,22 @@ void TextureFactory::LoadAll3DTextures(ID3D12Device* pDevice, ID3D12GraphicsComm
         throw std::exception("3D textures folder doesn't exist!");
 #endif
 
-    // Each directory represents a separate NVDF, consisting of loose layers packed as tga files.
-    // Assume the following naming convention: 
-    // - field_data.#.tga : red channel = dimensional_profile
-    // - modeling_data.#.tga : red = detail_type, green = density_scale, blue = sdf
-
+    
     for (const auto& entry : fs::directory_iterator(tex3dPath))
     {
         if (!entry.is_directory())
             continue;
+
+        Muon::ResetCommandList(nullptr);
 
         if (!Load3DTextureFromSlices(entry.path(), pDevice, pCommandList, codex))
         {
             Muon::Printf(L"Warning: Failed to load 3D Texture from directory: %s\n", entry.path().wstring().c_str());
             continue;
         }
+
+        Muon::CloseCommandList();
+        Muon::ExecuteCommandList();
     }
 }
 
@@ -784,6 +785,7 @@ bool MaterialFactory::CreateAllMaterials(ResourceCodex& codex)
     const ResourceID kRockDiffuseId = GetResourceID(L"Rock_T.png");
     const ResourceID kRockNormalId = GetResourceID(L"Rock_N.png");
     const ResourceID kTestNVDFId = GetResourceID(L"StormbirdCloud_NVDF");
+    const ResourceID kTest3DTexId = GetResourceID(L"Test_3D");
     {
         const wchar_t* kPhongMaterialName = L"Phong";
         Material* pPhongMaterial = codex.InsertMaterialType(kPhongMaterialName);
@@ -799,9 +801,9 @@ bool MaterialFactory::CreateAllMaterials(ResourceCodex& codex)
 
         pPhongMaterial->PopulateMaterialParams(codex.GetMatParamsStagingBuffer(), Muon::GetCommandList());
 
-        pPhongMaterial->SetTextureParam("diffuseTexture",   kRockDiffuseId);
-        pPhongMaterial->SetTextureParam("normalMap",        kRockNormalId);
-        pPhongMaterial->SetTextureParam("testNVDF",         kTestNVDFId);
+        pPhongMaterial->SetTextureParam("diffuseTexture", kRockDiffuseId);
+        pPhongMaterial->SetTextureParam("normalMap",      kRockNormalId);
+        pPhongMaterial->SetTextureParam("test3d", kTest3DTexId);
     }
 
 
