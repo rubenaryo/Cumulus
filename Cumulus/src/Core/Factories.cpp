@@ -519,6 +519,214 @@ void TextureFactory::LoadTexturesForNVDF(std::filesystem::path directoryPath, ID
         pDevice, pCommandList, codex);
 }
 
+static bool LoadTGASlices(const std::vector<std::filesystem::path>& sliceFiles, size_t width, size_t height, std::vector<float>& outData)
+{
+    using namespace DirectX;
+    for (size_t i = 0; i < sliceFiles.size(); ++i)
+    {
+        ScratchImage sliceImg;
+        if (FAILED(LoadFromTGAFile(sliceFiles[i].c_str(), nullptr, sliceImg)))
+            return false;
+
+        const Image* img = sliceImg.GetImage(0, 0, 0);
+        if (!img) return false;
+
+        const uint8_t* pixels = img->pixels;
+        size_t bytesPerPixel = BitsPerPixel(img->format) / 8;
+        size_t sliceOffset = i * width * height * 4;
+
+        for (size_t j = 0; j < width * height; ++j)
+        {
+            size_t x = j % width, y = j / width;
+            size_t pixelOffset = y * img->rowPitch + x * bytesPerPixel;
+            size_t baseIndex = sliceOffset + j * 4;
+
+            outData[baseIndex + 0] = pixels[pixelOffset + 0] / 255.0f;
+            outData[baseIndex + 1] = pixels[pixelOffset + 1] / 255.0f;
+            outData[baseIndex + 2] = pixels[pixelOffset + 2] / 255.0f;
+            outData[baseIndex + 3] = (bytesPerPixel >= 4) ? pixels[pixelOffset + 3] / 255.0f : 1.0f;
+        }
+    }
+    return true;
+}
+
+static bool LoadHDRSlices(const std::vector<std::filesystem::path>& sliceFiles, size_t width, size_t height, std::vector<float>& outData)
+{
+    using namespace DirectX;
+    for (size_t i = 0; i < sliceFiles.size(); ++i)
+    {
+        ScratchImage sliceImg;
+        if (FAILED(LoadFromHDRFile(sliceFiles[i].c_str(), nullptr, sliceImg)))
+            return false;
+
+        const Image* img = sliceImg.GetImage(0, 0, 0);
+        if (!img) return false;
+
+        const float* pixels = reinterpret_cast<const float*>(img->pixels);
+        size_t channelsPerPixel = BitsPerPixel(img->format) / 32;
+        size_t sliceOffset = i * width * height * 4;
+
+        for (size_t j = 0; j < width * height; ++j)
+        {
+            size_t x = j % width, y = j / width;
+            size_t pixelOffset = (y * img->rowPitch / 4) + x * channelsPerPixel;
+            size_t baseIndex = sliceOffset + j * 4;
+
+            outData[baseIndex + 0] = pixels[pixelOffset + 0];
+            outData[baseIndex + 1] = pixels[pixelOffset + 1];
+            outData[baseIndex + 2] = pixels[pixelOffset + 2];
+            outData[baseIndex + 3] = (channelsPerPixel >= 4) ? pixels[pixelOffset + 3] : 1.0f;
+        }
+    }
+    return true;
+}
+
+static bool LoadWICSlices(const std::vector<std::filesystem::path>& sliceFiles, size_t width, size_t height, std::vector<float>& outData)
+{
+    using namespace DirectX;
+    for (size_t i = 0; i < sliceFiles.size(); ++i)
+    {
+        ScratchImage sliceImg;
+        if (FAILED(LoadFromWICFile(sliceFiles[i].c_str(), WIC_FLAGS_NONE, nullptr, sliceImg)))
+            return false;
+
+        const Image* img = sliceImg.GetImage(0, 0, 0);
+        if (!img) return false;
+
+        const uint8_t* pixels = img->pixels;
+        size_t bytesPerPixel = BitsPerPixel(img->format) / 8;
+        size_t sliceOffset = i * width * height * 4;
+
+        for (size_t j = 0; j < width * height; ++j)
+        {
+            size_t x = j % width, y = j / width;
+            size_t pixelOffset = y * img->rowPitch + x * bytesPerPixel;
+            size_t baseIndex = sliceOffset + j * 4;
+
+            outData[baseIndex + 0] = pixels[pixelOffset + 0] / 255.0f;
+            outData[baseIndex + 1] = pixels[pixelOffset + 1] / 255.0f;
+            outData[baseIndex + 2] = pixels[pixelOffset + 2] / 255.0f;
+            outData[baseIndex + 3] = (bytesPerPixel >= 4) ? pixels[pixelOffset + 3] / 255.0f : 1.0f;
+        }
+    }
+    return true;
+}
+
+bool TextureFactory::Load3DTextureFromSlices(std::filesystem::path directoryPath, ID3D12Device* pDevice, ID3D12GraphicsCommandList* pCommandList, ResourceCodex& codex)
+{
+    using namespace DirectX;
+    namespace fs = std::filesystem;
+
+    auto ExtractIndexAndInsert = [](const std::filesystem::path& p, std::vector<fs::path>& outVector)
+    {
+        size_t number = extractNumber(p);
+        if (outVector.size() < number)
+            outVector.resize(number);
+        outVector[number - 1] = p;
+    };
+
+    auto IsSupportedFileFormat = [](std::wstring& ext)
+    {
+        return ext == L".tga" || ext == L".hdr" || ext == L".png";
+    };
+
+    std::vector<fs::path> sliceFiles;
+
+    static const size_t INITIAL_CAPACITY = 64;
+    sliceFiles.reserve(INITIAL_CAPACITY);
+
+    // All files are assumed to have the same extension. Force a failure if not.
+    std::wstring requiredExt;
+
+    for (const auto& entry : fs::directory_iterator(directoryPath))
+    {
+        if (!entry.is_regular_file())
+            continue;
+
+        std::filesystem::path ext = entry.path().extension();
+        if (!IsSupportedFileFormat(ext.wstring()))
+            continue;
+
+        if (requiredExt.empty()) // This is the first file, every other file must match this.
+            requiredExt = ext.wstring();
+
+        if (ext.wstring() != requiredExt)
+        {
+            Printf(L"Error: Mixed file formats in directory: %s. Expected %s but found %s\n",
+                directoryPath.wstring().c_str(), requiredExt.c_str(), ext.wstring().c_str());
+            return false;
+        }
+
+        ExtractIndexAndInsert(entry.path(), sliceFiles);
+    }
+
+    if (sliceFiles.empty())
+    {
+        Printf(L"Warning: Early out of loading 3D texture for directory: %s. No files found.\n", directoryPath.c_str());
+        return false;
+    }
+
+    // We assume no gaps with missing slices. Early out if not
+    for (size_t i = 0; i < sliceFiles.size(); ++i)
+    {
+        if (sliceFiles[i].empty())
+        {
+            Printf(L"Error: Missing slice at index %zu\n", i + 1);
+            return false;
+        }
+    }
+
+    // Get dimensions from first slice
+    size_t width = 0, height = 0;
+    {
+        ScratchImage image;
+        HRESULT hr = E_FAIL;
+        if (requiredExt == L".tga")
+            hr = LoadFromTGAFile(sliceFiles[0].c_str(), nullptr, image);
+        else if (requiredExt == L".hdr")
+            hr = LoadFromHDRFile(sliceFiles[0].c_str(), nullptr, image);
+        else if (requiredExt == L"png")
+            hr = LoadFromWICFile(sliceFiles[0].c_str(), WIC_FLAGS_NONE, nullptr, image);
+
+        if (FAILED(hr))
+        {
+            Muon::Printf(L"Error: Failed to determine ideal image dimensions (Load Fail): %s\n", directoryPath.wstring().c_str());
+            return false;
+        }
+
+        const Image* pImage = image.GetImage(0, 0, 0);
+        if (!pImage)
+        {
+            Muon::Printf(L"Error: Failed to determine ideal image dimensions (No Image): %s\n", directoryPath.wstring().c_str());
+            return false;
+        }
+
+        width = pImage->width;
+        height = pImage->height;
+    }
+
+    // Load all slices
+    const size_t CHANNELS_PER_VOXEL = 4;
+    std::vector<float> outData(width * height * sliceFiles.size() * CHANNELS_PER_VOXEL);
+
+    bool success = false;
+    if (requiredExt == L".tga")
+        success = LoadTGASlices(sliceFiles, width, height, outData);
+    else if (requiredExt == L".hdr")
+        success = LoadHDRSlices(sliceFiles, width, height, outData);
+    else if (requiredExt == L".png")
+        success = LoadWICSlices(sliceFiles, width, height, outData);
+
+    if (!success)
+        return false;
+
+    std::wstring lookupName = directoryPath.filename().wstring() + L"_3D";
+    success = Upload3DTextureFromData(lookupName.c_str(), outData.data(), width, height, sliceFiles.size(),
+        DXGI_FORMAT_R32G32B32A32_FLOAT, pDevice, pCommandList, codex);
+
+    return success;
+}
+
 void TextureFactory::LoadAllNVDF(ID3D12Device* pDevice, ID3D12GraphicsCommandList* pCommandList, ResourceCodex& codex)
 {
     namespace fs = std::filesystem;
@@ -540,6 +748,34 @@ void TextureFactory::LoadAllNVDF(ID3D12Device* pDevice, ID3D12GraphicsCommandLis
             continue;
 
         LoadTexturesForNVDF(entry.path(), pDevice, pCommandList, codex);
+    }
+}
+
+void TextureFactory::LoadAll3DTextures(ID3D12Device* pDevice, ID3D12GraphicsCommandList* pCommandList, ResourceCodex& codex)
+{
+    namespace fs = std::filesystem;
+    std::wstring tex3dPath = TEX3DPATHW;
+
+#if defined(MN_DEBUG)
+    if (!fs::exists(tex3dPath))
+        throw std::exception("3D textures folder doesn't exist!");
+#endif
+
+    // Each directory represents a separate NVDF, consisting of loose layers packed as tga files.
+    // Assume the following naming convention: 
+    // - field_data.#.tga : red channel = dimensional_profile
+    // - modeling_data.#.tga : red = detail_type, green = density_scale, blue = sdf
+
+    for (const auto& entry : fs::directory_iterator(tex3dPath))
+    {
+        if (!entry.is_directory())
+            continue;
+
+        if (!Load3DTextureFromSlices(entry.path(), pDevice, pCommandList, codex))
+        {
+            Muon::Printf(L"Warning: Failed to load 3D Texture from directory: %s\n", entry.path().wstring().c_str());
+            continue;
+        }
     }
 }
 
