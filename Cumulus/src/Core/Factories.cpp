@@ -357,6 +357,10 @@ void TextureFactory::LoadAllTextures(ID3D12Device* pDevice, ID3D12GraphicsComman
             continue;
         }
     
+        ResourceID tid = GetResourceID(name.c_str());
+        Texture& tex = codex.InsertTexture(tid);
+    
+        Muon::ResetCommandList(nullptr);
         DirectX::ScratchImage scratchImg;
         HRESULT hr = E_FAIL;
          
@@ -1154,8 +1158,8 @@ void TextureFactory::LoadAll3DTextures(ID3D12Device* pDevice, ID3D12GraphicsComm
 
 bool MaterialFactory::CreateAllMaterials(ResourceCodex& codex)
 {
-    const ResourceID kPhongDiffuseId = GetResourceID(L"Bark_T.png");
-    const ResourceID kPhongNormalId = GetResourceID (L"Bark_N.png");
+    const ResourceID kRockDiffuseId = GetResourceID(L"Bark_T.png");
+    const ResourceID kRockNormalId = GetResourceID(L"Rock_N.png");
     const ResourceID kTestNVDFId = GetResourceID(L"StormbirdCloud_NVDF");
     const ResourceID kTest3DTexId = GetResourceID(L"Test_3D");
     const ResourceID kTestDDS = GetResourceID(L"scatter_tex_full.dds");

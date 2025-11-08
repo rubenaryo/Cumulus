@@ -54,25 +54,14 @@ void ResourceCodex::Init()
     gCodexInstance->m2DTextureStagingBuffer.Create(L"2D Staging Buffer", 32 * 1024 * 1024); // 1 MB per Texture
     gCodexInstance->m3DTextureStagingBuffer.Create(L"NVDF Staging Buffer", 512 * 1024 * 1024); // 512MB per 3D Texture
 
-    // TODO: Optimization opportunity.
-    // Some of these load operations are CPU-heavy. 
-    // At the moment we do all the CPU load upfront, 
-    // only scheduling what to do in the GPU for later when the initialization command list is executed.
-    // Idea: We should open, schedule, then execute command lists intermittently so the GPU isn't idle while we
-    // do heavy CPU work (like loading models, or 3d textures, etc)
-    // Of note are model loading and 3D texture loading, which can be quite expensive. 
-    
-    Muon::ResetCommandList(nullptr);
     ShaderFactory::LoadAllShaders(*gCodexInstance);
     TextureFactory::LoadAllTextures(GetDevice(), GetCommandList(), *gCodexInstance);
     MeshFactory::LoadAllMeshes(*gCodexInstance);
     TextureFactory::LoadAllNVDF(GetDevice(), GetCommandList(), *gCodexInstance);
-    MaterialFactory::CreateAllMaterials(*gCodexInstance);
-    Muon::CloseCommandList();
-    Muon::ExecuteCommandList();
-
-    // Command List is now closed. It will be executed within this function.
     TextureFactory::LoadAll3DTextures(GetDevice(), GetCommandList(), *gCodexInstance);
+    MaterialFactory::CreateAllMaterials(*gCodexInstance);
+
+    // After initialization, before real frame loop:
 }
 
 void ResourceCodex::Destroy()
