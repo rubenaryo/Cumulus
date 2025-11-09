@@ -1,4 +1,5 @@
 #include "PhongCommon.hlsli"
+#include "TimeBuffer.hlsli"
 
 struct VertexOut
 {
@@ -40,27 +41,35 @@ float4 main(VertexOut input) : SV_TARGET
 
     // create transformation matrix TBN
     float3x3 TBN = float3x3(input.tangent, input.binormal, input.normal);
-    input.normal = mul(sampledNormal, TBN);
+    input.normal = mul(TBN, sampledNormal);
 
     // Holds the total light for this pixel
     float3 totalLight = 0;
     float3 toCamera = normalize(cameraWorldPos - input.worldPos);
 
+    float3 lightColor = float3(1.0, 1.0, 1.0);
+    float3 ambientColor = float3(1.0, 1.0, 1.0);
+    float3 toLight = float3(cos(totalTime), 0.0, sin(totalTime));
+    float matSpecularity = 64.0;
+    toLight = normalize(toLight);
+    
     // Diffuse Color
-    float3 diffuseLighting = directionalLight.diffuseColor.rgb *
-        DiffuseAmount(input.normal, directionalLight.toLight);
+    float3 diffuseLighting = lightColor *
+        DiffuseAmount(input.normal, toLight);
 
-    // Specular Color
-    float3 specularLighting = directionalLight.diffuseColor.rgb *
-        SpecularPhong(input.normal, -directionalLight.toLight, toCamera, specularity) * any(diffuseLighting);
+    // Specular Color 
+    float3 specularLighting = lightColor *
+        SpecularPhong(input.normal, toLight, toCamera, matSpecularity) * any(diffuseLighting);
 
     // Add to totallight
-    totalLight += diffuseLighting + specularLighting;
+    totalLight += diffuseLighting;
 
     // Finally, add the ambient color
-    totalLight += ambientColor;
+    const float AMBIENT_INTENSITY = 0.4f;
+    totalLight += ambientColor * AMBIENT_INTENSITY;
     
     totalLight *= surfaceColor;
 
+    totalLight = saturate(totalLight);
     return float4(totalLight, 1);
 }

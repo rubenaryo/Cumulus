@@ -34,12 +34,6 @@ float4 main(VertexOut input) : SV_TARGET
     // Sample diffuse texture, normal map(unpacked)
     float3 surfaceColor = diffuseTexture.Sample(samplerOptions, input.uv).rgb;
     
-    // TEST NVDF
-    float zSlice = float(12) / float(64 - 1);
-    float3 uvw = float3(input.uv, zSlice);
-    float4 sliceValue = test3d.Sample(samplerOptions, uvw);
-    surfaceColor.rgb = sliceValue.rgb;
-    
     // Normalize normal vector
     input.normal = normalize(input.normal);
     
@@ -49,14 +43,14 @@ float4 main(VertexOut input) : SV_TARGET
     
     // Diffuse Color
     float3 diffuseLighting = directionalLight.diffuseColor.rgb *
-        DiffuseAmount(input.normal, directionalLight.toLight);
+        DiffuseAmount(input.normal, normalize(directionalLight.toLight));
     
-    // Specular Color
-    float3 specularLighting = directionalLight.diffuseColor.rgb *
-        SpecularPhong(input.normal, -directionalLight.toLight, toCamera, specularity) * any(diffuseLighting);
+    // Specular Color. TODO: It doesn't look right, just get rid of it for now.
+    //float3 specularLighting = directionalLight.diffuseColor.rgb *
+    //    SpecularPhong(input.normal, -directionalLight.toLight, toCamera, specularity) * any(diffuseLighting);
     
     // Add to totallight
-    totalLight += diffuseLighting + specularLighting;
+    totalLight += diffuseLighting;
     
     // Finally, add the ambient color
     totalLight += ambientColor;
