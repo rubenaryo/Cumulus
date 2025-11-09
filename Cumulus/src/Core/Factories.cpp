@@ -947,9 +947,9 @@ bool TextureFactory::Load3DTextureFromSlices(std::filesystem::path directoryPath
     auto ExtractIndexAndInsert = [](const std::filesystem::path& p, std::vector<fs::path>& outVector)
     {
         size_t number = extractNumber(p);
-        if (outVector.size() < number)
-            outVector.resize(number);
-        outVector[number - 1] = p;
+        if (outVector.size() <= number)
+            outVector.resize(number + 1);
+        outVector[number] = p;
     };
 
     auto IsSupportedFileFormat = [](std::wstring& ext)
