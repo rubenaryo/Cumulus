@@ -18,50 +18,52 @@ This class encapsulates all app functionality
 class Game
 {
 public:
-    Game();
-    ~Game();
+	Game();
+	~Game();
 
-    bool Init(HWND window, int width, int height);
+	bool Init(HWND window, int width, int height);
 
-    // Main Game Loop
-    void Frame();
+	// Main Game Loop
+	void Frame();
 
-    // Callbacks for windows messages
-    void OnActivated();
-    void OnDeactivated();
-    void OnSuspending();
-    void OnResuming();
-    void OnMove();
-    void OnResize(int newWidth, int newHeight);
+	// Callbacks for windows messages
+	void OnActivated();
+	void OnDeactivated();
+	void OnSuspending();
+	void OnResuming();
+	void OnMove();
+	void OnResize(int newWidth, int newHeight);
 
-    // Input Callbacks
-    void OnMouseMove(short newX, short newY);
+	// Input Callbacks
+	void OnMouseMove(short newX, short newY);
 
 private:
-    void Update(Muon::StepTimer const& timer);
-    void Render();
+	void Update(Muon::StepTimer const& timer);
+	void Render();
 
-    void CreateDeviceDependentResources();
-    void CreateWindowSizeDependentResources(int newWidth, int newHeight);
+	void CreateDeviceDependentResources();
+	void CreateWindowSizeDependentResources(int newWidth, int newHeight);
 
-    // Input Management
-    Input::GameInput mInput;
+	// Input Management
+	Input::GameInput mInput;
 
-    // Main Camera
-    Muon::Camera mCamera;
+	// Main Camera
+	Muon::Camera mCamera;
 
-    Muon::GraphicsPass mOpaquePass;
-    Muon::ComputePass mSobelPass;
-    Muon::ComputePass mRaymarchPass;
-    Muon::GraphicsPass mPostProcessPass;
+	Muon::GraphicsPass mOpaquePass;
+	Muon::ComputePass mSobelPass;
+	Muon::ComputePass mRaymarchPass;
+	Muon::GraphicsPass mPostProcessPass;
 
-    // TEMP: For testing
-    Muon::Mesh mCube;
+	// TEMP: For testing
+	Muon::Mesh mCube;
 
-    Muon::UploadBuffer mWorldMatrixBuffer;
-    Muon::UploadBuffer mLightBuffer;
+	Muon::UploadBuffer mWorldMatrixBuffer;
+	Muon::UploadBuffer mLightBuffer;
+	Muon::UploadBuffer mAABBBuffer;
 
-    // Timer for the main game loop
-    Muon::StepTimer mTimer;
+
+	// Timer for the main game loop
+	Muon::StepTimer mTimer;
 };
 #endif

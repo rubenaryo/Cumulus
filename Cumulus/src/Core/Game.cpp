@@ -17,245 +17,267 @@ Description : Implementation of Game.h
 #include <Utils/Utils.h>
 
 Game::Game() :
-    mInput(),
-    mCamera(),
-    mOpaquePass(L"OpaquePass"),
-    mSobelPass(L"SobelPass"),
-    mRaymarchPass(L"RaymarchPass"),
-    mPostProcessPass(L"PostProcessPass")
+	mInput(),
+	mCamera(),
+	mOpaquePass(L"OpaquePass"),
+	mSobelPass(L"SobelPass"),
+	mRaymarchPass(L"RaymarchPass"),
+	mPostProcessPass(L"PostProcessPass")
 {
-    mTimer.SetFixedTimeStep(false);
+	mTimer.SetFixedTimeStep(false);
 }
 
 bool Game::Init(HWND window, int width, int height)
 {
-    using namespace Muon;
+	using namespace Muon;
 
-    bool success = Muon::InitDX12(window, width, height);
+	bool success = Muon::InitDX12(window, width, height);
 
-    Muon::ResetCommandList(nullptr);
-    ResourceCodex::Init();
+	Muon::ResetCommandList(nullptr);
+	ResourceCodex::Init();
 
-    // TODO: Create the offscreen render target externally, but register it in the codex so it can manage its lifetime. 
-    TextureFactory::CreateOffscreenRenderTarget(Muon::GetDevice(), width, height);
+	// TODO: Create the offscreen render target externally, but register it in the codex so it can manage its lifetime. 
+	TextureFactory::CreateOffscreenRenderTarget(Muon::GetDevice(), width, height);
 
-    ResourceCodex& codex = ResourceCodex::GetSingleton();
+	ResourceCodex& codex = ResourceCodex::GetSingleton();
 
-    mCamera.Init(DirectX::XMFLOAT3(3.0, 3.0, 3.0), width / (float)height, 0.1f, 1000.0f);
+	mCamera.Init(DirectX::XMFLOAT3(3.0, 3.0, 3.0), width / (float)height, 0.1f, 1000.0f);
 
-    // Assemble opaque render pass
-    {
-        mOpaquePass.SetVertexShader(codex.GetVertexShader(GetResourceID(L"Phong.vs")));
-        mOpaquePass.SetPixelShader(codex.GetPixelShader(GetResourceID(L"Phong.ps")));
+	// Assemble opaque render pass
+	{
+		mOpaquePass.SetVertexShader(codex.GetVertexShader(GetResourceID(L"Phong.vs")));
+		mOpaquePass.SetPixelShader(codex.GetPixelShader(GetResourceID(L"Phong.ps")));
 
-        if (!mOpaquePass.Generate())
-            Printf(L"Warning: %s failed to generate!\n", mOpaquePass.GetName());
-    }
+		if (!mOpaquePass.Generate())
+			Printf(L"Warning: %s failed to generate!\n", mOpaquePass.GetName());
+	}
 
-    // Assemble compute filter pass
-    {
-        mSobelPass.SetComputeShader(codex.GetComputeShader(GetResourceID(L"Sobel.cs")));
+	// Assemble compute filter pass
+	{
+		mSobelPass.SetComputeShader(codex.GetComputeShader(GetResourceID(L"Sobel.cs")));
 
-        if (!mSobelPass.Generate())
-            Printf(L"Warning: %s failed to generate!\n", mSobelPass.GetName());
-    }
+		if (!mSobelPass.Generate())
+			Printf(L"Warning: %s failed to generate!\n", mSobelPass.GetName());
+	}
 
-    // Assemble raymarch pass
-    {
-        mRaymarchPass.SetComputeShader(codex.GetComputeShader(GetResourceID(L"Raymarch.cs")));
+	// Assemble raymarch pass
+	{
+		mRaymarchPass.SetComputeShader(codex.GetComputeShader(GetResourceID(L"Raymarch.cs")));
 
-        if (!mRaymarchPass.Generate())
-            Printf(L"Warning: %s failed to generate!\n", mRaymarchPass.GetName());
-    }
+		if (!mRaymarchPass.Generate())
+			Printf(L"Warning: %s failed to generate!\n", mRaymarchPass.GetName());
+	}
 
-    // Assemble post-process render pass
-    {
-        mPostProcessPass.SetVertexShader(codex.GetVertexShader(GetResourceID(L"Passthrough.vs")));
-        mPostProcessPass.SetPixelShader(codex.GetPixelShader(GetResourceID(L"Passthrough.ps")));
+	// Assemble post-process render pass
+	{
+		mPostProcessPass.SetVertexShader(codex.GetVertexShader(GetResourceID(L"Passthrough.vs")));
+		mPostProcessPass.SetPixelShader(codex.GetPixelShader(GetResourceID(L"Passthrough.ps")));
 
-        if (!mPostProcessPass.Generate())
-            Printf(L"Warning: %s failed to generate!\n", mPostProcessPass.GetName());
-    }
+		if (!mPostProcessPass.Generate())
+			Printf(L"Warning: %s failed to generate!\n", mPostProcessPass.GetName());
+	}
 
 
-    mWorldMatrixBuffer.Create(L"world matrix buffer", sizeof(cbPerEntity));
-    UINT8* mapped = mWorldMatrixBuffer.GetMappedPtr();
-    assert(mapped);
-    if (mapped)
-    {
-        cbPerEntity entity;
-        DirectX::XMMATRIX entityWorld = DirectX::XMMatrixTranslation(0, 1, 0);
-        DirectX::XMStoreFloat4x4(&entity.world, entityWorld);
-        DirectX::XMStoreFloat4x4(&entity.invWorld, DirectX::XMMatrixInverse(nullptr, entityWorld));
-        memcpy(mapped, &entity, sizeof(entity));
-    }
+	mWorldMatrixBuffer.Create(L"world matrix buffer", sizeof(cbPerEntity));
+	UINT8* mapped = mWorldMatrixBuffer.GetMappedPtr();
+	assert(mapped);
+	if (mapped)
+	{
+		cbPerEntity entity;
+		DirectX::XMMATRIX entityWorld = DirectX::XMMatrixTranslation(0, 1, 0);
+		DirectX::XMStoreFloat4x4(&entity.world, entityWorld);
+		DirectX::XMStoreFloat4x4(&entity.invWorld, DirectX::XMMatrixInverse(nullptr, entityWorld));
+		memcpy(mapped, &entity, sizeof(entity));
+	}
 
-    mLightBuffer.Create(L"Light Buffer", sizeof(cbLights));
+	mLightBuffer.Create(L"Light Buffer", sizeof(cbLights));
 
-    Muon::CloseCommandList();
-    Muon::ExecuteCommandList();
-    return success;
+	mAABBBuffer.Create(L"AABB Buffer", sizeof(cbIntersections));
+
+
+	const Mesh* m = codex.GetMesh(Muon::GetResourceID(L"cube.obj"));
+
+	cbIntersections intersections;
+	intersections.aabbCount = 1;
+	intersections.aabbs[0] = m->GetAABB();
+
+	if (m) {
+		UINT8* aabbPtr = mAABBBuffer.GetMappedPtr();
+		if (aabbPtr) {
+			memcpy(aabbPtr, &intersections, sizeof(cbIntersections));
+		}
+	}
+
+	Muon::CloseCommandList();
+	Muon::ExecuteCommandList();
+	return success;
 }
 
 // On Timer tick, run Update() on the game, then Render()
 void Game::Frame()
 {
-    mTimer.Tick([&]()
-    {
-        Update(mTimer);
-    });
+	mTimer.Tick([&]()
+		{
+			Update(mTimer);
+		});
 
-    Render();
+	Render();
 
-    Muon::UpdateTitleBar(mTimer.GetFramesPerSecond(), mTimer.GetFrameCount());
+	Muon::UpdateTitleBar(mTimer.GetFramesPerSecond(), mTimer.GetFrameCount());
 }
 
 void Game::Update(Muon::StepTimer const& timer)
 {
-    float elapsedTime = float(timer.GetElapsedSeconds());
-    mInput.Frame(elapsedTime, &mCamera);
-    mCamera.UpdateView();
+	float elapsedTime = float(timer.GetElapsedSeconds());
+	mInput.Frame(elapsedTime, &mCamera);
+	mCamera.UpdateView();
 
-    Muon::cbLights lights;
+	Muon::cbLights lights;
 
-    lights.ambientColor = DirectX::XMFLOAT3A(+1.0f, +0.772f, +0.56f);
+	lights.ambientColor = DirectX::XMFLOAT3A(+1.0f, +0.772f, +0.56f);
 
-    lights.directionalLight.diffuseColor = DirectX::XMFLOAT3A(1, 1, 1);
-    lights.directionalLight.dir = DirectX::XMFLOAT3A(cos(elapsedTime), 0.0, sin(elapsedTime));
+	lights.directionalLight.diffuseColor = DirectX::XMFLOAT3A(1, 1, 1);
+	lights.directionalLight.dir = DirectX::XMFLOAT3A(cos(elapsedTime), 0.0, sin(elapsedTime));
 
-    DirectX::XMStoreFloat3(&lights.cameraWorldPos, mCamera.GetPosition());
+	DirectX::XMStoreFloat3(&lights.cameraWorldPos, mCamera.GetPosition());
 
-    UINT8* mapped = mLightBuffer.GetMappedPtr();
-    
-    if (mapped)
-        memcpy(mapped, &lights, sizeof(Muon::cbLights));
+	UINT8* mapped = mLightBuffer.GetMappedPtr();
+
+	if (mapped)
+		memcpy(mapped, &lights, sizeof(Muon::cbLights));
 }
 
 void Game::Render()
 {
-    using namespace Muon;
+	using namespace Muon;
 
-    // Don't try to render anything before the first Update.
-    if (mTimer.GetFrameCount() == 0)
-    {
-        return;
-    }
+	// Don't try to render anything before the first Update.
+	if (mTimer.GetFrameCount() == 0)
+	{
+		return;
+	}
 
-    ResetCommandList(nullptr);
-    PrepareForRender();
+	ResetCommandList(nullptr);
+	PrepareForRender();
 
-    // Fetch the desired material from the codex
-    ResourceCodex& codex = ResourceCodex::GetSingleton();
-    ResourceID matId = GetResourceID(L"Phong");
-    const Muon::Material* pPhongMaterial = codex.GetMaterialType(matId);
-    
-    Texture* pOffscreenTarget = codex.GetTexture(GetResourceID(L"OffscreenTarget"));
-    Texture* pComputeOutput = codex.GetTexture(GetResourceID(L"SobelOutput"));
-    if (!pOffscreenTarget || !pComputeOutput)
-    {
-        Muon::Printf("Error: Game::Render Failed to fetch the offscreen target and compute output textures.\n");
-        return;
-    }
+	// Fetch the desired material from the codex
+	ResourceCodex& codex = ResourceCodex::GetSingleton();
+	ResourceID matId = GetResourceID(L"Phong");
+	const Muon::Material* pPhongMaterial = codex.GetMaterialType(matId);
 
-    ID3D12GraphicsCommandList* pCommandList = GetCommandList();
-    pCommandList->SetDescriptorHeaps(1, GetSRVHeap()->GetHeapAddr());
+	Texture* pOffscreenTarget = codex.GetTexture(GetResourceID(L"OffscreenTarget"));
+	Texture* pComputeOutput = codex.GetTexture(GetResourceID(L"SobelOutput"));
+	if (!pOffscreenTarget || !pComputeOutput)
+	{
+		Muon::Printf("Error: Game::Render Failed to fetch the offscreen target and compute output textures.\n");
+		return;
+	}
 
-    if (mOpaquePass.Bind(pCommandList))
-    {
-        // Bind's the materials parameter buffer and textures.
-        mOpaquePass.BindMaterial(*pPhongMaterial, pCommandList);
+	ID3D12GraphicsCommandList* pCommandList = GetCommandList();
+	pCommandList->SetDescriptorHeaps(1, GetSRVHeap()->GetHeapAddr());
 
-        // Bind the Camera's Upload Buffer to the root index known by the material
-        int32_t cameraRootIdx = mOpaquePass.GetResourceRootIndex("VSCamera");
-        if (cameraRootIdx != ROOTIDX_INVALID)
-        {
-            mCamera.Bind(cameraRootIdx, pCommandList);
-        }
+	if (mOpaquePass.Bind(pCommandList))
+	{
+		// Bind's the materials parameter buffer and textures.
+		mOpaquePass.BindMaterial(*pPhongMaterial, pCommandList);
 
-        // Bind the world matrix Upload Buffer to the root index known by the material
-        int32_t worldMatrixRootIdx = mOpaquePass.GetResourceRootIndex("VSWorld");
-        if (worldMatrixRootIdx != ROOTIDX_INVALID)
-        {
-            pCommandList->SetGraphicsRootConstantBufferView(worldMatrixRootIdx, mWorldMatrixBuffer.GetGPUVirtualAddress());
-        }
+		// Bind the Camera's Upload Buffer to the root index known by the material
+		int32_t cameraRootIdx = mOpaquePass.GetResourceRootIndex("VSCamera");
+		if (cameraRootIdx != ROOTIDX_INVALID)
+		{
+			mCamera.Bind(cameraRootIdx, pCommandList);
+		}
 
-        int32_t lightsRootIdx = mOpaquePass.GetResourceRootIndex("PSLights");
-        if (lightsRootIdx != ROOTIDX_INVALID)
-        {
-            pCommandList->SetGraphicsRootConstantBufferView(lightsRootIdx, mLightBuffer.GetGPUVirtualAddress());
-        }
+		// Bind the world matrix Upload Buffer to the root index known by the material
+		int32_t worldMatrixRootIdx = mOpaquePass.GetResourceRootIndex("VSWorld");
+		if (worldMatrixRootIdx != ROOTIDX_INVALID)
+		{
+			pCommandList->SetGraphicsRootConstantBufferView(worldMatrixRootIdx, mWorldMatrixBuffer.GetGPUVirtualAddress());
+		}
 
-        const Mesh* pMesh = codex.GetMesh(GetResourceID(L"cylinder.obj"));
-        if (pMesh)
-        {
-            pMesh->DrawIndexed(pCommandList);
-        }
-    }
+		int32_t lightsRootIdx = mOpaquePass.GetResourceRootIndex("PSLights");
+		if (lightsRootIdx != ROOTIDX_INVALID)
+		{
+			pCommandList->SetGraphicsRootConstantBufferView(lightsRootIdx, mLightBuffer.GetGPUVirtualAddress());
+		}
 
-    if (mRaymarchPass.Bind(pCommandList))
-    {
-        pCommandList->ResourceBarrier(1, &CD3DX12_RESOURCE_BARRIER::Transition(pOffscreenTarget->GetResource(),
-            D3D12_RESOURCE_STATE_RENDER_TARGET, D3D12_RESOURCE_STATE_GENERIC_READ));
+		const Mesh* pMesh = codex.GetMesh(GetResourceID(L"cylinder.obj"));
+		if (pMesh)
+		{
+			pMesh->DrawIndexed(pCommandList);
+		}
+	}
 
-        // Bind the Camera's Upload Buffer to the root index known by the material
-        int32_t cameraRootIdx = mRaymarchPass.GetResourceRootIndex("VSCamera");
-        if (cameraRootIdx != ROOTIDX_INVALID)
-        {
-            pCommandList->SetComputeRootConstantBufferView(cameraRootIdx, mCamera.GetGPUVirtualAddress());
-        }
+	if (mRaymarchPass.Bind(pCommandList))
+	{
+		pCommandList->ResourceBarrier(1, &CD3DX12_RESOURCE_BARRIER::Transition(pOffscreenTarget->GetResource(),
+			D3D12_RESOURCE_STATE_RENDER_TARGET, D3D12_RESOURCE_STATE_GENERIC_READ));
 
-        int32_t inIdx = mRaymarchPass.GetResourceRootIndex("gInput");
-        if (inIdx != ROOTIDX_INVALID)
-        {
-            pCommandList->SetComputeRootDescriptorTable(inIdx, pOffscreenTarget->GetSRVHandleGPU());
-        }
+		// Bind the Camera's Upload Buffer to the root index known by the material
+		int32_t cameraRootIdx = mRaymarchPass.GetResourceRootIndex("VSCamera");
+		if (cameraRootIdx != ROOTIDX_INVALID)
+		{
+			pCommandList->SetComputeRootConstantBufferView(cameraRootIdx, mCamera.GetGPUVirtualAddress());
+		}
 
-        int32_t outIdx = mRaymarchPass.GetResourceRootIndex("gOutput");
-        if (outIdx != ROOTIDX_INVALID)
-        {
-            pCommandList->SetComputeRootDescriptorTable(outIdx, pComputeOutput->GetUAVHandleGPU());
-        }
+		int32_t aabbIdx = mRaymarchPass.GetResourceRootIndex("AABBBuffer");
+		if (aabbIdx != ROOTIDX_INVALID)
+		{
+			pCommandList->SetComputeRootConstantBufferView(aabbIdx, mAABBBuffer.GetGPUVirtualAddress());
+		}
 
-        pCommandList->ResourceBarrier(1, &CD3DX12_RESOURCE_BARRIER::Transition(pComputeOutput->GetResource(),
-            D3D12_RESOURCE_STATE_GENERIC_READ, D3D12_RESOURCE_STATE_UNORDERED_ACCESS));
+		int32_t inIdx = mRaymarchPass.GetResourceRootIndex("gInput");
+		if (inIdx != ROOTIDX_INVALID)
+		{
+			pCommandList->SetComputeRootDescriptorTable(inIdx, pOffscreenTarget->GetSRVHandleGPU());
+		}
 
-        UINT numGroupsX = (UINT)ceilf(pOffscreenTarget->GetWidth() / 16.0f);
-        UINT numGroupsY = (UINT)ceilf(pOffscreenTarget->GetHeight() / 16.0f);
-        pCommandList->Dispatch(numGroupsX, numGroupsY, 1);
+		int32_t outIdx = mRaymarchPass.GetResourceRootIndex("gOutput");
+		if (outIdx != ROOTIDX_INVALID)
+		{
+			pCommandList->SetComputeRootDescriptorTable(outIdx, pComputeOutput->GetUAVHandleGPU());
+		}
 
-        pCommandList->ResourceBarrier(1, &CD3DX12_RESOURCE_BARRIER::Transition(pComputeOutput->GetResource(),
-            D3D12_RESOURCE_STATE_UNORDERED_ACCESS, D3D12_RESOURCE_STATE_GENERIC_READ));
+		pCommandList->ResourceBarrier(1, &CD3DX12_RESOURCE_BARRIER::Transition(pComputeOutput->GetResource(),
+			D3D12_RESOURCE_STATE_GENERIC_READ, D3D12_RESOURCE_STATE_UNORDERED_ACCESS));
 
-        // Indicate a state transition on the resource usage.
-        pCommandList->ResourceBarrier(1, &CD3DX12_RESOURCE_BARRIER::Transition(GetCurrentBackBuffer(),
-            D3D12_RESOURCE_STATE_PRESENT, D3D12_RESOURCE_STATE_RENDER_TARGET));
+		UINT numGroupsX = (UINT)ceilf(pOffscreenTarget->GetWidth() / 16.0f);
+		UINT numGroupsY = (UINT)ceilf(pOffscreenTarget->GetHeight() / 16.0f);
+		pCommandList->Dispatch(numGroupsX, numGroupsY, 1);
 
-        // Specify the buffers we are going to render to.
-        pCommandList->OMSetRenderTargets(1, &GetCurrentBackBufferView(), true, &GetDepthStencilView());
-    }
+		pCommandList->ResourceBarrier(1, &CD3DX12_RESOURCE_BARRIER::Transition(pComputeOutput->GetResource(),
+			D3D12_RESOURCE_STATE_UNORDERED_ACCESS, D3D12_RESOURCE_STATE_GENERIC_READ));
 
-    if (mPostProcessPass.Bind(pCommandList))
-    {
-        int32_t edgeMapIdx = mPostProcessPass.GetResourceRootIndex("gInput");
-        if (edgeMapIdx != ROOTIDX_INVALID)
-        {
-            pCommandList->SetGraphicsRootDescriptorTable(edgeMapIdx, pComputeOutput->GetSRVHandleGPU());
-        }
+		// Indicate a state transition on the resource usage.
+		pCommandList->ResourceBarrier(1, &CD3DX12_RESOURCE_BARRIER::Transition(GetCurrentBackBuffer(),
+			D3D12_RESOURCE_STATE_PRESENT, D3D12_RESOURCE_STATE_RENDER_TARGET));
 
-        // Draw fullscreen quad
-        pCommandList->IASetVertexBuffers(0, 1, nullptr);
-        pCommandList->IASetIndexBuffer(nullptr);
-        pCommandList->IASetPrimitiveTopology(D3D_PRIMITIVE_TOPOLOGY_TRIANGLELIST);
+		// Specify the buffers we are going to render to.
+		pCommandList->OMSetRenderTargets(1, &GetCurrentBackBufferView(), true, &GetDepthStencilView());
+	}
 
-        pCommandList->DrawInstanced(6, 1, 0, 0);
-    }
+	if (mPostProcessPass.Bind(pCommandList))
+	{
+		int32_t edgeMapIdx = mPostProcessPass.GetResourceRootIndex("gInput");
+		if (edgeMapIdx != ROOTIDX_INVALID)
+		{
+			pCommandList->SetGraphicsRootDescriptorTable(edgeMapIdx, pComputeOutput->GetSRVHandleGPU());
+		}
 
-    FinalizeRender();
-    CloseCommandList();
-    ExecuteCommandList();
-    Present();
-    FlushCommandQueue();
-    UpdateBackBufferIndex();
+		// Draw fullscreen quad
+		pCommandList->IASetVertexBuffers(0, 1, nullptr);
+		pCommandList->IASetIndexBuffer(nullptr);
+		pCommandList->IASetPrimitiveTopology(D3D_PRIMITIVE_TOPOLOGY_TRIANGLELIST);
+
+		pCommandList->DrawInstanced(6, 1, 0, 0);
+	}
+
+	FinalizeRender();
+	CloseCommandList();
+	ExecuteCommandList();
+	Present();
+	FlushCommandQueue();
+	UpdateBackBufferIndex();
 }
 
 void Game::CreateDeviceDependentResources()
@@ -264,24 +286,25 @@ void Game::CreateDeviceDependentResources()
 
 void Game::CreateWindowSizeDependentResources(int newWidth, int newHeight)
 {
-    float aspectRatio = (float)newWidth / (float)newHeight;
-    mCamera.UpdateProjection(aspectRatio);
+	float aspectRatio = (float)newWidth / (float)newHeight;
+	mCamera.UpdateProjection(aspectRatio);
 }
 
 Game::~Game()
-{ 
-    mCube.Destroy();
-    mWorldMatrixBuffer.Destroy();
-    mLightBuffer.Destroy();
-    mCamera.Destroy();
-    mInput.Destroy();
-    mOpaquePass.Destroy();
-    mSobelPass.Destroy();
-    mRaymarchPass.Destroy();
-    mPostProcessPass.Destroy();
+{
+	mCube.Destroy();
+	mWorldMatrixBuffer.Destroy();
+	mLightBuffer.Destroy();
+	mAABBBuffer.Destroy();
+	mCamera.Destroy();
+	mInput.Destroy();
+	mOpaquePass.Destroy();
+	mSobelPass.Destroy();
+	mRaymarchPass.Destroy();
+	mPostProcessPass.Destroy();
 
-    Muon::ResourceCodex::Destroy();
-    Muon::DestroyDX12();
+	Muon::ResourceCodex::Destroy();
+	Muon::DestroyDX12();
 }
 
 #pragma region Game State Callbacks
@@ -299,7 +322,7 @@ void Game::OnSuspending()
 
 void Game::OnResuming()
 {
-    mTimer.ResetElapsedTime();
+	mTimer.ResetElapsedTime();
 }
 
 // Recreates Window size dependent resources if needed
@@ -310,23 +333,23 @@ void Game::OnMove()
 // Recreates Window size dependent resources if needed
 void Game::OnResize(int newWidth, int newHeight)
 {
-    #if defined(MN_DEBUG)
-        try
-        {
-            CreateWindowSizeDependentResources(newWidth, newHeight);
-        }
-        catch (std::exception const& e)
-        {
-            MessageBoxA(Muon::GetHwnd(), e.what(), "Fatal Exception on resize!", MB_OK | MB_ICONERROR | MB_SETFOREGROUND);
-            DestroyWindow(Muon::GetHwnd());
-        }
-    #else
-        CreateWindowSizeDependentResources(newWidth, newHeight);
-    #endif
-}
+#if defined(MN_DEBUG)
+	try
+	{
+		CreateWindowSizeDependentResources(newWidth, newHeight);
+	}
+	catch (std::exception const& e)
+	{
+		MessageBoxA(Muon::GetHwnd(), e.what(), "Fatal Exception on resize!", MB_OK | MB_ICONERROR | MB_SETFOREGROUND);
+		DestroyWindow(Muon::GetHwnd());
+	}
+#else
+	CreateWindowSizeDependentResources(newWidth, newHeight);
+#endif
+	}
 
 void Game::OnMouseMove(short newX, short newY)
 {
-    mInput.OnMouseMove(newX, newY);
+	mInput.OnMouseMove(newX, newY);
 }
 #pragma endregion
