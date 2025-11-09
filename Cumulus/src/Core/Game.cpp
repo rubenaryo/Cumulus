@@ -46,7 +46,7 @@ bool Game::Init(HWND window, int width, int height)
     // Assemble opaque render pass
     {
         mOpaquePass.SetVertexShader(codex.GetVertexShader(GetResourceID(L"Phong.vs")));
-        mOpaquePass.SetPixelShader(codex.GetPixelShader(GetResourceID(L"Phong.ps")));
+        mOpaquePass.SetPixelShader(codex.GetPixelShader(GetResourceID(L"Phong_NormalMap.ps")));
 
         if (!mOpaquePass.Generate())
             Printf(L"Warning: %s failed to generate!\n", mOpaquePass.GetName());
@@ -83,14 +83,22 @@ bool Game::Init(HWND window, int width, int height)
     assert(mapped);
     if (mapped)
     {
+        using namespace DirectX;
         cbPerEntity entity;
-        DirectX::XMMATRIX entityWorld = DirectX::XMMatrixTranslation(0, 1, 0);
-        DirectX::XMStoreFloat4x4(&entity.world, entityWorld);
-        DirectX::XMStoreFloat4x4(&entity.invWorld, DirectX::XMMatrixInverse(nullptr, entityWorld));
+
+        const float PI = 3.14159;
+        XMMATRIX entityWorld = DirectX::XMMatrixIdentity();
+        //entityWorld = XMMatrixMultiply(entityWorld, DirectX::XMMatrixRotationRollPitchYaw(0, 0, PI/2.0f));
+        //entityWorld = XMMatrixMultiply(entityWorld, DirectX::XMMatrixRotationRollPitchYaw(-PI/2.0f, 0,0));
+        //entityWorld = XMMatrixMultiply(entityWorld, DirectX::XMMatrixScaling(0.12f, 0.12f, 0.12f));
+        entityWorld = XMMatrixMultiply(entityWorld, DirectX::XMMatrixTranslation(0, 1, 0));
+        XMStoreFloat4x4(&entity.world, entityWorld);
+        XMStoreFloat4x4(&entity.invWorld, DirectX::XMMatrixInverse(nullptr, entityWorld));
         memcpy(mapped, &entity, sizeof(entity));
     }
 
     mLightBuffer.Create(L"Light Buffer", sizeof(cbLights));
+    mTimeBuffer.Create(L"Time", sizeof(cbTime));
 
     Muon::CloseCommandList();
     Muon::ExecuteCommandList();
@@ -119,9 +127,8 @@ void Game::Update(Muon::StepTimer const& timer)
     Muon::cbLights lights;
 
     lights.ambientColor = DirectX::XMFLOAT3A(+1.0f, +0.772f, +0.56f);
-
-    lights.directionalLight.diffuseColor = DirectX::XMFLOAT3A(1, 1, 1);
-    lights.directionalLight.dir = DirectX::XMFLOAT3A(cos(elapsedTime), 0.0, sin(elapsedTime));
+    lights.directionalLight.diffuseColor = DirectX::XMFLOAT3A(1.0, 1.0, 1.0);
+    lights.directionalLight.dir = DirectX::XMFLOAT3A(0,1,0);
 
     DirectX::XMStoreFloat3(&lights.cameraWorldPos, mCamera.GetPosition());
 
@@ -129,6 +136,15 @@ void Game::Update(Muon::StepTimer const& timer)
     
     if (mapped)
         memcpy(mapped, &lights, sizeof(Muon::cbLights));
+
+
+    Muon::cbTime time;
+    time.totalTime = timer.GetTotalSeconds();
+    time.deltaTime = elapsedTime;
+
+    UINT8* timeBuf = mTimeBuffer.GetMappedPtr();
+    if (timeBuf)
+        memcpy(timeBuf, &time, sizeof(Muon::cbTime));
 }
 
 void Game::Render()
@@ -183,6 +199,12 @@ void Game::Render()
         if (lightsRootIdx != ROOTIDX_INVALID)
         {
             pCommandList->SetGraphicsRootConstantBufferView(lightsRootIdx, mLightBuffer.GetGPUVirtualAddress());
+        }
+
+        int32_t timeRootIdx = mOpaquePass.GetResourceRootIndex("Time");
+        if (timeRootIdx != ROOTIDX_INVALID)
+        {
+            pCommandList->SetGraphicsRootConstantBufferView(timeRootIdx, mTimeBuffer.GetGPUVirtualAddress());
         }
 
         const Mesh* pMesh = codex.GetMesh(GetResourceID(L"cube.obj"));
@@ -273,6 +295,7 @@ Game::~Game()
     mCube.Destroy();
     mWorldMatrixBuffer.Destroy();
     mLightBuffer.Destroy();
+    mTimeBuffer.Destroy();
     mCamera.Destroy();
     mInput.Destroy();
     mOpaquePass.Destroy();

@@ -808,8 +808,8 @@ void TextureFactory::LoadAll3DTextures(ID3D12Device* pDevice, ID3D12GraphicsComm
 
 bool MaterialFactory::CreateAllMaterials(ResourceCodex& codex)
 {
-    const ResourceID kRockDiffuseId = GetResourceID(L"Bark_T.png");
-    const ResourceID kRockNormalId = GetResourceID(L"Rock_N.png");
+    const ResourceID kPhongDiffuseId = GetResourceID(L"Bark_T.png");
+    const ResourceID kPhongNormalId = GetResourceID (L"Bark_N.png");
     const ResourceID kTestNVDFId = GetResourceID(L"StormbirdCloud_NVDF");
     const ResourceID kTest3DTexId = GetResourceID(L"Test_3D");
     {
@@ -832,8 +832,8 @@ bool MaterialFactory::CreateAllMaterials(ResourceCodex& codex)
         Muon::CloseCommandList();
         Muon::ExecuteCommandList();
 
-        pPhongMaterial->SetTextureParam("diffuseTexture", kRockDiffuseId);
-        pPhongMaterial->SetTextureParam("normalMap",      kRockNormalId);
+        pPhongMaterial->SetTextureParam("diffuseTexture", kPhongDiffuseId);
+        pPhongMaterial->SetTextureParam("normalMap",      kPhongNormalId);
         pPhongMaterial->SetTextureParam("test3d", kTest3DTexId);
     }
 
