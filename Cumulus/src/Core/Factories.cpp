@@ -335,23 +335,34 @@ void TextureFactory::LoadAllTextures(ID3D12Device* pDevice, ID3D12GraphicsComman
         pos = name.find(L'.') + 1;
         const std::wstring TexExt = name.substr(pos);
     
-        if (!entry.is_regular_file() || (TexExt != L"png" && TexExt != L"jpg"))
+        if (!entry.is_regular_file())
         {
             continue;
         }
     
+        DirectX::ScratchImage scratchImg;
+        HRESULT hr = E_FAIL;
+         
+        if (TexExt == L"png" || TexExt == L"jpg")
+        {
+            hr = DirectX::LoadFromWICFile(path.c_str(), DirectX::WIC_FLAGS_NONE, nullptr, scratchImg, nullptr);
+        }
+        else if (TexExt == L"tga")
+        {
+            hr = DirectX::LoadFromTGAFile(path.c_str(), nullptr, scratchImg);
+        }
+
+        if (FAILED(hr))
+        {
+            // Unsupported texture types fall through and get caught here
+            Muon::Printf(L"Error: Failed to load texture %s: 0x%08X\n", path.c_str(), hr);
+            continue;
+        }
+
         ResourceID tid = GetResourceID(name.c_str());
         Texture& tex = codex.InsertTexture(tid);
     
         Muon::ResetCommandList(nullptr);
-        DirectX::ScratchImage scratchImg;
-        HRESULT hr = DirectX::LoadFromWICFile(path.c_str(), DirectX::WIC_FLAGS_NONE, nullptr, scratchImg, nullptr);
-        if (FAILED(hr))
-        {
-            Muon::Printf(L"Error: Failed to load texture %s: 0x%08X\n", path.c_str(), hr);
-            continue;
-        }
-    
         const DirectX::Image* pImage = scratchImg.GetImage(0, 0, 0);
         if (!pImage || !tex.Create(name.c_str(), pDevice, (UINT)pImage->width, (UINT)pImage->height, 1, pImage->format, D3D12_RESOURCE_FLAG_NONE, D3D12_RESOURCE_STATE_COPY_DEST))
         {
