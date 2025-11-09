@@ -25,14 +25,28 @@ cbuffer PSPerMaterial : register(b11)
     float  specularity;
 }
 
+#define VISUALIZE_3D 0
 Texture2D diffuseTexture    : register(t0);
 Texture2D normalMap         : register(t1);
+Texture3D test3d : register(t2);
 SamplerState samplerOptions : register(s0);
 float4 main(VertexOut input) : SV_TARGET
 {
     // Sample diffuse texture, normal map(unpacked)
     float3 surfaceColor = diffuseTexture.Sample(samplerOptions, input.uv).rgb;
     float3 sampledNormal = normalMap.Sample(samplerOptions, input.uv).rgb * 2 - 1;
+    
+    
+#if VISUALIZE_3D
+    float t = totalTime * 0.2;
+    float animatedIndex = frac(t) * (32 - 1);
+    float zSlice = animatedIndex / (32 - 1);
+
+    float3 uvw = float3(input.uv, zSlice);
+    float4 sliceValue = test3d.Sample(samplerOptions, uvw);
+    surfaceColor.rgb = sliceValue.rgb;
+    return float4(surfaceColor, 1);
+#endif
 
     // Normalize normal vector
     input.normal = normalize(input.normal);
