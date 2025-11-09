@@ -383,7 +383,7 @@ void TextureFactory::LoadAllTextures(ID3D12Device* pDevice, ID3D12GraphicsComman
 size_t extractNumber(const std::filesystem::path& p)
 {
     std::string stem = p.stem().string();
-    auto dotPos = stem.find_last_of('.');
+    auto dotPos = stem.find_last_of('_');
     if (dotPos == std::string::npos)
         throw std::runtime_error("Invalid filename format: " + stem);
     return std::stoul(stem.substr(dotPos + 1));
@@ -396,9 +396,9 @@ bool TextureFactory::LoadTexturesForNVDF(std::filesystem::path directoryPath, ID
     auto ExtractIndexAndInsert = [](const std::filesystem::path& p, std::vector<fs::path>& outVector)
     {
         size_t number = extractNumber(p);
-        if (outVector.size() < number)
-            outVector.resize(number);
-        outVector[number - 1] = p;
+        if (outVector.size() <= number)
+            outVector.resize(number + 1);
+        outVector[number] = p;
     };
 
     // Assume the following naming convention: 
@@ -418,11 +418,11 @@ bool TextureFactory::LoadTexturesForNVDF(std::filesystem::path directoryPath, ID
             continue;
 
         std::wstring name = entry.path().filename().wstring();
-        if (name.rfind(L"field_data.", 0) == 0)
+        if (name.rfind(L"field_data", 0) == 0)
         {
             ExtractIndexAndInsert(entry.path(), fieldFiles);
         }
-        else if (name.rfind(L"modeling_data.", 0) == 0)
+        else if (name.rfind(L"modeling_data", 0) == 0)
         {
             ExtractIndexAndInsert(entry.path(), modelingFiles);
         }
@@ -637,9 +637,9 @@ bool TextureFactory::Load3DTextureFromSlices(std::filesystem::path directoryPath
     auto ExtractIndexAndInsert = [](const std::filesystem::path& p, std::vector<fs::path>& outVector)
     {
         size_t number = extractNumber(p);
-        if (outVector.size() < number)
-            outVector.resize(number);
-        outVector[number - 1] = p;
+        if (outVector.size() <= number)
+            outVector.resize(number + 1);
+        outVector[number] = p;
     };
 
     auto IsSupportedFileFormat = [](std::wstring& ext)
