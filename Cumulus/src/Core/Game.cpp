@@ -86,7 +86,7 @@ bool Game::Init(HWND window, int width, int height)
         using namespace DirectX;
         cbPerEntity entity;
 
-        const float PI = 3.14159;
+        const float PI = 3.14159f;
         XMMATRIX entityWorld = DirectX::XMMatrixIdentity();
         //entityWorld = XMMatrixMultiply(entityWorld, DirectX::XMMatrixRotationRollPitchYaw(0, 0, PI/2.0f));
         //entityWorld = XMMatrixMultiply(entityWorld, DirectX::XMMatrixRotationRollPitchYaw(-PI/2.0f, 0,0));
@@ -139,7 +139,7 @@ void Game::Update(Muon::StepTimer const& timer)
 
 
     Muon::cbTime time;
-    time.totalTime = timer.GetTotalSeconds();
+    time.totalTime = (float)timer.GetTotalSeconds();
     time.deltaTime = elapsedTime;
 
     UINT8* timeBuf = mTimeBuffer.GetMappedPtr();

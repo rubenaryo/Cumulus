@@ -782,7 +782,7 @@ bool TextureFactory::Load3DTextureFromDDS(std::filesystem::path directoryPath, I
     Texture& tex = codex.InsertTexture(tid);
 
     const DirectX::Image* pImage = scratchImg.GetImage(0, 0, 0);
-    if (!pImage || !tex.Create(name.c_str(), pDevice, (UINT)pImage->width, (UINT)pImage->height, metadata.depth, pImage->format, D3D12_RESOURCE_FLAG_NONE, D3D12_RESOURCE_STATE_COPY_DEST))
+    if (!pImage || !tex.Create(name.c_str(), pDevice, (UINT)pImage->width, (UINT)pImage->height, (UINT)metadata.depth, pImage->format, D3D12_RESOURCE_FLAG_NONE, D3D12_RESOURCE_STATE_COPY_DEST))
     {
         Muon::Printf(L"Error: Failed to create texture on default heap %s: 0x%08X\n", name.c_str(), hr);
         return false;
