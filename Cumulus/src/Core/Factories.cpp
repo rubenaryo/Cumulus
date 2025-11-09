@@ -645,6 +645,8 @@ bool TextureFactory::Load3DTextureFromSlices(std::filesystem::path directoryPath
     using namespace DirectX;
     namespace fs = std::filesystem;
 
+    std::wstring dirPathStr = directoryPath.wstring();
+
     auto ExtractIndexAndInsert = [](const std::filesystem::path& p, std::vector<fs::path>& outVector)
     {
         size_t number = extractNumber(p);
@@ -672,16 +674,17 @@ bool TextureFactory::Load3DTextureFromSlices(std::filesystem::path directoryPath
             continue;
 
         std::filesystem::path ext = entry.path().extension();
-        if (!IsSupportedFileFormat(ext.wstring()))
+        std::wstring extStr = ext.wstring();
+        if (!IsSupportedFileFormat(extStr))
             continue;
 
         if (requiredExt.empty()) // This is the first file, every other file must match this.
-            requiredExt = ext.wstring();
+            requiredExt = extStr.c_str();
 
-        if (ext.wstring() != requiredExt)
+        if (extStr != requiredExt)
         {
             Printf(L"Error: Mixed file formats in directory: %s. Expected %s but found %s\n",
-                directoryPath.wstring().c_str(), requiredExt.c_str(), ext.wstring().c_str());
+                dirPathStr.c_str(), requiredExt.c_str(), extStr.c_str());
             return false;
         }
 
@@ -690,7 +693,7 @@ bool TextureFactory::Load3DTextureFromSlices(std::filesystem::path directoryPath
 
     if (sliceFiles.empty())
     {
-        Printf(L"Warning: Early out of loading 3D texture for directory: %s. No files found.\n", directoryPath.c_str());
+        Printf(L"Warning: Early out of loading 3D texture for directory: %s. No files found.\n", dirPathStr.c_str());
         return false;
     }
 
@@ -718,14 +721,14 @@ bool TextureFactory::Load3DTextureFromSlices(std::filesystem::path directoryPath
 
         if (FAILED(hr))
         {
-            Muon::Printf(L"Error: Failed to determine ideal image dimensions (Load Fail): %s\n", directoryPath.wstring().c_str());
+            Muon::Printf(L"Error: Failed to determine ideal image dimensions (Load Fail): %s\n", dirPathStr.c_str());
             return false;
         }
 
         const Image* pImage = image.GetImage(0, 0, 0);
         if (!pImage)
         {
-            Muon::Printf(L"Error: Failed to determine ideal image dimensions (No Image): %s\n", directoryPath.wstring().c_str());
+            Muon::Printf(L"Error: Failed to determine ideal image dimensions (No Image): %s\n", dirPathStr.c_str());
             return false;
         }
 
@@ -757,42 +760,43 @@ bool TextureFactory::Load3DTextureFromSlices(std::filesystem::path directoryPath
 
 bool TextureFactory::Load3DTextureFromDDS(std::filesystem::path directoryPath, ID3D12Device* pDevice, ID3D12GraphicsCommandList* pCommandList, ResourceCodex& codex)
 {
+    std::wstring name = directoryPath.filename().wstring();
+
     DirectX::ScratchImage scratchImg;
     DirectX::TexMetadata metadata = {};
     HRESULT hr = DirectX::LoadFromDDSFile(directoryPath.c_str(), DirectX::DDS_FLAGS_NONE, &metadata, scratchImg);
     
     if (FAILED(hr))
     {
-        Muon::Printf(L"Error: Failed to load texture %s: 0x%08X\n", directoryPath.wstring().c_str(), hr);
+        Muon::Printf(L"Error: Failed to load texture %s: 0x%08X\n", name.c_str(), hr);
         return false;
     }
 
     if (metadata.dimension != DirectX::TEX_DIMENSION_TEXTURE3D)
     {
-        Muon::Printf(L"Error: Loaded DDS texture %s: 0x%08X but it's not 3D!\n", directoryPath.wstring().c_str(), hr);
+        Muon::Printf(L"Error: Loaded DDS texture %s: 0x%08X but it's not 3D!\n", name.c_str(), hr);
         return false;
     }
 
-    std::wstring name = directoryPath.filename().wstring();
     ResourceID tid = GetResourceID(name.c_str());
     Texture& tex = codex.InsertTexture(tid);
 
     const DirectX::Image* pImage = scratchImg.GetImage(0, 0, 0);
     if (!pImage || !tex.Create(name.c_str(), pDevice, (UINT)pImage->width, (UINT)pImage->height, metadata.depth, pImage->format, D3D12_RESOURCE_FLAG_NONE, D3D12_RESOURCE_STATE_COPY_DEST))
     {
-        Muon::Printf(L"Error: Failed to create texture on default heap %s: 0x%08X\n", directoryPath.wstring().c_str(), hr);
+        Muon::Printf(L"Error: Failed to create texture on default heap %s: 0x%08X\n", name.c_str(), hr);
         return false;
     }
 
     if (!codex.Get3DTextureStagingBuffer().UploadToTexture(tex, pImage->pixels, GetCommandList()))
     {
-        Muon::Printf(L"Error: Failed to upload data to texture %s: 0x%08X\n", directoryPath.wstring().c_str(), hr);
+        Muon::Printf(L"Error: Failed to upload data to texture %s: 0x%08X\n", name.c_str(), hr);
         return false;
     }
 
     if (!tex.InitSRV(pDevice, Muon::GetSRVHeap()))
     {
-        Muon::Printf(L"Error: Failed to create D3D12 Resource and SRV for %s!\n", directoryPath.wstring().c_str());
+        Muon::Printf(L"Error: Failed to create D3D12 Resource and SRV for %s!\n", name.c_str());
         return false;
     }
 
@@ -846,13 +850,14 @@ void TextureFactory::LoadAll3DTextures(ID3D12Device* pDevice, ID3D12GraphicsComm
     for (const auto& entry : fs::directory_iterator(tex3dPath))
     {
         Muon::ResetCommandList(nullptr);
+        std::wstring path = entry.path().wstring();
         
         if (entry.is_directory())
         {
             if (!Load3DTextureFromSlices(entry.path(), pDevice, pCommandList, codex))
             {
                 Muon::CloseCommandList();
-                Muon::Printf(L"Warning: Failed to load 3D Texture from directory: %s\n", entry.path().wstring().c_str());
+                Muon::Printf(L"Warning: Failed to load 3D Texture from directory: %s\n", path.c_str());
                 continue;
             }
         }
@@ -861,7 +866,7 @@ void TextureFactory::LoadAll3DTextures(ID3D12Device* pDevice, ID3D12GraphicsComm
             if (!Load3DTextureFromDDS(entry.path(), pDevice, pCommandList, codex))
             {
                 Muon::CloseCommandList();
-                Muon::Printf(L"Warning: Failed to load 3D Texture from DDS: %s\n", entry.path().wstring().c_str());
+                Muon::Printf(L"Warning: Failed to load 3D Texture from DDS: %s\n", path.c_str());
                 continue;
             }
         }
