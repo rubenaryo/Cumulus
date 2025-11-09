@@ -339,6 +339,7 @@ namespace Muon
         sd.BufferUsage = DXGI_USAGE_RENDER_TARGET_OUTPUT;
         sd.SwapEffect = DXGI_SWAP_EFFECT_FLIP_DISCARD;
         sd.SampleDesc.Count = 1;
+        sd.Flags = DXGI_SWAP_CHAIN_FLAG_ALLOW_TEARING;
 
         Microsoft::WRL::ComPtr<IDXGISwapChain1> swapChain;
         HRESULT hr = pFactory->CreateSwapChainForHwnd(
@@ -562,7 +563,7 @@ namespace Muon
         if (!GetSwapChain())
             return false;
 
-        HRESULT hr = GetSwapChain()->Present(1, 0);
+        HRESULT hr = GetSwapChain()->Present(0, DXGI_PRESENT_ALLOW_TEARING);
         return SUCCEEDED(hr);
     }
 
