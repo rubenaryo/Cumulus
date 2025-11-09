@@ -100,6 +100,7 @@ bool Game::Init(HWND window, int width, int height)
     }
 
     mLightBuffer.Create(L"Light Buffer", sizeof(cbLights));
+    mTimeBuffer.Create(L"Time", sizeof(cbTime));
 
     mAABBBuffer.Create(L"AABB Buffer", sizeof(cbIntersections));
 
