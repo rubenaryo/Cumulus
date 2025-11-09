@@ -357,10 +357,6 @@ void TextureFactory::LoadAllTextures(ID3D12Device* pDevice, ID3D12GraphicsComman
             continue;
         }
     
-        ResourceID tid = GetResourceID(name.c_str());
-        Texture& tex = codex.InsertTexture(tid);
-    
-        Muon::ResetCommandList(nullptr);
         DirectX::ScratchImage scratchImg;
         HRESULT hr = E_FAIL;
          
