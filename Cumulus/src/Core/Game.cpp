@@ -162,8 +162,10 @@ void Game::Render()
 
     // Fetch the desired material from the codex
     ResourceCodex& codex = ResourceCodex::GetSingleton();
-    ResourceID matId = GetResourceID(L"Phong");
-    const Muon::Material* pPhongMaterial = codex.GetMaterialType(matId);
+    ResourceID phongMatId = GetResourceID(L"Phong");
+    const Muon::Material* pPhongMaterial = codex.GetMaterialType(phongMatId);
+    ResourceID cloudMatId = GetResourceID(L"Cloud"); 
+    const Muon::Material* pCloudMaterial = codex.GetMaterialType(cloudMatId);
     
     Texture* pOffscreenTarget = codex.GetTexture(GetResourceID(L"OffscreenTarget"));
     Texture* pComputeOutput = codex.GetTexture(GetResourceID(L"SobelOutput"));
@@ -194,7 +196,7 @@ void Game::Render()
         {
             pCommandList->SetGraphicsRootConstantBufferView(worldMatrixRootIdx, mWorldMatrixBuffer.GetGPUVirtualAddress());
         }
-
+     
         int32_t lightsRootIdx = mOpaquePass.GetResourceRootIndex("PSLights");
         if (lightsRootIdx != ROOTIDX_INVALID)
         {
@@ -216,6 +218,9 @@ void Game::Render()
 
     if (mRaymarchPass.Bind(pCommandList))
     {
+        // Bind's the materials parameter buffer and textures.
+        mRaymarchPass.BindMaterial(*pCloudMaterial, pCommandList); 
+
         pCommandList->ResourceBarrier(1, &CD3DX12_RESOURCE_BARRIER::Transition(pOffscreenTarget->GetResource(),
             D3D12_RESOURCE_STATE_RENDER_TARGET, D3D12_RESOURCE_STATE_GENERIC_READ));
 
