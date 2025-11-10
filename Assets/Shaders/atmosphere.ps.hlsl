@@ -130,7 +130,7 @@ static const float3 SUN_SPECTRAL_RADIANCE_TO_LUMINANCE = float3(98242.786222, 69
 static const float kLengthUnitInMeters = 1000.000000;
 
 // Constant buffer
-cbuffer SceneConstants : register(b0)
+cbuffer AtmosphereConstants : register(b0)
 {
     float3 camera;
     float exposure;

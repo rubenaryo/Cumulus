@@ -57,7 +57,25 @@ struct alignas(256) cbIntersections
 {
     uint32_t aabbCount;
     AABB aabbs[1];
+}
+
+struct alignas(16) cbAtmosphere
+{
+    DirectX::XMFLOAT3 camera_position;
+    float pad0;
+    DirectX::XMFLOAT3 earth_center;
+    float pad1;
+    DirectX::XMFLOAT3 sun_direction;
+    float pad2;
+    DirectX::XMFLOAT2 sun_size;
+    float exposure;
+    float pad3;
+    DirectX::XMFLOAT3 white_point;
+    int display_texture;
+    int scatter_slice;
+    float pad4;
+    float pad5;
+    float pad6;
 };
 
-}
 #endif
