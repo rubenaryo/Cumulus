@@ -95,16 +95,15 @@ bool Game::Init(HWND window, int width, int height)
 	mAABBBuffer.Create(L"AABB Buffer", sizeof(cbIntersections));
 
 
-	const Mesh* m = codex.GetMesh(Muon::GetResourceID(L"cube.obj"));
+	const Mesh* m = codex.GetMesh(Muon::GetResourceID(L"cylinder.obj"));
 
-	cbIntersections intersections;
+	cbIntersections intersections = {};
 	intersections.aabbCount = 1;
 	intersections.aabbs[0] = m->GetAABB();
-
 	if (m) {
 		UINT8* aabbPtr = mAABBBuffer.GetMappedPtr();
 		if (aabbPtr) {
-			memcpy(aabbPtr, &intersections, sizeof(cbIntersections));
+			memcpy(aabbPtr, &intersections, sizeof(intersections));
 		}
 	}
 

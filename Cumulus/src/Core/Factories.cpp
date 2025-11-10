@@ -152,7 +152,7 @@ namespace Muon
 		boundingBox.min = data.min;
 		boundingBox.max = data.max;
 
-		bool success = outMesh.Create(fileName, (UINT)data.vertexData.size(), (UINT)data.vertexData.size() / data.vertexCount, (UINT)data.vertexCount, (UINT)data.indices.size() * sizeof(uint32_t), (UINT)data.indices.size(), DXGI_FORMAT_R32_UINT);
+		bool success = outMesh.Create(fileName, (UINT)data.vertexData.size(), (UINT)data.vertexData.size() / data.vertexCount, (UINT)data.vertexCount, (UINT)data.indices.size() * sizeof(uint32_t), (UINT)data.indices.size(), DXGI_FORMAT_R32_UINT, boundingBox);
 		if (!success)
 		{
 			Muon::Printf(L"Error: Failed to create mesh: %s\n", fileName);

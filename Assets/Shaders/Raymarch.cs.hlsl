@@ -40,19 +40,19 @@ float rayMarch(float3 eyePos, float3 dir, float start, float end)
             return end;
         }
 
-        for(int i = 0; i <  aabbCount; i++)
+        float3 pos = eyePos + depth * dir;
+
+        if(aabbCount == 0) return depth;
+
+        for(int i = 0; i < aabbCount; i++)
         {
             AABB box = aabbs[i];
-            float3 boxCenter = (box.minBounds + box.maxBounds) * 0.5;
-            float3 boxExtents = (box.maxBounds - box.minBounds) * 0.5;
-            float3 p = eyePos + depth * dir - boxCenter;
-            float3 q = abs(p) - boxExtents;
-            float boxDist = length(max(q, 0.0)) + min(max(q.x, max(q.y, q.z)), 0.0);
             
-            if(boxDist < dist)
+            if(all(pos >= box.minBounds) && all(pos <= box.maxBounds))
             {
-                dist = boxDist;
+                //return end;
             }
+
         }
     }
     return end;
