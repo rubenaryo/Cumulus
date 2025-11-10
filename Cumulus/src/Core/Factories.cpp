@@ -385,8 +385,8 @@ void TextureFactory::LoadTexturesForNVDF(std::filesystem::path directoryPath, ID
     };
 
     // Assume the following naming convention: 
-    // - field_data.#.tga : red channel = dimensional_profile
-    // - modeling_data.#.tga : red = detail_type, green = density_scale, blue = sdf
+    // - field_data.#.tga : red channel = signed distance field [-256, 4096] mapped to [0, 1] 
+    // - modeling_data.#.tga : red = dimensional profile, green = detail_type, blue = density scale
     // Note: # starts from 1. 
     std::vector<fs::path> fieldFiles;
     std::vector<fs::path> modelingFiles;
@@ -566,6 +566,23 @@ bool MaterialFactory::CreateAllMaterials(ResourceCodex& codex)
         pPhongMaterial->SetTextureParam("diffuseTexture",   kRockDiffuseId);
         pPhongMaterial->SetTextureParam("normalMap",        kRockNormalId);
         pPhongMaterial->SetTextureParam("testNVDF",         kTestNVDFId);
+    }
+
+    {
+        const wchar_t* kCloudMaterialName = L"Cloud"; 
+        Material* pCloudMaterial = codex.InsertMaterialType(kCloudMaterialName); 
+        if (!pCloudMaterial) {
+            Muon::Printf(L"Warning: %s Material failed to be inserted into codex!", kCloudMaterialName); 
+            return false; 
+        }
+
+        cbMaterialParams pCloudMaterialParams; 
+        pCloudMaterialParams.colorTint = DirectX::XMFLOAT4(1, 1, 1, 1);
+        pCloudMaterialParams.specularExp = 0.0f; // Not used in cloud shading 
+
+        pCloudMaterial->PopulateMaterialParams(codex.GetMatParamsStagingBuffer(), Muon::GetCommandList()); 
+
+        pCloudMaterial->SetTextureParam("sdfNvdfTex", kTestNVDFId);
     }
 
 

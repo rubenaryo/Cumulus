@@ -6,6 +6,7 @@ static const float MAX_DIST = 10.0;
 static const float EPSILON = 0.001;
 
 Texture2D gInput : register(t0);
+Texture3D sdfNvdfTex : register(t1); // Sdf and model textures combined [sdf.r, model.r, model.g, model.b] 
 RWTexture2D<float4> gOutput : register(u0);
 
 float sphereSDF(float3 samplePoint, float radius)
