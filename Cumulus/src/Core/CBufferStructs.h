@@ -46,10 +46,11 @@ namespace Muon
 		float              specularExp = 0.0f;
 	};
 
-	struct alignas(16) cbIntersections
+	struct alignas(256) cbIntersections
 	{
-		AABB aabbs[128];
-		unsigned int aabbCount;
+		AABB aabbs[31];
+		uint32_t aabbCount;
+		float padding[3];
 	};
 }
 #endif

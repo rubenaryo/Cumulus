@@ -12,9 +12,10 @@ struct AABB
 	float3 maxBounds;
 };
 
-cbuffer AABBBuffer : register(b11)
+cbuffer AABBBuffer : register(b14)
 {
-	AABB aabbs[128];
+	AABB aabbs[31];
 	uint aabbCount;
+    float padding[3]; // Pad to 16 bytes
 };
 #endif
