@@ -46,5 +46,11 @@ struct alignas(16) cbMaterialParams
     float              specularExp = 0.0f;
 };
 
+struct alignas(16) cbTime
+{
+    float totalTime = 0;
+    float deltaTime = 0;
+};
+
 }
 #endif
