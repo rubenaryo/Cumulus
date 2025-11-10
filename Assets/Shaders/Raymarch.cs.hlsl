@@ -1,11 +1,11 @@
 #include "VS_Common.hlsli"
 
-static const int MAX_STEPS = 255;
+static const int MAX_STEPS = 512;
 static const float MIN_DIST = 0.001;
-static const float MAX_DIST = 10.0;
+static const float MAX_DIST = 1000.0;
 static const float EPSILON = 0.001;
-static const float3 VOLUME_MIN_WS = float3(-2.0, 0.0, -2.0);
-static const float3 VOLUME_MAX_WS = float3(2.0, 4.0, 2.0);
+static const float3 VOLUME_MIN_WS = float3(-40, 0.0, -40);
+static const float3 VOLUME_MAX_WS = float3(40, 10, 40);
 static const float DENSITY_SCALE = 1.0; // Placeholder; to be replaced by values from NVDF
 static const float MIN_TRANSMITTANCE = 0.01; // Early-out
 
@@ -16,8 +16,15 @@ RWTexture2D<float4> gOutput : register(u0);
 
 float3 WorldToNvdfUV(float3 worldPos)
 {
-    float3 uvw = (worldPos - VOLUME_MIN_WS) / (VOLUME_MAX_WS - VOLUME_MIN_WS);
-    return uvw;
+    float3 local = (worldPos - VOLUME_MIN_WS) / (VOLUME_MAX_WS - VOLUME_MIN_WS);
+
+    // local: (X, Y, Z) normalized into [0,1]
+
+    float u = local.x; // world X -> texture X
+    float v = local.z; // world Z -> texture Y (so each slice is an XZ plane)
+    float w = local.y; // world Y -> texture Z (stacking along Y)
+
+    return float3(u, v, w);
 }
 
 bool RayBoxIntersect(
@@ -84,12 +91,6 @@ float3 VolumeRaymarchNvdf(float3 eyePos, float3 dir, float3 bgColor)
         // Sample NVDF: sdfNvdfTex.r = sdf, .g = dimensional profile (density), etc.
         float4 nvdfSample = sdfNvdfTex.SampleLevel(linearWrap, uvw, 0.0f);
         float density = nvdfSample.g; // Dimensional profile
-        
-        // If the result is all red, the texture is not being loaded or sampled properly
-        if (density < EPSILON)
-        {
-            return float3(1, 0, 0); 
-        }
 
         // Map density to extinction
         float sigma = density * DENSITY_SCALE;
