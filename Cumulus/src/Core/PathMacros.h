@@ -24,6 +24,8 @@ helper macros for reaching certain paths
 #define TGAPATHW WIDEN(TGAPATH)
 #define NVDFPATH TGAPATH ## "NVDF\\"
 #define NVDFPATHW WIDEN(NVDFPATH)
+#define TEX3DPATH TEXTUREPATH ## "3D\\"
+#define TEX3DPATHW WIDEN(TEX3DPATH)
 #define NOISEPATH TGAPATH ## "Noise\\"
 #define NOISEPATHW WIDEN(NOISEPATH)
 #define SHADERPATH "..\\_bin\\Shaders\\"
