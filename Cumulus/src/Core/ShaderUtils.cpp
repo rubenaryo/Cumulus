@@ -384,11 +384,36 @@ namespace Muon
 
         // Merge resources - combine from both shaders
         // VS resources come first, then PS resources
+        std::unordered_map<std::string, size_t> resNameToIndex;
+
+        auto MergeResources = [](ShaderResourceBinding& dst, const ShaderResourceBinding& src)
+        {
+            if (dst.Visibility != src.Visibility)
+                dst.Visibility = D3D12_SHADER_VISIBILITY_ALL;
+        };
+
         for (const auto& res : vsData.Resources)
+        {
+            resNameToIndex[res.Name] = outResources.size();
             outResources.push_back(res);
+        }
 
         for (const auto& res : psData.Resources)
+        {
+            // If a resource with the same name already exists in the vertex shader
+            // (Such as a shared constant buffer). Don't add a new entry and instead merge the two.
+            // Merging just means switching the visibility to be ALL
+            if (resNameToIndex.find(res.Name) != resNameToIndex.end())
+            {
+                size_t idx = resNameToIndex[res.Name];
+                ShaderResourceBinding& dst = outResources.at(idx);
+                MergeResources(dst, res);
+                continue;
+            }
+
             outResources.push_back(res);
+        }
+
 
         // Merge constant buffers - check for duplicates by name
         std::unordered_map<std::string, size_t> cbNameToIndex;
