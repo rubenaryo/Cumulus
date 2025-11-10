@@ -93,7 +93,13 @@ bool Pass::GenerateRootSignature()
         builder.AddStaticSampler(sampler.BindPoint, sampler.Space);
     }
 
-    return builder.Build(pDevice, mpRootSignature.GetAddressOf());
+    bool success =  builder.Build(pDevice, mpRootSignature.GetAddressOf());
+    if (success)
+    {
+        std::wstring rootSigName = mName + L"_RootSignature";
+        mpRootSignature->SetName(rootSigName.c_str());
+    }
+    return success;
 }
 
 bool Pass::Generate()
@@ -226,7 +232,14 @@ bool GraphicsPass::GeneratePipelineState()
     psoDesc.PrimitiveTopologyType = D3D12_PRIMITIVE_TOPOLOGY_TYPE_TRIANGLE;
 
     HRESULT hr = pDevice->CreateGraphicsPipelineState(&psoDesc, IID_PPV_ARGS(&mpPipelineState));
-    return SUCCEEDED(hr);
+    bool success = SUCCEEDED(hr);
+    if (success)
+    {
+        std::wstring psoName = mName + L"_PipelineState";
+        mpPipelineState->SetName(psoName.c_str());
+    }
+
+    return success;
 }
 
 /////////////////////////////////////////////////////////
@@ -266,7 +279,13 @@ bool ComputePass::GeneratePipelineState()
     compDesc.Flags = D3D12_PIPELINE_STATE_FLAG_NONE;
 
     HRESULT hr = pDevice->CreateComputePipelineState(&compDesc, IID_PPV_ARGS(&mpPipelineState));
-    return SUCCEEDED(hr);
+    bool success = SUCCEEDED(hr);
+    if (success)
+    {
+        std::wstring psoName = mName + L"_PipelineState";
+        mpPipelineState->SetName(psoName.c_str());
+    }
+    return success;
 }
 
 }

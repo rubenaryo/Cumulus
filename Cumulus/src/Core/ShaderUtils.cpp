@@ -382,6 +382,14 @@ namespace Muon
         outResources.clear();
         outCBs.clear();
 
+        std::unordered_map<std::string, size_t> resNameToIndex;
+
+        auto MergeResources = [](ShaderResourceBinding& dst, const ShaderResourceBinding& src)
+        {
+            if (dst.Visibility != src.Visibility)
+                dst.Visibility = D3D12_SHADER_VISIBILITY_ALL;
+        };
+
         // Merge resources - combine from both shaders
         // VS resources come first, then PS resources
         std::unordered_map<std::string, size_t> resNameToIndex;
@@ -414,7 +422,6 @@ namespace Muon
             outResources.push_back(res);
         }
 
-
         // Merge constant buffers - check for duplicates by name
         std::unordered_map<std::string, size_t> cbNameToIndex;
 
@@ -439,6 +446,7 @@ namespace Muon
                 {
                     Printf("Warning: Constant buffer '%s' has different properties in VS and PS!\n", cb.Name.c_str());
                 }
+
 
                 // Merge variables (avoid duplicates)
                 for (const auto& var : cb.Variables)
