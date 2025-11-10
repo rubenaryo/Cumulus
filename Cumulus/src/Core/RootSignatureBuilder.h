@@ -19,7 +19,7 @@ public:
     void AddShaderResourceView(UINT shaderRegister, UINT space, D3D12_SHADER_VISIBILITY visibility);
     void AddUnorderedAccessView(UINT shaderRegister, UINT space, D3D12_SHADER_VISIBILITY visibility);
     void AddDescriptorTable(const D3D12_DESCRIPTOR_RANGE* ranges, UINT numRanges, D3D12_SHADER_VISIBILITY visibility);
-    void AddStaticSampler(const D3D12_STATIC_SAMPLER_DESC& sampler);
+    void AddStaticSampler(UINT shaderRegister, UINT registerSpace);
 
     bool Build(ID3D12Device* pDevice, ID3D12RootSignature** ppRootSig);
 

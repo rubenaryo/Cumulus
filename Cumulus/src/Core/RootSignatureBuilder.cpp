@@ -5,9 +5,65 @@ Description : Generator for D3D12 Root Signatures
 ----------------------------------------------*/
 
 #include <Core/RootSignatureBuilder.h>
+#include <array>
 
 namespace Muon
 {
+
+static const size_t NUM_STATIC_SAMPLERS = 6;
+std::array<const CD3DX12_STATIC_SAMPLER_DESC, NUM_STATIC_SAMPLERS> InitStaticSamplers()
+{
+    const CD3DX12_STATIC_SAMPLER_DESC pointWrap(
+        0, // shaderRegister
+        D3D12_FILTER_MIN_MAG_MIP_POINT, // filter
+        D3D12_TEXTURE_ADDRESS_MODE_WRAP,  // addressU
+        D3D12_TEXTURE_ADDRESS_MODE_WRAP,  // addressV
+        D3D12_TEXTURE_ADDRESS_MODE_WRAP); // addressW
+
+    const CD3DX12_STATIC_SAMPLER_DESC pointClamp(
+        1, // shaderRegister
+        D3D12_FILTER_MIN_MAG_MIP_POINT, // filter
+        D3D12_TEXTURE_ADDRESS_MODE_CLAMP,  // addressU
+        D3D12_TEXTURE_ADDRESS_MODE_CLAMP,  // addressV
+        D3D12_TEXTURE_ADDRESS_MODE_CLAMP); // addressW
+
+    const CD3DX12_STATIC_SAMPLER_DESC linearWrap(
+        2, // shaderRegister
+        D3D12_FILTER_MIN_MAG_MIP_LINEAR, // filter
+        D3D12_TEXTURE_ADDRESS_MODE_WRAP,  // addressU
+        D3D12_TEXTURE_ADDRESS_MODE_WRAP,  // addressV
+        D3D12_TEXTURE_ADDRESS_MODE_WRAP); // addressW
+
+    const CD3DX12_STATIC_SAMPLER_DESC linearClamp(
+        3, // shaderRegister
+        D3D12_FILTER_MIN_MAG_MIP_LINEAR, // filter
+        D3D12_TEXTURE_ADDRESS_MODE_CLAMP,  // addressU
+        D3D12_TEXTURE_ADDRESS_MODE_CLAMP,  // addressV
+        D3D12_TEXTURE_ADDRESS_MODE_CLAMP); // addressW
+
+    const CD3DX12_STATIC_SAMPLER_DESC anisotropicWrap(
+        4, // shaderRegister
+        D3D12_FILTER_ANISOTROPIC, // filter
+        D3D12_TEXTURE_ADDRESS_MODE_WRAP,  // addressU
+        D3D12_TEXTURE_ADDRESS_MODE_WRAP,  // addressV
+        D3D12_TEXTURE_ADDRESS_MODE_WRAP,  // addressW
+        0.0f,                             // mipLODBias
+        8);                               // maxAnisotropy
+
+    const CD3DX12_STATIC_SAMPLER_DESC anisotropicClamp(
+        5, // shaderRegister
+        D3D12_FILTER_ANISOTROPIC, // filter
+        D3D12_TEXTURE_ADDRESS_MODE_CLAMP,  // addressU
+        D3D12_TEXTURE_ADDRESS_MODE_CLAMP,  // addressV
+        D3D12_TEXTURE_ADDRESS_MODE_CLAMP,  // addressW
+        0.0f,                              // mipLODBias
+        8);                                // maxAnisotropy
+
+    return {
+        pointWrap, pointClamp,
+        linearWrap, linearClamp,
+        anisotropicWrap, anisotropicClamp };
+}
 
 void RootSignatureBuilder::Reset()
 {
@@ -62,9 +118,19 @@ void RootSignatureBuilder::AddDescriptorTable(const D3D12_DESCRIPTOR_RANGE* rang
     mParameters.push_back(param);
 }
 
-void RootSignatureBuilder::AddStaticSampler(const D3D12_STATIC_SAMPLER_DESC& sampler)
+/// We define a fixed set of 6 sampler types as static. They will always be available should the shader ask for them.
+/// If shaderRegister >= 6, all following samplers will be copies of the last one.
+void RootSignatureBuilder::AddStaticSampler(UINT shaderRegister, UINT registerSpace)
 {
-    mStaticSamplers.push_back(sampler);
+    static std::array<const CD3DX12_STATIC_SAMPLER_DESC, NUM_STATIC_SAMPLERS> sStaticSamplerTemplates = InitStaticSamplers();
+
+    UINT index = min(shaderRegister, NUM_STATIC_SAMPLERS - 1);
+    CD3DX12_STATIC_SAMPLER_DESC desc = sStaticSamplerTemplates.at(index);
+    desc.ShaderRegister = shaderRegister;
+    desc.RegisterSpace = registerSpace;
+    desc.ShaderVisibility = D3D12_SHADER_VISIBILITY_ALL; // Assumed visible to all shaders.
+
+    mStaticSamplers.push_back(desc);
 }
 
 bool RootSignatureBuilder::Build(ID3D12Device* pDevice, ID3D12RootSignature** ppRootSig)
