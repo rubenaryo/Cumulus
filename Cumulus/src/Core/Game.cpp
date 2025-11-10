@@ -113,7 +113,7 @@ bool Game::Init(HWND window, int width, int height)
     mAtmosphereBuffer.Create(L"Atmosphere CB", sizeof(cbAtmosphere));
 
     cbAtmosphere atmosphereParams;
-    UpdateAtmosphereConstants(atmosphereParams);
+    UpdateAtmosphereConstants(atmosphereParams, width, height);
 
     mapped = mAtmosphereBuffer.GetMappedPtr();
     if (mapped)
@@ -306,7 +306,7 @@ void Game::Render()
             mCamera.Bind(cameraRootIdx, pCommandList);
         }
 
-        int32_t atmosphereRootIdx = mAtmospherePass.GetResourceRootIndex("AtmosphereConstants");
+        int32_t atmosphereRootIdx = mAtmospherePass.GetResourceRootIndex("cbAtmosphere");
         if (atmosphereRootIdx != ROOTIDX_INVALID)
         {
             pCommandList->SetGraphicsRootConstantBufferView(atmosphereRootIdx, mAtmosphereBuffer.GetGPUVirtualAddress());
