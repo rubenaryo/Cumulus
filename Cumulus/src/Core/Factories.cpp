@@ -908,24 +908,6 @@ bool MaterialFactory::CreateAllMaterials(ResourceCodex& codex)
         pPhongMaterial->SetTextureParam("test3d", kTestDDS);
     }
 
-    {
-        const wchar_t* kCloudMaterialName = L"Cloud"; 
-        Material* pCloudMaterial = codex.InsertMaterialType(kCloudMaterialName); 
-        if (!pCloudMaterial) {
-            Muon::Printf(L"Warning: %s Material failed to be inserted into codex!", kCloudMaterialName); 
-            return false; 
-        }
-
-        cbMaterialParams pCloudMaterialParams; 
-        pCloudMaterialParams.colorTint = DirectX::XMFLOAT4(1, 1, 1, 1);
-        pCloudMaterialParams.specularExp = 0.0f; // Not used in cloud shading 
-
-        pCloudMaterial->PopulateMaterialParams(codex.GetMatParamsStagingBuffer(), Muon::GetCommandList()); 
-
-        pCloudMaterial->SetTextureParam("sdfNvdfTex", kTestNVDFId);
-    }
-
-
     return true;
 }
 

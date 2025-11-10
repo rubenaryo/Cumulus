@@ -4,7 +4,7 @@ static const int MAX_STEPS = 512;
 static const float MIN_DIST = 0.001;
 static const float MAX_DIST = 1000.0;
 static const float EPSILON = 0.001;
-static const float3 VOLUME_MIN_WS = float3(-40, 0.0, -40);
+static const float3 VOLUME_MIN_WS = float3(-40, 0.0, -40); // Bounds for the cloud volume
 static const float3 VOLUME_MAX_WS = float3(40, 10, 40);
 static const float DENSITY_SCALE = 1.0; // Placeholder; to be replaced by values from NVDF
 static const float MIN_TRANSMITTANCE = 0.01; // Early-out
@@ -112,14 +112,6 @@ float3 VolumeRaymarchNvdf(float3 eyePos, float3 dir, float3 bgColor)
     // Composite over background
     float3 finalColor = accumColor + bgColor * transmittance;
     return finalColor;
-}
-
-
-float3 rayDir(float fov, float2 res, float2 pixelCoord)
-{
-    float2 xy = pixelCoord - res / 2.0;
-    float z = res.y / tan(radians(fov) / 2.0);
-    return normalize(float3(xy, -z));
 }
 
 [numthreads(16, 16, 1)]
