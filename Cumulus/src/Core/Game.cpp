@@ -15,11 +15,13 @@ Description : Implementation of Game.h
 #include <Core/Shader.h>
 #include <Core/Texture.h>
 #include <Utils/Utils.h>
+#include <Utils/AtmosphereUtils.h>
 
 Game::Game() :
     mInput(),
     mCamera(),
     mOpaquePass(L"OpaquePass"),
+    mAtmospherePass(L"AtmospherePass"),
     mSobelPass(L"SobelPass"),
     mRaymarchPass(L"RaymarchPass"),
     mPostProcessPass(L"PostProcessPass")
@@ -50,6 +52,15 @@ bool Game::Init(HWND window, int width, int height)
 
         if (!mOpaquePass.Generate())
             Printf(L"Warning: %s failed to generate!\n", mOpaquePass.GetName());
+    }
+
+    // Assemble atmosphere render pass
+    {
+        mAtmospherePass.SetVertexShader(codex.GetVertexShader(GetResourceID(L"atmosphere.vs")));
+        mAtmospherePass.SetPixelShader(codex.GetPixelShader(GetResourceID(L"atmosphere.ps")));
+
+        if (!mAtmospherePass.Generate())
+            Printf(L"Warning: %s failed to generate!\n", mAtmospherePass.GetName());
     }
 
     // Assemble compute filter pass
@@ -99,6 +110,16 @@ bool Game::Init(HWND window, int width, int height)
 
     mLightBuffer.Create(L"Light Buffer", sizeof(cbLights));
     mTimeBuffer.Create(L"Time", sizeof(cbTime));
+    mAtmosphereBuffer.Create(L"Atmosphere CB", sizeof(cbAtmosphere));
+
+    cbAtmosphere atmosphereParams;
+    UpdateAtmosphereConstants(atmosphereParams);
+
+    mapped = mAtmosphereBuffer.GetMappedPtr();
+    if (mapped)
+    {
+        memcpy(mapped, &atmosphereParams, sizeof(cbAtmosphere));
+    }
 
     Muon::CloseCommandList();
     Muon::ExecuteCommandList();
@@ -176,7 +197,7 @@ void Game::Render()
     ID3D12GraphicsCommandList* pCommandList = GetCommandList();
     pCommandList->SetDescriptorHeaps(1, GetSRVHeap()->GetHeapAddr());
 
-    if (mOpaquePass.Bind(pCommandList))
+    if (0 && mOpaquePass.Bind(pCommandList))
     {
         // Bind's the materials parameter buffer and textures.
         mOpaquePass.BindMaterial(*pPhongMaterial, pCommandList);
@@ -272,6 +293,51 @@ void Game::Render()
         pCommandList->DrawInstanced(6, 1, 0, 0);
     }
 
+    if (mAtmospherePass.Bind(pCommandList))
+    {
+        const Texture* pTransmittanceTex = codex.GetTexture(GetResourceID(L"transmittance_tex.tga"));
+        const Texture* pIrradianceTex = codex.GetTexture(GetResourceID(L"irradiance_tex.tga"));
+        const Texture* pScatteringTex = codex.GetTexture(GetResourceID(L"scatter_tex_full.dds"));
+
+
+        int32_t cameraRootIdx = mAtmospherePass.GetResourceRootIndex("VSCamera");
+        if (cameraRootIdx != ROOTIDX_INVALID)
+        {
+            mCamera.Bind(cameraRootIdx, pCommandList);
+        }
+
+        int32_t atmosphereRootIdx = mAtmospherePass.GetResourceRootIndex("AtmosphereConstants");
+        if (atmosphereRootIdx != ROOTIDX_INVALID)
+        {
+            pCommandList->SetGraphicsRootConstantBufferView(atmosphereRootIdx, mAtmosphereBuffer.GetGPUVirtualAddress());
+        }
+
+        int32_t transmittanceIdx = mAtmospherePass.GetResourceRootIndex("transmittance_texture");
+        if (pTransmittanceTex && transmittanceIdx != ROOTIDX_INVALID)
+        {
+            pCommandList->SetGraphicsRootDescriptorTable(transmittanceIdx, pTransmittanceTex->GetSRVHandleGPU());
+        }
+
+        int32_t irradianceIdx = mAtmospherePass.GetResourceRootIndex("irradiance_texture");
+        if (pIrradianceTex && irradianceIdx != ROOTIDX_INVALID)
+        {
+            pCommandList->SetGraphicsRootDescriptorTable(irradianceIdx, pIrradianceTex->GetSRVHandleGPU());
+        }
+
+        int32_t scatterIdx = mAtmospherePass.GetResourceRootIndex("scattering_texture");
+        if (pScatteringTex && scatterIdx != ROOTIDX_INVALID)
+        {
+            pCommandList->SetGraphicsRootDescriptorTable(scatterIdx, pScatteringTex->GetSRVHandleGPU());
+        }
+
+        // Draw fullscreen quad
+        pCommandList->IASetVertexBuffers(0, 1, nullptr);
+        pCommandList->IASetIndexBuffer(nullptr);
+        pCommandList->IASetPrimitiveTopology(D3D_PRIMITIVE_TOPOLOGY_TRIANGLELIST);
+
+        pCommandList->DrawInstanced(6, 1, 0, 0);
+    }
+
     FinalizeRender();
     CloseCommandList();
     ExecuteCommandList();
@@ -296,9 +362,11 @@ Game::~Game()
     mWorldMatrixBuffer.Destroy();
     mLightBuffer.Destroy();
     mTimeBuffer.Destroy();
+    mAtmosphereBuffer.Destroy();
     mCamera.Destroy();
     mInput.Destroy();
     mOpaquePass.Destroy();
+    mAtmospherePass.Destroy();
     mSobelPass.Destroy();
     mRaymarchPass.Destroy();
     mPostProcessPass.Destroy();

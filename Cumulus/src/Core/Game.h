@@ -51,6 +51,7 @@ private:
     Muon::Camera mCamera;
 
     Muon::GraphicsPass mOpaquePass;
+    Muon::GraphicsPass mAtmospherePass;
     Muon::ComputePass mSobelPass;
     Muon::ComputePass mRaymarchPass;
     Muon::GraphicsPass mPostProcessPass;
@@ -61,6 +62,7 @@ private:
     Muon::UploadBuffer mWorldMatrixBuffer;
     Muon::UploadBuffer mLightBuffer;
     Muon::UploadBuffer mTimeBuffer;
+    Muon::UploadBuffer mAtmosphereBuffer;
 
     // Timer for the main game loop
     Muon::StepTimer mTimer;
