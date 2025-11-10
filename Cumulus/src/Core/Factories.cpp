@@ -413,8 +413,8 @@ bool TextureFactory::LoadTexturesForNVDF(std::filesystem::path directoryPath, ID
     };
 
     // Assume the following naming convention: 
-    // - field_data.#.tga : red channel = dimensional_profile
-    // - modeling_data.#.tga : red = detail_type, green = density_scale, blue = sdf
+    // - field_data.#.tga : red channel = signed distance field [-256, 4096] mapped to [0, 1] 
+    // - modeling_data.#.tga : red = dimensional profile, green = detail_type, blue = density scale
     // Note: # starts from 1. 
     std::vector<fs::path> fieldFiles;
     std::vector<fs::path> modelingFiles;
@@ -907,7 +907,6 @@ bool MaterialFactory::CreateAllMaterials(ResourceCodex& codex)
         pPhongMaterial->SetTextureParam("normalMap",      kPhongNormalId);
         pPhongMaterial->SetTextureParam("test3d", kTestDDS);
     }
-
 
     return true;
 }

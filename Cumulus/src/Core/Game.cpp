@@ -162,11 +162,14 @@ void Game::Render()
 
     // Fetch the desired material from the codex
     ResourceCodex& codex = ResourceCodex::GetSingleton();
-    ResourceID matId = GetResourceID(L"Phong");
-    const Muon::Material* pPhongMaterial = codex.GetMaterialType(matId);
+    ResourceID phongMatId = GetResourceID(L"Phong");
+    const Muon::Material* pPhongMaterial = codex.GetMaterialType(phongMatId);
+    ResourceID cloudMatId = GetResourceID(L"Cloud"); 
+    const Muon::Material* pCloudMaterial = codex.GetMaterialType(cloudMatId);
     
     Texture* pOffscreenTarget = codex.GetTexture(GetResourceID(L"OffscreenTarget"));
     Texture* pComputeOutput = codex.GetTexture(GetResourceID(L"SobelOutput"));
+    Texture* pSdfNVDF = codex.GetTexture(GetResourceID(L"StormbirdCloud_NVDF"));
     if (!pOffscreenTarget || !pComputeOutput)
     {
         Muon::Printf("Error: Game::Render Failed to fetch the offscreen target and compute output textures.\n");
@@ -194,7 +197,7 @@ void Game::Render()
         {
             pCommandList->SetGraphicsRootConstantBufferView(worldMatrixRootIdx, mWorldMatrixBuffer.GetGPUVirtualAddress());
         }
-
+     
         int32_t lightsRootIdx = mOpaquePass.GetResourceRootIndex("PSLights");
         if (lightsRootIdx != ROOTIDX_INVALID)
         {
@@ -236,6 +239,12 @@ void Game::Render()
         if (outIdx != ROOTIDX_INVALID)
         {
             pCommandList->SetComputeRootDescriptorTable(outIdx, pComputeOutput->GetUAVHandleGPU());
+        }
+
+        int32_t sdfNVDFIndex = mRaymarchPass.GetResourceRootIndex("sdfNvdfTex");
+        if (inIdx != ROOTIDX_INVALID)
+        {
+            pCommandList->SetComputeRootDescriptorTable(sdfNVDFIndex, pSdfNVDF->GetSRVHandleGPU());
         }
 
         pCommandList->ResourceBarrier(1, &CD3DX12_RESOURCE_BARRIER::Transition(pComputeOutput->GetResource(),
