@@ -25,7 +25,7 @@ static const float DENSITY_SCALE = .3; // To be tuned / driven by NVDF
 
 Texture2D gInput : register(t0);
 Texture3D sdfNvdfTex : register(t1); // Sdf and model textures combined [sdf.r, model.r, model.g, model.b] 
-SamplerState linearWrap : register(s0); 
+SamplerState linearClamp : register(s3); 
 RWTexture2D<float4> gOutput : register(u0);
 
 float3 WorldToNvdfUV(float3 worldPos)
@@ -136,7 +136,7 @@ float3 VolumeRaymarchNvdf(float3 eyePos, float3 dir, float3 bgColor, int3 dispat
         float3 samplePos = eyePos + distance * dir;
 
         // Sample NVDF volume: .r = encoded SDF, .g = density (dimensional profile)
-        float4 sdfSample = sdfNvdfTex.SampleLevel(linearWrap, WorldToNvdfUV(samplePos), 0.0f);
+        float4 sdfSample = sdfNvdfTex.SampleLevel(linearClamp, WorldToNvdfUV(samplePos), 0.0f);
         // Decode SDF from [0,1] texture range into NVDF space, then scale into world units
         float sdfDistance = DecodeSdf(sdfSample.r) * NVDF_TO_WORLD_SCALE;
         
@@ -158,7 +158,7 @@ float3 VolumeRaymarchNvdf(float3 eyePos, float3 dir, float3 bgColor, int3 dispat
         if (sdfDistance < 0.0)
         {
             // Map density to extinction
-            float4 nvdfSample = sdfNvdfTex.SampleLevel(linearWrap, WorldToNvdfUV(samplePos), 0.0f);
+            float4 nvdfSample = sdfNvdfTex.SampleLevel(linearClamp, WorldToNvdfUV(samplePos), 0.0f);
             float density = nvdfSample.g;
             float sigma = density * DENSITY_SCALE;
    
