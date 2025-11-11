@@ -138,7 +138,7 @@ float3 VolumeRaymarchNvdf(float3 eyePos, float3 dir, float3 bgColor, int3 dispat
         // Sample NVDF volume: .r = encoded SDF, .g = density (dimensional profile)
         float4 sdfSample = sdfNvdfTex.SampleLevel(linearWrap, WorldToNvdfUV(samplePos), 0.0f);
         // Decode SDF from [0,1] texture range into NVDF space, then scale into world units
-        float sdfDistance = DecodeSdf(sdfSample.r) * NVDF_TO_WORLD_SCALE * 0.5;
+        float sdfDistance = DecodeSdf(sdfSample.r) * NVDF_TO_WORLD_SCALE;
         
 #if USE_ADAPTIVE_STEP
         // Step size: SDF-guided, but never smaller than the distance-based adaptive step
