@@ -4,7 +4,7 @@
 // Toggle features
 #define USE_ADAPTIVE_STEP 1 // Shows some artifact ATM. Will debug again after uprez. 
 #define USE_JITTERED_STEP 1
-#define DEBUG_AABB_INTERSECT 1
+#define DEBUG_AABB_INTERSECT 0
 // Raymarch settings
 static const int MAX_STEPS = 1024; // Max steps per ray
 static const float MIN_DIST = 0.001; // Global near distance
@@ -107,16 +107,6 @@ float StaticStepJitter(uint2 pixelCoord, uint stepIndex)
     return Hash231(pixelCoord, stepIndex) - 0.5f;
 }
 
-bool RayAABBIntersect(
-    float3 origin,
-    float3 dir,
-    AABB aabb,
-    out float tEnter,
-    out float tExit)
-{
-    return RayBoxIntersect(origin, dir, aabb.minBounds, aabb.maxBounds, tEnter, tExit);
-}
-
 float3 VolumeRaymarchNvdf(float3 eyePos, float3 dir, float3 bgColor, int3 dispathThreadID)
 {
     float tEnter, tExit;
@@ -131,7 +121,7 @@ float3 VolumeRaymarchNvdf(float3 eyePos, float3 dir, float3 bgColor, int3 dispat
     for (uint i = 0; i < aabbCount; ++i)
     {
         float aabbEnter, aabbExit;
-        if (RayAABBIntersect(eyePos, dir, aabbs[i], aabbEnter, aabbExit))
+        if (RayBoxIntersect(eyePos, dir, aabbs[i].minBounds, aabbs[i].maxBounds, aabbEnter, aabbExit))
         {
             minBoxEnter = min(minBoxEnter, aabbEnter);
             maxBoxExit = max(maxBoxExit, aabbExit);

@@ -107,7 +107,6 @@ bool Game::Init(HWND window, int width, int height)
     cbIntersections intersections = {};
     intersections.aabbCount = 1;
     intersections.aabbs[0] = m->GetAABB();
-    //intersections.aabbs[0].min = DirectX::XMFLOAT3A(0, 1, 0);
     if (m) {
         UINT8* aabbPtr = mAABBBuffer.GetMappedPtr();
         if (aabbPtr) {
