@@ -30,7 +30,7 @@ RWTexture2D<float4> gOutput : register(u0);
 
 float3 WorldToNvdfUV(float3 worldPos)
 {
-    float3 local = saturate((worldPos - VOLUME_MIN_WS) / (VOLUME_MAX_WS - VOLUME_MIN_WS));
+    float3 local = (worldPos - VOLUME_MIN_WS) / (VOLUME_MAX_WS - VOLUME_MIN_WS);
 
     // local: (X, Y, Z) normalized into [0,1]
 
