@@ -327,6 +327,19 @@ bool TextureFactory::CreateOffscreenRenderTarget(ID3D12Device* pDevice, UINT wid
     return success;
 }
 
+bool TextureFactory::CreatePrecomputeTextures(ID3D12Device* pDevice, ResourceCodex& codex)
+{
+    const wchar_t* pcTransName = L"pc_transmittance";
+    Texture& pcTransmit = codex.InsertTexture(GetResourceID(pcTransName));
+    bool success = pcTransmit.Create(pcTransName, Muon::GetDevice(), 256, 4, 1, DXGI_FORMAT_R32G32B32A32_FLOAT, D3D12_RESOURCE_FLAG_ALLOW_UNORDERED_ACCESS, D3D12_RESOURCE_STATE_GENERIC_READ);
+    success &= pcTransmit.InitSRV(pDevice, Muon::GetSRVHeap());
+    success &= pcTransmit.InitUAV(pDevice, Muon::GetSRVHeap());
+    if (!success)
+        return false;
+
+    return true;
+}
+
 // Loads all the textures from the directory and returns them as out params to the ResourceCodex
 void TextureFactory::LoadAllTextures(ID3D12Device* pDevice, ID3D12GraphicsCommandList* pCommandList, ResourceCodex& codex)
 {

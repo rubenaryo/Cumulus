@@ -20,6 +20,7 @@ Description : Implementation of Game.h
 Game::Game() :
     mInput(),
     mCamera(),
+    mPrecomputePass_Transmittance(L"pcTransmittancePass"),
     mOpaquePass(L"OpaquePass"),
     mAtmospherePass(L"AtmospherePass"),
     mSobelPass(L"SobelPass"),
@@ -90,7 +91,6 @@ bool Game::Init(HWND window, int width, int height)
             Printf(L"Warning: %s failed to generate!\n", mPostProcessPass.GetName());
     }
 
-
     mWorldMatrixBuffer.Create(L"world matrix buffer", sizeof(cbPerEntity));
     UINT8* mapped = mWorldMatrixBuffer.GetMappedPtr();
     assert(mapped);
@@ -142,6 +142,9 @@ bool Game::Init(HWND window, int width, int height)
 
     Muon::CloseCommandList();
     Muon::ExecuteCommandList();
+
+    PrecomputeTransmittance(mPrecomputePass_Transmittance);
+
     return success;
 }
 
@@ -217,7 +220,11 @@ void Game::Render()
     ID3D12GraphicsCommandList* pCommandList = GetCommandList();
     pCommandList->SetDescriptorHeaps(1, GetSRVHeap()->GetHeapAddr());
 
-    if (0 && mOpaquePass.Bind(pCommandList))
+    static bool bEnableOpaque = false;
+    static bool bEnableAtmosphere = true;
+    static bool bShowTransmittance = false;
+
+    if (bEnableOpaque && mOpaquePass.Bind(pCommandList))
     {
         // Bind's the materials parameter buffer and textures.
         mOpaquePass.BindMaterial(*pPhongMaterial, pCommandList);
@@ -331,6 +338,16 @@ void Game::Render()
             pCommandList->SetGraphicsRootDescriptorTable(edgeMapIdx, pComputeOutput->GetSRVHandleGPU());
         }
 
+        if (bShowTransmittance)
+        {
+            const wchar_t* pcTransName = L"pc_transmittance";
+            Texture* pTransmittance = codex.GetTexture(GetResourceID(pcTransName));
+            if (pTransmittance && edgeMapIdx != ROOTIDX_INVALID)
+            {
+                pCommandList->SetGraphicsRootDescriptorTable(edgeMapIdx, pTransmittance->GetSRVHandleGPU());
+            }
+        }
+
         // Draw fullscreen quad
         pCommandList->IASetVertexBuffers(0, 1, nullptr);
         pCommandList->IASetIndexBuffer(nullptr);
@@ -339,8 +356,10 @@ void Game::Render()
         pCommandList->DrawInstanced(6, 1, 0, 0);
     }
 
-    if (mAtmospherePass.Bind(pCommandList))
+    if (bEnableAtmosphere && mAtmospherePass.Bind(pCommandList))
     {
+        // Note for Avi: These are the ones from Assets/Textures.
+        // If you want to use the one gotten from dx12 precomputation: use "pc_transmittance" (see above)
         const Texture* pTransmittanceTex = codex.GetTexture(GetResourceID(L"transmittance_tex.tga"));
         const Texture* pIrradianceTex = codex.GetTexture(GetResourceID(L"irradiance_tex.tga"));
         const Texture* pScatteringTex = codex.GetTexture(GetResourceID(L"scatter_tex_full.dds"));
@@ -412,6 +431,7 @@ Game::~Game()
     mAtmosphereBuffer.Destroy();
     mCamera.Destroy();
     mInput.Destroy();
+    mPrecomputePass_Transmittance.Destroy();
     mOpaquePass.Destroy();
     mAtmospherePass.Destroy();
     mSobelPass.Destroy();
