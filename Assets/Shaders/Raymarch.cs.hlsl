@@ -152,7 +152,7 @@ float3 VolumeRaymarchNvdf(float3 eyePos, float3 dir, float3 bgColor, int3 dispat
         // Later 
 #if USE_JITTERED_STEP
         float jitter = StaticStepJitter(dispathThreadID.xy, i); // [-0.5, 0.5]
-        float jitterDistance = 0.1 * stepSize;
+        float jitterDistance = jitter * stepSize;
         samplePos += dir * jitterDistance;
 #endif
         
