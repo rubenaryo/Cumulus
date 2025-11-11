@@ -27,7 +27,6 @@ cbuffer PSPerMaterial : register(b11)
 Texture2D diffuseTexture    : register(t0);
 Texture3D test3d : register(t1);
 SamplerState samplerOptions : register(s0);
-
 float4 main(VertexOut input) : SV_TARGET
 {
     float3 normalRGB = input.normal.xyz * 0.5 + 0.5;
