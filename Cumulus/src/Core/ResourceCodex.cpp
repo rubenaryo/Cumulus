@@ -59,6 +59,7 @@ void ResourceCodex::Init()
     MeshFactory::LoadAllMeshes(*gCodexInstance);
     TextureFactory::LoadAllNVDF(GetDevice(), GetCommandList(), *gCodexInstance);
     TextureFactory::LoadAll3DTextures(GetDevice(), GetCommandList(), *gCodexInstance);
+    TextureFactory::CreatePrecomputeTextures(GetDevice(), *gCodexInstance);
     MaterialFactory::CreateAllMaterials(*gCodexInstance);
 
     // After initialization, before real frame loop:

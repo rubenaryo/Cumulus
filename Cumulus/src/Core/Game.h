@@ -50,6 +50,8 @@ private:
     // Main Camera
     Muon::Camera mCamera;
 
+    Muon::ComputePass mPrecomputePass_Transmittance;
+
     Muon::GraphicsPass mOpaquePass;
     Muon::GraphicsPass mAtmospherePass;
     Muon::ComputePass mSobelPass;
