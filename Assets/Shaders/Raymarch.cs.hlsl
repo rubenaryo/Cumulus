@@ -1,13 +1,26 @@
 #include "VS_Common.hlsli"
 
-static const int MAX_STEPS = 512;
-static const float MIN_DIST = 0.001;
-static const float MAX_DIST = 1000.0;
-static const float EPSILON = 0.001;
-static const float3 VOLUME_MIN_WS = float3(-40, 0.0, -40); // Bounds for the cloud volume
-static const float3 VOLUME_MAX_WS = float3(40, 10, 40);
-static const float DENSITY_SCALE = 1.0; // Placeholder; to be replaced by values from NVDF
-static const float MIN_TRANSMITTANCE = 0.01; // Early-out
+// Toggle features
+#define USE_ADAPTIVE_STEP 0 // Shows some artifact ATM. Will debug again after uprez. 
+
+// Raymarch settings
+static const int MAX_STEPS = 1024; // Max steps per ray
+static const float MIN_DIST = 0.001; // Global near distance
+static const float MAX_DIST = 1000.0; // Global far distance
+static const float EPSILON = 0.001; // Small epsilon for safety
+static const float MIN_TRANSMITTANCE = 0.01; // Early-out when mostly opaque
+
+// Volume bounds in world space
+static const float SIDE_LENGTH = 100.0;
+static const float3 VOLUME_MIN_WS = float3(-SIDE_LENGTH / 2, 0.0, -SIDE_LENGTH / 2);
+static const float3 VOLUME_MAX_WS = float3(SIDE_LENGTH / 2, SIDE_LENGTH / 8, SIDE_LENGTH / 2);
+
+// Mapping from NVDF authoring space to world space
+static const float NVDF_DOMAIN_SIDE_LENGTH = 4096.0; // authoring space extent
+static const float NVDF_TO_WORLD_SCALE = SIDE_LENGTH / NVDF_DOMAIN_SIDE_LENGTH;
+
+// Density -> extinction scaling
+static const float DENSITY_SCALE = .3; // To be tuned / driven by NVDF
 
 Texture2D gInput : register(t0);
 Texture3D sdfNvdfTex : register(t1); // Sdf and model textures combined [sdf.r, model.r, model.g, model.b] 
@@ -16,7 +29,7 @@ RWTexture2D<float4> gOutput : register(u0);
 
 float3 WorldToNvdfUV(float3 worldPos)
 {
-    float3 local = (worldPos - VOLUME_MIN_WS) / (VOLUME_MAX_WS - VOLUME_MIN_WS);
+    float3 local = saturate((worldPos - VOLUME_MIN_WS) / (VOLUME_MAX_WS - VOLUME_MIN_WS));
 
     // local: (X, Y, Z) normalized into [0,1]
 
@@ -50,6 +63,26 @@ bool RayBoxIntersect(
     return tExit > max(tEnter, 0.0);
 }
 
+// Encoded value in [0, 1]  ->  real SDF in [-256, 4096]
+float DecodeSdf(float encodedSdf)
+{
+    const float sdfMin = -256.0;
+    const float sdfMax = 4096.0;
+    return lerp(sdfMin, sdfMax, encodedSdf);
+}
+
+// Take smaller steps near the camera
+float ComputeAdaptiveStepSize(float distanceFromCamera)
+{
+    return max(1.0, max(sqrt(distanceFromCamera), EPSILON) * 0.08);
+}
+
+// The larger of the adaptiveStepSize and sdfDistance
+float ComputeBaseStepSize(float sdfDistance, float adaptiveStepSize)
+{
+    return max(sdfDistance, adaptiveStepSize);
+}
+
 float3 VolumeRaymarchNvdf(float3 eyePos, float3 dir, float3 bgColor)
 {
     float tEnter, tExit;
@@ -66,7 +99,6 @@ float3 VolumeRaymarchNvdf(float3 eyePos, float3 dir, float3 bgColor)
     if (tExit <= tEnter)
         return bgColor;
 
-    float segmentLength = (tExit - tEnter) / MAX_STEPS;
     float3 accumColor = float3(0.0, 0.0, 0.0);
     float transmittance = 1.0;
 
@@ -74,39 +106,45 @@ float3 VolumeRaymarchNvdf(float3 eyePos, float3 dir, float3 bgColor)
     const float3 cloudColor = float3(1.0, 1.0, 1.0);
 
     float t = tEnter;
+    float stepSize = 0;
+    // Ray march until the ray exits the volume or max steps are reached
     [loop]
-    for (int i = 0; i < MAX_STEPS; ++i)
+    for (int i = 0; i < MAX_STEPS && t < tExit; ++i)
     {
         float3 worldPos = eyePos + t * dir;
         float3 uvw = WorldToNvdfUV(worldPos);
 
-        // Stay inside [0,1]^3; Just in case uvw returned by WorldToNvdfUV is invalid
-        if (any(uvw < 0.0) || any(uvw > 1.0))
-        {
-            t += segmentLength;
-            
-            continue;
-        }
-
-        // Sample NVDF: sdfNvdfTex.r = sdf, .g = dimensional profile (density), etc.
+        // Sample NVDF volume: .r = encoded SDF, .g = density (dimensional profile)
         float4 nvdfSample = sdfNvdfTex.SampleLevel(linearWrap, uvw, 0.0f);
-        float density = nvdfSample.g; // Dimensional profile
-
+        // Decode SDF from [0,1] texture range into NVDF space, then scale into world units
+        float sdfDistance = DecodeSdf(nvdfSample.r) * NVDF_TO_WORLD_SCALE;
+        float density = nvdfSample.g;
+        
+#if USE_ADAPTIVE_STEP
+        // Step size: SDF-guided, but never smaller than the distance-based adaptive step
+        float adaptive = ComputeAdaptiveStepSize(t);
+        stepSize       = ComputeBaseStepSize(sdfDistance, adaptive);
+#else
+        // Pure SDF sphere-march; clamp to at least one voxel in world space
+        stepSize = max(sdfDistance, NVDF_TO_WORLD_SCALE);
+#endif
+        
         // Map density to extinction
         float sigma = density * DENSITY_SCALE;
-
+   
         // Beer-Lambert: alpha for this step
-        float alpha = 1.0 - exp(-sigma * segmentLength);
+        float alpha = 1.0 - exp(-sigma * stepSize);
 
+        // How much new cloud light this step contributes to the pixel, after accounting for previous absorption
         float3 contrib = cloudColor * alpha * transmittance;
-
         accumColor += contrib;
+        
+        // Less background color is left for further steps
         transmittance *= (1.0 - alpha);
-
         if (transmittance < MIN_TRANSMITTANCE)
             break;
 
-        t += segmentLength;
+        t += stepSize;
     }
 
     // Composite over background
