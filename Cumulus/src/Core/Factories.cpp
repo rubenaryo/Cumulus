@@ -351,6 +351,10 @@ void TextureFactory::LoadAllTextures(ID3D12Device* pDevice, ID3D12GraphicsComman
         {
             hr = DirectX::LoadFromTGAFile(path.c_str(), nullptr, scratchImg);
         }
+        else if (TexExt == L"hdr")
+        {
+            hr = DirectX::LoadFromHDRFile(path.c_str(), nullptr, scratchImg);
+        }
 
         if (FAILED(hr))
         {
