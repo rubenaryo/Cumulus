@@ -181,8 +181,6 @@ void Game::Render()
     ResourceCodex& codex = ResourceCodex::GetSingleton();
     ResourceID phongMatId = GetResourceID(L"Phong");
     const Muon::Material* pPhongMaterial = codex.GetMaterialType(phongMatId);
-    ResourceID cloudMatId = GetResourceID(L"Cloud"); 
-    const Muon::Material* pCloudMaterial = codex.GetMaterialType(cloudMatId);
     
     Texture* pOffscreenTarget = codex.GetTexture(GetResourceID(L"OffscreenTarget"));
     Texture* pComputeOutput = codex.GetTexture(GetResourceID(L"SobelOutput"));
@@ -265,7 +263,7 @@ void Game::Render()
         }
 
         int32_t sdfNVDFIndex = mRaymarchPass.GetResourceRootIndex("sdfNvdfTex");
-        if (sdfNVDFIndex != ROOTIDX_INVALID)
+        if (inIdx != ROOTIDX_INVALID)
         {
             pCommandList->SetComputeRootDescriptorTable(sdfNVDFIndex, pSdfNVDF->GetSRVHandleGPU());
         }

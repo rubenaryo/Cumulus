@@ -559,9 +559,31 @@ bool TextureFactory::LoadTexturesForNVDF(std::filesystem::path directoryPath, ID
     std::wstring lookupName = directoryPath.filename().c_str();
     lookupName += L"_NVDF";
 
-    return Upload3DTextureFromData(lookupName.c_str(), outData.data(),
+    bool success = Upload3DTextureFromData(lookupName.c_str(), outData.data(),
         width, height, depth, DXGI_FORMAT_R32G32B32A32_FLOAT, 
         pDevice, pCommandList, codex);
+
+    if (!success)
+    {
+        Printf(L"Error: Failed to upload to 3D texture %s\n", lookupName.c_str());
+        return false;
+    }
+
+    Texture* pNVDFTex = codex.GetTexture(GetResourceID(lookupName.c_str()));
+    if (!pNVDFTex)
+    {
+        Printf(L"Error: Failed to fetch 3D NVDF texture: %s from codex when transitioning to compute resource\n", lookupName.c_str());
+        return false;
+    }
+
+    // Since NVDF's are only used in the compute shader, we must transition them away from being pixel shader resources.
+    pCommandList->ResourceBarrier(1, &CD3DX12_RESOURCE_BARRIER::Transition(
+        pNVDFTex->GetResource(),
+        D3D12_RESOURCE_STATE_PIXEL_SHADER_RESOURCE,
+        D3D12_RESOURCE_STATE_NON_PIXEL_SHADER_RESOURCE
+    ));
+
+    return true;
 }
 
 static bool LoadTGASlices(const std::vector<std::filesystem::path>& sliceFiles, size_t width, size_t height, std::vector<float>& outData)
