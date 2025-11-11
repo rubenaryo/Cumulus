@@ -1,11 +1,49 @@
 // Atmosphere Shader - HLSL (DirectX 12)
+
+/**
+ * Copyright (c) 2017 Eric Bruneton
+ * All rights reserved.
+ *
+ * Redistribution and use in source and binary forms, with or without
+ * modification, are permitted provided that the following conditions
+ * are met:
+ * 1. Redistributions of source code must retain the above copyright
+ *    notice, this list of conditions and the following disclaimer.
+ * 2. Redistributions in binary form must reproduce the above copyright
+ *    notice, this list of conditions and the following disclaimer in the
+ *    documentation and/or other materials provided with the distribution.
+ * 3. Neither the name of the copyright holders nor the names of its
+ *    contributors may be used to endorse or promote products derived from
+ *    this software without specific prior written permission.
+ *
+ * THIS SOFTWARE IS PROVIDED BY THE COPYRIGHT HOLDERS AND CONTRIBUTORS "AS IS"
+ * AND ANY EXPRESS OR IMPLIED WARRANTIES, INCLUDING, BUT NOT LIMITED TO, THE
+ * IMPLIED WARRANTIES OF MERCHANTABILITY AND FITNESS FOR A PARTICULAR PURPOSE
+ * ARE DISCLAIMED. IN NO EVENT SHALL THE COPYRIGHT OWNER OR CONTRIBUTORS BE
+ * LIABLE FOR ANY DIRECT, INDIRECT, INCIDENTAL, SPECIAL, EXEMPLARY, OR
+ * CONSEQUENTIAL DAMAGES (INCLUDING, BUT NOT LIMITED TO, PROCUREMENT OF
+ * SUBSTITUTE GOODS OR SERVICES; LOSS OF USE, DATA, OR PROFITS; OR BUSINESS
+ * INTERRUPTION) HOWEVER CAUSED AND ON ANY THEORY OF LIABILITY, WHETHER IN
+ * CONTRACT, STRICT LIABILITY, OR TORT (INCLUDING NEGLIGENCE OR OTHERWISE)
+ * ARISING IN ANY WAY OUT OF THE USE OF THIS SOFTWARE, EVEN IF ADVISED OF
+ * THE POSSIBILITY OF SUCH DAMAGE.
+ */
+
+// This HLSL version was created by Avi Serebrenik and Ruben Young, Fall 2025
+// It modifies Bruneton's original code by combining all, and only, the functions needed
+// for atmospheric scattering after the precompute step.
+// It assumes that Luminance is used with a combined scattering texture
+// and that the precomputed textures are passed in through
+// Texture2D transmittance_texture : register(t0);
+// Texture2D irradiance_texture : register(t1);
+// Texture3D scattering_texture : register(t2);
+
+
 #include "AtmosphereBuffer.hlsli"
 
-#define USE_LUMINANCE
-#define IN(x) const x
-#define OUT(x) out x
-#define TEMPLATE(x)
-#define TEMPLATE_ARGUMENT(x)
+//---------------------------
+// CONSTANTS AND DEFINITIONS
+//---------------------------
 
 static const int TRANSMITTANCE_TEXTURE_WIDTH = 256;
 static const int TRANSMITTANCE_TEXTURE_HEIGHT = 64;
@@ -16,77 +54,34 @@ static const int SCATTERING_TEXTURE_NU_SIZE = 8;
 static const int IRRADIANCE_TEXTURE_WIDTH = 64;
 static const int IRRADIANCE_TEXTURE_HEIGHT = 16;
 
-//#define COMBINED_SCATTERING_TEXTURES
-
-// Type definitions
-#define Length float
-#define Wavelength float
-#define Angle float
-#define SolidAngle float
-#define Power float
-#define LuminousPower float
-#define Number float
-#define InverseLength float
-#define Area float
-#define Volume float
-#define NumberDensity float
-#define Irradiance float
-#define Radiance float
-#define SpectralPower float
-#define SpectralIrradiance float
-#define SpectralRadiance float
-#define SpectralRadianceDensity float
-#define ScatteringCoefficient float
-#define InverseSolidAngle float
-#define LuminousIntensity float
-#define Luminance float
-#define Illuminance float
-#define AbstractSpectrum float3
-#define DimensionlessSpectrum float3
-#define PowerSpectrum float3
-#define IrradianceSpectrum float3
-#define RadianceSpectrum float3
-#define RadianceDensitySpectrum float3
-#define ScatteringSpectrum float3
-#define Position float3
-#define Direction float3
-#define Luminance3 float3
-#define Illuminance3 float3
-#define TransmittanceTexture Texture2D
-#define AbstractScatteringTexture Texture3D
-#define ReducedScatteringTexture Texture3D
-#define ScatteringTexture Texture3D
-#define ScatteringDensityTexture Texture3D
-#define IrradianceTexture Texture2D
-
-static const Length m = 1.0;
-static const Wavelength nm = 1.0;
-static const Angle rad = 1.0;
-static const SolidAngle sr = 1.0;
-static const Power watt = 1.0;
-static const LuminousPower lm = 1.0;
+static const float m = 1.0;
+static const float nm = 1.0;
+static const float rad = 1.0;
+static const float sr = 1.0;
+static const float watt = 1.0;
+static const float lm = 1.0;
 static const float PI = 3.14159265358979323846;
-static const Length km = 1000.0 * m;
-static const Area m2 = m * m;
-static const Volume m3 = m * m * m;
-static const Angle pi = PI * rad;
-static const Angle deg = pi / 180.0;
-static const Irradiance watt_per_square_meter = watt / m2;
-static const Radiance watt_per_square_meter_per_sr = watt / (m2 * sr);
-static const SpectralIrradiance watt_per_square_meter_per_nm = watt / (m2 * nm);
-static const SpectralRadiance watt_per_square_meter_per_sr_per_nm = watt / (m2 * sr * nm);
-static const SpectralRadianceDensity watt_per_cubic_meter_per_sr_per_nm = watt / (m3 * sr * nm);
-static const LuminousIntensity cd = lm / sr;
-static const LuminousIntensity kcd = 1000.0 * cd;
-static const Luminance cd_per_square_meter = cd / m2;
-static const Luminance kcd_per_square_meter = kcd / m2;
+static const float km = 1000.0 * m;
+static const float m2 = m * m;
+static const float m3 = m * m * m;
+static const float pi = PI * rad;
+static const float deg = pi / 180.0;
+static const float watt_per_square_meter = watt / m2;
+static const float watt_per_square_meter_per_sr = watt / (m2 * sr);
+static const float watt_per_square_meter_per_nm = watt / (m2 * nm);
+static const float watt_per_square_meter_per_sr_per_nm = watt / (m2 * sr * nm);
+static const float watt_per_cubic_meter_per_sr_per_nm = watt / (m3 * sr * nm);
+static const float cd = lm / sr;
+static const float kcd = 1000.0 * cd;
+static const float cd_per_square_meter = cd / m2;
+static const float kcd_per_square_meter = kcd / m2;
 
 struct DensityProfileLayer {
-    Length width;
-    Number exp_term;
-    InverseLength exp_scale;
-    InverseLength linear_term;
-    Number constant_term;
+    float width;
+    float exp_term;
+    float exp_scale;
+    float linear_term;
+    float constant_term;
 };
 
 struct DensityProfile {
@@ -94,20 +89,20 @@ struct DensityProfile {
 };
 
 struct AtmosphereParameters {
-    IrradianceSpectrum solar_irradiance;
-    Angle sun_angular_radius;
-    Length bottom_radius;
-    Length top_radius;
+    float3 solar_irradiance;
+    float sun_angular_radius;
+    float bottom_radius;
+    float top_radius;
     DensityProfile rayleigh_density;
-    ScatteringSpectrum rayleigh_scattering;
+    float3 rayleigh_scattering;
     DensityProfile mie_density;
-    ScatteringSpectrum mie_scattering;
-    ScatteringSpectrum mie_extinction;
-    Number mie_phase_function_g;
+    float3 mie_scattering;
+    float3 mie_extinction;
+    float mie_phase_function_g;
     DensityProfile absorption_density;
-    ScatteringSpectrum absorption_extinction;
-    DimensionlessSpectrum ground_albedo;
-    Number mu_s_min;
+    float3 absorption_extinction;
+    float3 ground_albedo;
+    float mu_s_min;
 };
 
 static const AtmosphereParameters ATMOSPHERE = {
@@ -130,116 +125,196 @@ static const AtmosphereParameters ATMOSPHERE = {
 static const float3 SKY_SPECTRAL_RADIANCE_TO_LUMINANCE = float3(683.000000, 683.000000, 683.000000);
 static const float3 SUN_SPECTRAL_RADIANCE_TO_LUMINANCE = float3(98242.786222, 69954.398112, 66475.012354);
 static const float kLengthUnitInMeters = 1000.0f;
+static const float3 kSphereCenter = float3(0.0, 0.0, 1.0); // this reduces to 0, 0, 1..... float3(0.0, 0.0, 1000.0) / kLengthUnitInMeters;
+static const float kSphereRadius = 1.0; // this reduces to 1.... 1000.0 / kLengthUnitInMeters;
+static const float3 kSphereAlbedo = float3(0.8, 0.8, 0.8); // NOTE: Change these albedos later for diff ground colors and for moon
+static const float3 kGroundAlbedo = float3(0.0, 0.0, 0.04);
 
-// Textures and samplers
+//--------------------------
+// TEXTURES AND SAMPLERS
+//--------------------------
 Texture2D transmittance_texture : register(t0);
 Texture2D irradiance_texture : register(t1);
 Texture3D scattering_texture : register(t2);
 SamplerState linearSampler : register(s0);
 
-static const float3 kSphereCenter = float3(0.0, 0.0, 1000.0) / kLengthUnitInMeters;
-static const float kSphereRadius = 1000.0 / kLengthUnitInMeters;
-static const float3 kSphereAlbedo = float3(0.8, 0.8, 0.8);
-static const float3 kGroundAlbedo = float3(0.0, 0.0, 0.04);
-
-// Utility functions
-Number ClampCosine(Number mu) {
-    return clamp(mu, Number(-1.0), Number(1.0));
+//----------------------------
+// GENERAL UTILITY FUNCTIONS
+//----------------------------
+float ClampCosine(float mu)
+{
+    return clamp(mu, float(-1.0), float(1.0));
 }
 
-Length ClampDistance(Length d) {
+float ClampDistance(float d)
+{
     return max(d, 0.0 * m);
 }
 
-Length ClampRadius(IN(AtmosphereParameters) atmosphere, Length r) {
+float ClampRadius(const AtmosphereParameters atmosphere,
+float r)
+{
     return clamp(r, atmosphere.bottom_radius, atmosphere.top_radius);
 }
 
-Length SafeSqrt(Area a) {
+float SafeSqrt(float a)
+{
     return sqrt(max(a, 0.0 * m2));
 }
 
-Length DistanceToTopAtmosphereBoundary(IN(AtmosphereParameters) atmosphere,
-    Length r, Number mu) {
-    Area discriminant = r * r * (mu * mu - 1.0) +
+//---------------------------------------------
+// ATMOSPHERIC SCATTERING COMPUTATION FUNCTIONS
+//---------------------------------------------
+
+// called by GetTransmittanceTextureUvFromRMu
+// called by GetScatteringTextureUvwzFromRMuMuSNu
+float DistanceToTopAtmosphereBoundary(const AtmosphereParameters atmosphere,
+    float r, float mu)
+{
+    float discriminant = r * r * (mu * mu - 1.0) +
         atmosphere.top_radius * atmosphere.top_radius;
     return ClampDistance(-r * mu + SafeSqrt(discriminant));
 }
 
-bool RayIntersectsGround(IN(AtmosphereParameters) atmosphere,
-    Length r, Number mu) {
+// called by GetSkyRadianceToPoint
+// called by GetSkyRadiance
+bool RayIntersectsGround(const AtmosphereParameters atmosphere,
+    float r, float mu)
+{
     return mu < 0.0 && r * r * (mu * mu - 1.0) +
         atmosphere.bottom_radius * atmosphere.bottom_radius >= 0.0 * m2;
 }
 
-Number GetLayerDensity(IN(DensityProfileLayer) layer, Length altitude) {
-    Number density = layer.exp_term * exp(layer.exp_scale * altitude) +
-        layer.linear_term * altitude + layer.constant_term;
-    return clamp(density, Number(0.0), Number(1.0));
+// called by GetSkyRadiance
+float RayleighPhaseFunction(float nu)
+{
+    float k = 3.0 / (16.0 * PI * sr);
+    return k * (1.0 + nu * nu);
 }
 
-Number GetProfileDensity(IN(DensityProfile) profile, Length altitude) {
-    return altitude < profile.layers[0].width ?
-        GetLayerDensity(profile.layers[0], altitude) :
-        GetLayerDensity(profile.layers[1], altitude);
+// called by GetSkyRadianceToPoint
+// called by GetSkyRadiance
+float MiePhaseFunction(float g, float nu)
+{
+    float k = 3.0 / (8.0 * PI * sr) * (1.0 - g * g) / (2.0 + g * g);
+    return k * (1.0 + nu * nu) / pow(1.0 + g * g - 2.0 * g * nu, 1.5);
 }
 
-Number GetTextureCoordFromUnitRange(Number x, int texture_size) {
-    return 0.5 / Number(texture_size) + x * (1.0 - 1.0 / Number(texture_size));
+// called by GetIrradianceTextureUvFromRMuS
+// called by GetTransmittanceTextureUvFromRMu
+// called by GetScatteringTextureUvwzFromRMuMuSNu
+float GetTextureCoordFromUnitRange(float x, int texture_size)
+{
+    return 0.5 / float(texture_size) + x * (1.0 - 1.0 / float(texture_size));
 }
 
-float2 GetTransmittanceTextureUvFromRMu(IN(AtmosphereParameters) atmosphere,
-    Length r, Number mu) {
-    Length H = sqrt(atmosphere.top_radius * atmosphere.top_radius -
+// called by GetIrradiance
+float2 GetIrradianceTextureUvFromRMuS(const AtmosphereParameters atmosphere,
+float r, float mu_s) {
+float x_r = (r - atmosphere.bottom_radius) /
+        (atmosphere.top_radius - atmosphere.bottom_radius);
+float x_mu_s = mu_s * 0.5 + 0.5;
+    return float2(GetTextureCoordFromUnitRange(x_mu_s, IRRADIANCE_TEXTURE_WIDTH),
+                  GetTextureCoordFromUnitRange(x_r, IRRADIANCE_TEXTURE_HEIGHT));
+}
+
+// called by GetTransmittanceToTopAtmosphereBoundary
+float2 GetTransmittanceTextureUvFromRMu(const AtmosphereParameters atmosphere,
+    float r, float mu)
+{
+    float H = sqrt(atmosphere.top_radius * atmosphere.top_radius -
         atmosphere.bottom_radius * atmosphere.bottom_radius);
-    Length rho =
+    float rho =
         SafeSqrt(r * r - atmosphere.bottom_radius * atmosphere.bottom_radius);
-    Length d = DistanceToTopAtmosphereBoundary(atmosphere, r, mu);
-    Length d_min = atmosphere.top_radius - r;
-    Length d_max = rho + H;
-    Number x_mu = (d - d_min) / (d_max - d_min);
-    Number x_r = rho / H;
+    float d = DistanceToTopAtmosphereBoundary(atmosphere, r, mu);
+    float d_min = atmosphere.top_radius - r;
+    float d_max = rho + H;
+    float x_mu = (d - d_min) / (d_max - d_min);
+    float x_r = rho / H;
     return float2(GetTextureCoordFromUnitRange(x_mu, TRANSMITTANCE_TEXTURE_WIDTH),
                   GetTextureCoordFromUnitRange(x_r, TRANSMITTANCE_TEXTURE_HEIGHT));
 }
 
-DimensionlessSpectrum GetTransmittanceToTopAtmosphereBoundary(
-    IN(AtmosphereParameters) atmosphere,
-    IN(TransmittanceTexture) transmittance_tex,
-    Length r, Number mu) {
-    float2 uv = GetTransmittanceTextureUvFromRMu(atmosphere, r, mu);
-    return DimensionlessSpectrum(transmittance_tex.Sample(linearSampler, uv).rgb);
+// called by GetCombinedScattering
+float4 GetScatteringTextureUvwzFromRMuMuSNu(
+    const AtmosphereParameters atmosphere,
+    float r, float mu, float mu_s, float nu,
+    bool ray_r_mu_intersects_ground) {
+    float H = sqrt(atmosphere.top_radius * atmosphere.top_radius -
+            atmosphere.bottom_radius * atmosphere.bottom_radius);
+    float rho = SafeSqrt(r * r - atmosphere.bottom_radius * atmosphere.bottom_radius);
+    float u_r = GetTextureCoordFromUnitRange(rho / H, SCATTERING_TEXTURE_R_SIZE);
+    float r_mu = r * mu;
+    float discriminant = r_mu * r_mu - r * r + atmosphere.bottom_radius * atmosphere.bottom_radius;
+    float u_mu;
+    if (ray_r_mu_intersects_ground) {
+        float d = -r_mu - SafeSqrt(discriminant);
+        float d_min = r - atmosphere.bottom_radius;
+        float d_max = rho;
+                u_mu = 0.5 - 0.5 * GetTextureCoordFromUnitRange(d_max == d_min ? 0.0 :
+                    (d - d_min) / (d_max - d_min), SCATTERING_TEXTURE_MU_SIZE / 2);
+    } else {
+        float d = -r_mu + SafeSqrt(discriminant + H * H);
+        float d_min = atmosphere.top_radius - r;
+        float d_max = rho + H;
+                u_mu = 0.5 + 0.5 * GetTextureCoordFromUnitRange(
+                    (d - d_min) / (d_max - d_min), SCATTERING_TEXTURE_MU_SIZE / 2);
+    }
+    float d = DistanceToTopAtmosphereBoundary(atmosphere, atmosphere.bottom_radius, mu_s);
+    float d_min = atmosphere.top_radius - atmosphere.bottom_radius;
+    float d_max = H;
+    float a = (d - d_min) / (d_max - d_min);
+    float D = DistanceToTopAtmosphereBoundary(atmosphere, atmosphere.bottom_radius, atmosphere.mu_s_min);
+    float A = (D - d_min) / (d_max - d_min);
+    float u_mu_s = GetTextureCoordFromUnitRange(max(1.0 - a / A, 0.0) / (1.0 + a), SCATTERING_TEXTURE_MU_S_SIZE);
+    float u_nu = (nu + 1.0) / 2.0;
+    
+    return float4(u_nu, u_mu_s, u_mu, u_r);
 }
 
-DimensionlessSpectrum GetTransmittance(
-    IN(AtmosphereParameters) atmosphere,
-    IN(TransmittanceTexture) transmittance_tex,
-    Length r, Number mu, Length d, bool ray_r_mu_intersects_ground) {
-    Length r_d = ClampRadius(atmosphere, sqrt(d * d + 2.0 * r * mu * d + r * r));
-    Number mu_d = ClampCosine((r * mu + d) / r_d);
+// called by GetTransmittanceToSun
+// called by GetTransmittance
+// called by GetSkyRadiance
+float3 GetTransmittanceToTopAtmosphereBoundary(
+    const AtmosphereParameters atmosphere,
+    const Texture2D transmittance_tex,
+    float r, float mu) {
+    float2 uv = GetTransmittanceTextureUvFromRMu(atmosphere, r, mu);
+    return float3(transmittance_tex.Sample(linearSampler, uv).rgb);
+}
+
+// called by GetSkyRadianceToPoint
+// called by GetSkyRadiance
+float3 GetTransmittance(
+    const AtmosphereParameters atmosphere,
+    const Texture2D transmittance_tex,
+    float r, float mu, float d, bool ray_r_mu_intersects_ground) {
+    float r_d = ClampRadius(atmosphere, sqrt(d * d + 2.0 * r * mu * d + r * r));
+    float mu_d = ClampCosine((r * mu + d) / r_d);
     if (ray_r_mu_intersects_ground) {
         return min(
             GetTransmittanceToTopAtmosphereBoundary(
                 atmosphere, transmittance_tex, r_d, -mu_d) /
             GetTransmittanceToTopAtmosphereBoundary(
                 atmosphere, transmittance_tex, r, -mu),
-            DimensionlessSpectrum(1.0, 1.0, 1.0));
+            float3(1.0, 1.0, 1.0));
     } else {
         return min(
             GetTransmittanceToTopAtmosphereBoundary(
                 atmosphere, transmittance_tex, r, mu) /
             GetTransmittanceToTopAtmosphereBoundary(
                 atmosphere, transmittance_tex, r_d, mu_d),
-            DimensionlessSpectrum(1.0, 1.0, 1.0));
+            float3(1.0, 1.0, 1.0));
     }
 }
 
-DimensionlessSpectrum GetTransmittanceToSun(
-    IN(AtmosphereParameters) atmosphere,
-    IN(TransmittanceTexture) transmittance_tex,
-    Length r, Number mu_s) {
-    Number sin_theta_h = atmosphere.bottom_radius / r;
-    Number cos_theta_h = -sqrt(max(1.0 - sin_theta_h * sin_theta_h, 0.0));
+// called by GetSunAndSkyIrradiance
+float3 GetTransmittanceToSun(
+    const AtmosphereParameters atmosphere,
+    const Texture2D transmittance_tex,
+    float r, float mu_s) {
+    float sin_theta_h = atmosphere.bottom_radius / r;
+    float cos_theta_h = -sqrt(max(1.0 - sin_theta_h * sin_theta_h, 0.0));
     return GetTransmittanceToTopAtmosphereBoundary(
             atmosphere, transmittance_tex, r, mu_s) *
         smoothstep(-sin_theta_h * atmosphere.sun_angular_radius / rad,
@@ -247,57 +322,10 @@ DimensionlessSpectrum GetTransmittanceToSun(
                    mu_s - cos_theta_h);
 }
 
-InverseSolidAngle RayleighPhaseFunction(Number nu) {
-    InverseSolidAngle k = 3.0 / (16.0 * PI * sr);
-    return k * (1.0 + nu * nu);
-}
-
-InverseSolidAngle MiePhaseFunction(Number g, Number nu) {
-    InverseSolidAngle k = 3.0 / (8.0 * PI * sr) * (1.0 - g * g) / (2.0 + g * g);
-    return k * (1.0 + nu * nu) / pow(1.0 + g * g - 2.0 * g * nu, 1.5);
-}
-
-float4 GetScatteringTextureUvwzFromRMuMuSNu(IN(AtmosphereParameters) atmosphere,
-    Length r, Number mu, Number mu_s, Number nu,
-    bool ray_r_mu_intersects_ground) {
-    Length H = sqrt(atmosphere.top_radius * atmosphere.top_radius -
-        atmosphere.bottom_radius * atmosphere.bottom_radius);
-    Length rho =
-        SafeSqrt(r * r - atmosphere.bottom_radius * atmosphere.bottom_radius);
-    Number u_r = GetTextureCoordFromUnitRange(rho / H, SCATTERING_TEXTURE_R_SIZE);
-    Length r_mu = r * mu;
-    Area discriminant =
-        r_mu * r_mu - r * r + atmosphere.bottom_radius * atmosphere.bottom_radius;
-    Number u_mu;
-    if (ray_r_mu_intersects_ground) {
-        Length d = -r_mu - SafeSqrt(discriminant);
-        Length d_min = r - atmosphere.bottom_radius;
-        Length d_max = rho;
-        u_mu = 0.5 - 0.5 * GetTextureCoordFromUnitRange(d_max == d_min ? 0.0 :
-            (d - d_min) / (d_max - d_min), SCATTERING_TEXTURE_MU_SIZE / 2);
-    } else {
-        Length d = -r_mu + SafeSqrt(discriminant + H * H);
-        Length d_min = atmosphere.top_radius - r;
-        Length d_max = rho + H;
-        u_mu = 0.5 + 0.5 * GetTextureCoordFromUnitRange(
-            (d - d_min) / (d_max - d_min), SCATTERING_TEXTURE_MU_SIZE / 2);
-    }
-    Length d = DistanceToTopAtmosphereBoundary(
-        atmosphere, atmosphere.bottom_radius, mu_s);
-    Length d_min = atmosphere.top_radius - atmosphere.bottom_radius;
-    Length d_max = H;
-    Number a = (d - d_min) / (d_max - d_min);
-    Length D = DistanceToTopAtmosphereBoundary(
-        atmosphere, atmosphere.bottom_radius, atmosphere.mu_s_min);
-    Number A = (D - d_min) / (d_max - d_min);
-    Number u_mu_s = GetTextureCoordFromUnitRange(
-        max(1.0 - a / A, 0.0) / (1.0 + a), SCATTERING_TEXTURE_MU_S_SIZE);
-    Number u_nu = (nu + 1.0) / 2.0;
-    return float4(u_nu, u_mu_s, u_mu, u_r);
-}
-
+// called by GetCombinedScattering
+// called by GetSkyRadianceToPoint
 float3 GetExtrapolatedSingleMieScattering(
-    IN(AtmosphereParameters) atmosphere, IN(float4) scattering) {
+    const AtmosphereParameters atmosphere, const float4 scattering) {
     if (scattering.r <= 0.0) {
         return float3(0.0, 0.0, 0.0);
     }
@@ -306,76 +334,74 @@ float3 GetExtrapolatedSingleMieScattering(
         (atmosphere.mie_scattering / atmosphere.rayleigh_scattering);
 }
 
-IrradianceSpectrum GetCombinedScattering(
-    IN(AtmosphereParameters) atmosphere,
-    IN(ReducedScatteringTexture) scattering_tex,
-    IN(ReducedScatteringTexture) single_mie_scattering_tex,
-    Length r, Number mu, Number mu_s, Number nu,
-    bool ray_r_mu_intersects_ground,
-    OUT(IrradianceSpectrum) single_mie_scattering) {
+// called by GetSkyRadianceToPoint
+// called by GetSkyRadiance
+float3 GetCombinedScattering(
+    const AtmosphereParameters atmosphere,
+    const Texture3D scattering_tex,
+    float r, float mu, float mu_s, float nu,
+    bool ray_r_mu_intersects_ground, out float3 single_mie_scattering) {
     float4 uvwz = GetScatteringTextureUvwzFromRMuMuSNu(
         atmosphere, r, mu, mu_s, nu, ray_r_mu_intersects_ground);
-    Number tex_coord_x = uvwz.x * Number(SCATTERING_TEXTURE_NU_SIZE - 1);
-    Number tex_x = floor(tex_coord_x);
-    Number lerp_factor = tex_coord_x - tex_x;
-    float3 uvw0 = float3((tex_x + uvwz.y) / Number(SCATTERING_TEXTURE_NU_SIZE),
+    float tex_coord_x = uvwz.x * float(SCATTERING_TEXTURE_NU_SIZE - 1);
+    float tex_x = floor(tex_coord_x);
+    float lerp_factor = tex_coord_x - tex_x;
+    float3 uvw0 = float3((tex_x + uvwz.y) / float(SCATTERING_TEXTURE_NU_SIZE),
         uvwz.z, uvwz.w);
-    float3 uvw1 = float3((tex_x + 1.0 + uvwz.y) / Number(SCATTERING_TEXTURE_NU_SIZE),
+    float3 uvw1 = float3((tex_x + 1.0 + uvwz.y) / float(SCATTERING_TEXTURE_NU_SIZE),
         uvwz.z, uvwz.w);
     float4 combined_scattering =
         scattering_tex.Sample(linearSampler, uvw0) * (1.0 - lerp_factor) +
         scattering_tex.Sample(linearSampler, uvw1) * lerp_factor;
-    IrradianceSpectrum scattering = IrradianceSpectrum(combined_scattering.rgb);
-    single_mie_scattering =
-        GetExtrapolatedSingleMieScattering(atmosphere, combined_scattering);
+    float3 scattering = float3(combined_scattering.rgb);
+    single_mie_scattering = GetExtrapolatedSingleMieScattering(atmosphere, combined_scattering);
     return scattering;
 }
 
-RadianceSpectrum GetSkyRadiance(
-    IN(AtmosphereParameters) atmosphere,
-    IN(TransmittanceTexture) transmittance_tex,
-    IN(ReducedScatteringTexture) scattering_tex,
-    IN(ReducedScatteringTexture) single_mie_scattering_tex,
-    Position camera_pos, IN(Direction) view_ray, Length shadow_length,
-    IN(Direction) sun_dir, OUT(DimensionlessSpectrum) transmittance) {
-    Length r = length(camera_pos);
-    Length rmu = dot(camera_pos, view_ray);
-    Length distance_to_top_atmosphere_boundary = -rmu -
+// called by GetSkyLuminance
+float3 GetSkyRadiance(
+    const AtmosphereParameters atmosphere,
+    const Texture2D transmittance_tex,
+    const Texture3D scattering_tex,
+    float3 camera_pos, const float3 view_ray, float shadow_length,
+    const float3 sun_dir, out float3 transmittance) {
+    float r = length(camera_pos);
+    float rmu = dot(camera_pos, view_ray);
+    float distance_to_top_atmosphere_boundary = -rmu -
         sqrt(rmu * rmu - r * r + atmosphere.top_radius * atmosphere.top_radius);
     if (distance_to_top_atmosphere_boundary > 0.0 * m) {
         camera_pos = camera_pos + view_ray * distance_to_top_atmosphere_boundary;
         r = atmosphere.top_radius;
         rmu += distance_to_top_atmosphere_boundary;
     } else if (r > atmosphere.top_radius) {
-        transmittance = DimensionlessSpectrum(1.0, 1.0, 1.0);
+        transmittance = float3(1.0, 1.0, 1.0);
         float w = 0.0 * watt_per_square_meter_per_sr_per_nm;
-        return RadianceSpectrum(w,w,w);
+        return float3(w,w,w);
     }
-    Number mu = rmu / r;
-    Number mu_s = dot(camera_pos, sun_dir) / r;
-    Number nu = dot(view_ray, sun_dir);
+    float mu = rmu / r;
+    float mu_s = dot(camera_pos, sun_dir) / r;
+    float nu = dot(view_ray, sun_dir);
     bool ray_r_mu_intersects_ground = RayIntersectsGround(atmosphere, r, mu);
-    transmittance = ray_r_mu_intersects_ground ? DimensionlessSpectrum(0.0, 0.0, 0.0) :
-        GetTransmittanceToTopAtmosphereBoundary(
-            atmosphere, transmittance_tex, r, mu);
-    IrradianceSpectrum single_mie_scattering;
-    IrradianceSpectrum scattering;
+    transmittance = ray_r_mu_intersects_ground ? float3(0.0, 0.0, 0.0) :
+        GetTransmittanceToTopAtmosphereBoundary(atmosphere, transmittance_tex, r, mu);
+    float3 single_mie_scattering;
+    float3 scattering;
     if (shadow_length == 0.0 * m) {
         scattering = GetCombinedScattering(
-            atmosphere, scattering_tex, single_mie_scattering_tex,
+            atmosphere, scattering_tex,
             r, mu, mu_s, nu, ray_r_mu_intersects_ground,
             single_mie_scattering);
     } else {
-        Length d = shadow_length;
-        Length r_p =
+        float d = shadow_length;
+        float r_p =
             ClampRadius(atmosphere, sqrt(d * d + 2.0 * r * mu * d + r * r));
-        Number mu_p = (r * mu + d) / r_p;
-        Number mu_s_p = (r * mu_s + d * nu) / r_p;
+        float mu_p = (r * mu + d) / r_p;
+        float mu_s_p = (r * mu_s + d * nu) / r_p;
         scattering = GetCombinedScattering(
-            atmosphere, scattering_tex, single_mie_scattering_tex,
+            atmosphere, scattering_tex,
             r_p, mu_p, mu_s_p, nu, ray_r_mu_intersects_ground,
             single_mie_scattering);
-        DimensionlessSpectrum shadow_transmittance =
+        float3 shadow_transmittance =
             GetTransmittance(atmosphere, transmittance_tex,
                 r, mu, shadow_length, ray_r_mu_intersects_ground);
         scattering = scattering * shadow_transmittance;
@@ -385,45 +411,45 @@ RadianceSpectrum GetSkyRadiance(
         MiePhaseFunction(atmosphere.mie_phase_function_g, nu);
 }
 
-RadianceSpectrum GetSkyRadianceToPoint(
-    IN(AtmosphereParameters) atmosphere,
-    IN(TransmittanceTexture) transmittance_tex,
-    IN(ReducedScatteringTexture) scattering_tex,
-    IN(ReducedScatteringTexture) single_mie_scattering_tex,
-    Position camera_pos, IN(Position) point_pos, Length shadow_length,
-    IN(Direction) sun_dir, OUT(DimensionlessSpectrum) transmittance) {
-    Direction view_ray = normalize(point_pos - camera_pos);
-    Length r = length(camera_pos);
-    Length rmu = dot(camera_pos, view_ray);
-    Length distance_to_top_atmosphere_boundary = -rmu -
+// called by GetSkyLuminanceToPoint
+float3 GetSkyRadianceToPoint(
+    const AtmosphereParameters atmosphere,
+    const Texture2D transmittance_tex,
+    const Texture3D scattering_tex,
+    float3 camera_pos, const float3 point_pos, float shadow_length,
+    const float3 sun_dir, out float3 transmittance) {
+    float3 view_ray = normalize(point_pos - camera_pos);
+    float r = length(camera_pos);
+    float rmu = dot(camera_pos, view_ray);
+    float distance_to_top_atmosphere_boundary = -rmu -
         sqrt(rmu * rmu - r * r + atmosphere.top_radius * atmosphere.top_radius);
     if (distance_to_top_atmosphere_boundary > 0.0 * m) {
         camera_pos = camera_pos + view_ray * distance_to_top_atmosphere_boundary;
         r = atmosphere.top_radius;
         rmu += distance_to_top_atmosphere_boundary;
     }
-    Number mu = rmu / r;
-    Number mu_s = dot(camera_pos, sun_dir) / r;
-    Number nu = dot(view_ray, sun_dir);
-    Length d = length(point_pos - camera_pos);
+    float mu = rmu / r;
+    float mu_s = dot(camera_pos, sun_dir) / r;
+    float nu = dot(view_ray, sun_dir);
+    float d = length(point_pos - camera_pos);
     bool ray_r_mu_intersects_ground = RayIntersectsGround(atmosphere, r, mu);
     transmittance = GetTransmittance(atmosphere, transmittance_tex,
         r, mu, d, ray_r_mu_intersects_ground);
-    IrradianceSpectrum single_mie_scattering;
-    IrradianceSpectrum scattering = GetCombinedScattering(
-        atmosphere, scattering_tex, single_mie_scattering_tex,
+    float3 single_mie_scattering;
+    float3 scattering = GetCombinedScattering(
+        atmosphere, scattering_tex,
         r, mu, mu_s, nu, ray_r_mu_intersects_ground,
         single_mie_scattering);
     d = max(d - shadow_length, 0.0 * m);
-    Length r_p = ClampRadius(atmosphere, sqrt(d * d + 2.0 * r * mu * d + r * r));
-    Number mu_p = (r * mu + d) / r_p;
-    Number mu_s_p = (r * mu_s + d * nu) / r_p;
-    IrradianceSpectrum single_mie_scattering_p;
-    IrradianceSpectrum scattering_p = GetCombinedScattering(
-        atmosphere, scattering_tex, single_mie_scattering_tex,
+    float r_p = ClampRadius(atmosphere, sqrt(d * d + 2.0 * r * mu * d + r * r));
+    float mu_p = (r * mu + d) / r_p;
+    float mu_s_p = (r * mu_s + d * nu) / r_p;
+    float3 single_mie_scattering_p;
+    float3 scattering_p = GetCombinedScattering(
+        atmosphere, scattering_tex,
         r_p, mu_p, mu_s_p, nu, ray_r_mu_intersects_ground,
         single_mie_scattering_p);
-    DimensionlessSpectrum shadow_transmittance = transmittance;
+    float3 shadow_transmittance = transmittance;
     if (shadow_length > 0.0 * m) {
         shadow_transmittance = GetTransmittance(atmosphere, transmittance_tex,
             r, mu, d, ray_r_mu_intersects_ground);
@@ -434,36 +460,29 @@ RadianceSpectrum GetSkyRadianceToPoint(
     single_mie_scattering = GetExtrapolatedSingleMieScattering(
         atmosphere, float4(scattering, single_mie_scattering.r));
     single_mie_scattering = single_mie_scattering *
-        smoothstep(Number(0.0), Number(0.01), mu_s);
+        smoothstep(float(0.0), float(0.01), mu_s);
     return scattering * RayleighPhaseFunction(nu) + single_mie_scattering *
         MiePhaseFunction(atmosphere.mie_phase_function_g, nu);
 }
 
-float2 GetIrradianceTextureUvFromRMuS(IN(AtmosphereParameters) atmosphere,
-    Length r, Number mu_s) {
-    Number x_r = (r - atmosphere.bottom_radius) /
-        (atmosphere.top_radius - atmosphere.bottom_radius);
-    Number x_mu_s = mu_s * 0.5 + 0.5;
-    return float2(GetTextureCoordFromUnitRange(x_mu_s, IRRADIANCE_TEXTURE_WIDTH),
-                  GetTextureCoordFromUnitRange(x_r, IRRADIANCE_TEXTURE_HEIGHT));
-}
-
-IrradianceSpectrum GetIrradiance(
-    IN(AtmosphereParameters) atmosphere,
-    IN(IrradianceTexture) irradiance_tex,
-    Length r, Number mu_s) {
+// called by GetSunAndSkyIrradiance
+float3 GetIrradiance(
+    const AtmosphereParameters atmosphere,
+    const Texture2D irradiance_tex,
+    float r, float mu_s) {
     float2 uv = GetIrradianceTextureUvFromRMuS(atmosphere, r, mu_s);
-    return IrradianceSpectrum(irradiance_tex.Sample(linearSampler, uv).rgb);
+    return float3(irradiance_tex.Sample(linearSampler, uv).rgb);
 }
 
-IrradianceSpectrum GetSunAndSkyIrradiance(
-    IN(AtmosphereParameters) atmosphere,
-    IN(TransmittanceTexture) transmittance_tex,
-    IN(IrradianceTexture) irradiance_tex,
-    IN(Position) point_pos, IN(Direction) norm, IN(Direction) sun_dir,
-    OUT(IrradianceSpectrum) sky_irradiance) {
-    Length r = length(point_pos);
-    Number mu_s = dot(point_pos, sun_dir) / r;
+// called by GetSunAndSkyIlluminance
+float3 GetSunAndSkyIrradiance(
+    const AtmosphereParameters atmosphere,
+    const Texture2D transmittance_tex,
+    const Texture2D irradiance_tex,
+    const float3 point_pos, const float3 norm, const float3 sun_dir,
+    out float3 sky_irradiance) {
+    float r = length(point_pos);
+    float mu_s = dot(point_pos, sun_dir) / r;
     sky_irradiance = GetIrradiance(atmosphere, irradiance_tex, r, mu_s) *
         (1.0 + dot(norm, point_pos) / r) * 0.5;
     return atmosphere.solar_irradiance *
@@ -472,33 +491,35 @@ IrradianceSpectrum GetSunAndSkyIrradiance(
         max(dot(norm, sun_dir), 0.0);
 }
 
-// Wrapper functions
+//----------------------------
+// WRAPPER FUNCTIONS
+//----------------------------
 float3 GetSolarLuminance() {
     return ATMOSPHERE.solar_irradiance /
-        (PI * ATMOSPHERE.sun_angular_radius * ATMOSPHERE.sun_angular_radius);
+        (PI * ATMOSPHERE.sun_angular_radius * ATMOSPHERE.sun_angular_radius) * SUN_SPECTRAL_RADIANCE_TO_LUMINANCE;
 }
 
 float3 GetSkyLuminance(
     float3 camera_pos, float3 view_ray, float shadow_length,
     float3 sun_dir, out float3 transmittance) {
     return GetSkyRadiance(ATMOSPHERE, transmittance_texture,
-        scattering_texture, scattering_texture,
-        camera_pos, view_ray, shadow_length, sun_dir, transmittance);
+        scattering_texture, camera_pos, view_ray, shadow_length, sun_dir, transmittance) * SKY_SPECTRAL_RADIANCE_TO_LUMINANCE;
 }
 
 float3 GetSkyLuminanceToPoint(
     float3 camera_pos, float3 point_pos, float shadow_length,
     float3 sun_dir, out float3 transmittance) {
     return GetSkyRadianceToPoint(ATMOSPHERE, transmittance_texture,
-        scattering_texture, scattering_texture,
-        camera_pos, point_pos, shadow_length, sun_dir, transmittance);
+        scattering_texture, camera_pos, point_pos, shadow_length, sun_dir, transmittance) * SKY_SPECTRAL_RADIANCE_TO_LUMINANCE;
 }
 
 float3 GetSunAndSkyIlluminance(
     float3 p, float3 norm, float3 sun_dir, out float3 sky_irradiance) {
-    return GetSunAndSkyIrradiance(
-        ATMOSPHERE, transmittance_texture, irradiance_texture,
-        p, norm, sun_dir, sky_irradiance);
+    float3 sun_irradiance = GetSunAndSkyIrradiance(
+      ATMOSPHERE, transmittance_texture, irradiance_texture, p, norm,
+      sun_dir, sky_irradiance);
+    sky_irradiance *= SKY_SPECTRAL_RADIANCE_TO_LUMINANCE;
+    return sun_irradiance * SUN_SPECTRAL_RADIANCE_TO_LUMINANCE;
 }
 
 float GetSunVisibility(float3 point_pos, float3 sun_dir) {
@@ -567,7 +588,9 @@ struct PSInput
     float3 view_ray : TEXCOORD0;
 };
 
-// Pixel Shader
+//------------------
+// MAIN
+//------------------
 float4 main(PSInput input) : SV_TARGET
 {
     float4 color;
