@@ -341,9 +341,9 @@ void Game::Render()
 
     if (mAtmospherePass.Bind(pCommandList))
     {
-        const Texture* pTransmittanceTex = codex.GetTexture(GetResourceID(L"transmittance_tex.tga"));
-        const Texture* pIrradianceTex = codex.GetTexture(GetResourceID(L"irradiance_tex.tga"));
-        const Texture* pScatteringTex = codex.GetTexture(GetResourceID(L"scatter_tex_full.dds"));
+        const Texture* pTransmittanceTex = codex.GetTexture(GetResourceID(L"transmittance_high.hdr"));
+        const Texture* pIrradianceTex = codex.GetTexture(GetResourceID(L"irradiance_high.hdr"));
+        const Texture* pScatteringTex = codex.GetTexture(GetResourceID(L"TestHDR_3D"));//L"scatter_tex_full.dds"));
 
 
         int32_t cameraRootIdx = mAtmospherePass.GetResourceRootIndex("VSCamera");
