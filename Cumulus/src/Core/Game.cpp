@@ -95,11 +95,12 @@ bool Game::Init(HWND window, int width, int height)
 	mAABBBuffer.Create(L"AABB Buffer", sizeof(cbIntersections));
 
 
-	const Mesh* m = codex.GetMesh(Muon::GetResourceID(L"cylinder.obj"));
+	const Mesh* m = codex.GetMesh(Muon::GetResourceID(L"cube.obj"));
 
 	cbIntersections intersections = {};
 	intersections.aabbCount = 1;
 	intersections.aabbs[0] = m->GetAABB();
+	//intersections.aabbs[0].min = DirectX::XMFLOAT3A(0, 1, 0);
 	if (m) {
 		UINT8* aabbPtr = mAABBBuffer.GetMappedPtr();
 		if (aabbPtr) {
@@ -200,10 +201,10 @@ void Game::Render()
 			pCommandList->SetGraphicsRootConstantBufferView(lightsRootIdx, mLightBuffer.GetGPUVirtualAddress());
 		}
 
-		const Mesh* pMesh = codex.GetMesh(GetResourceID(L"cylinder.obj"));
+		const Mesh* pMesh = codex.GetMesh(GetResourceID(L"cube.obj"));
 		if (pMesh)
 		{
-			pMesh->DrawIndexed(pCommandList);
+		//	pMesh->DrawIndexed(pCommandList);
 		}
 	}
 

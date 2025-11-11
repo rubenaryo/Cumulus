@@ -14,8 +14,8 @@ struct AABB
 
 cbuffer AABBBuffer : register(b14)
 {
-	AABB aabbs[31];
 	uint aabbCount;
-    float padding[3]; // Pad to 16 bytes
+  //  float padding[3]; // Pad to 16 bytes
+	AABB aabbs[1];
 };
 #endif

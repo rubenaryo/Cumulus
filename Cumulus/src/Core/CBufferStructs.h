@@ -48,9 +48,9 @@ namespace Muon
 
 	struct alignas(256) cbIntersections
 	{
-		AABB aabbs[31];
 		uint32_t aabbCount;
-		float padding[3];
+	//	float padding[3];
+		AABB aabbs[1];
 	};
 }
 #endif

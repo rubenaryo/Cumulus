@@ -42,15 +42,13 @@ float rayMarch(float3 eyePos, float3 dir, float start, float end)
 
         float3 pos = eyePos + depth * dir;
 
-        if(aabbCount == 0) return depth;
-
         for(int i = 0; i < aabbCount; i++)
         {
             AABB box = aabbs[i];
             
             if(all(pos >= box.minBounds) && all(pos <= box.maxBounds))
             {
-                //return end;
+                return -1.0; // Indicate intersection with AABB
             }
 
         }
@@ -90,6 +88,14 @@ void main(int3 dispatchThreadID : SV_DispatchThreadID)
     float3 eyePos = float3(invView[0][3], invView[1][3], invView[2][3]); // from the 4th column instead of row..
     
     float dist = rayMarch(eyePos, worldDir, MIN_DIST, MAX_DIST);
+
+    if(dist < 0.0)
+    {
+        // Hit AABB
+        gOutput[dispatchThreadID.xy] = float4(1, 0, 1, 1); // Red for AABB hit
+        return;
+    }
+
     float4 returnColor = float4(0, 0, 0, 0);
     if (dist > (MAX_DIST - EPSILON))
     {
@@ -100,6 +106,9 @@ void main(int3 dispatchThreadID : SV_DispatchThreadID)
         float normalized = 1.0 - (dist / MAX_DIST);
         returnColor = float4(normalized, normalized, normalized, 1);
     }
-    
+
+    float4 test = float4(0.1,0,0,0);
+    AABB box = aabbs[0];
+    //returnColor = float4(box.maxBounds, 1.0);  
     gOutput[dispatchThreadID.xy] = returnColor;
 }
