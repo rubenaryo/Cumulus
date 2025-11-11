@@ -8,6 +8,7 @@ Description : Declation of structs used as constant buffers by various shaders
 
 #include <DirectXMath.h>
 #include <DirectXColors.h>
+#include <Core/CommonTypes.h>
 
 namespace Muon
 {
@@ -50,6 +51,13 @@ struct alignas(16) cbTime
 {
     float totalTime = 0;
     float deltaTime = 0;
+};
+
+struct alignas(256) cbIntersections
+{
+    uint32_t aabbCount;
+ //  	float padding[3];
+    AABB aabbs[1];
 };
 
 }

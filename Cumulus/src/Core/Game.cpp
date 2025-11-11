@@ -91,13 +91,30 @@ bool Game::Init(HWND window, int width, int height)
         //entityWorld = XMMatrixMultiply(entityWorld, DirectX::XMMatrixRotationRollPitchYaw(0, 0, PI/2.0f));
         //entityWorld = XMMatrixMultiply(entityWorld, DirectX::XMMatrixRotationRollPitchYaw(-PI/2.0f, 0,0));
         //entityWorld = XMMatrixMultiply(entityWorld, DirectX::XMMatrixScaling(0.12f, 0.12f, 0.12f));
-        entityWorld = XMMatrixMultiply(entityWorld, DirectX::XMMatrixTranslation(0, 1, 0));
+        //entityWorld = XMMatrixMultiply(entityWorld, DirectX::XMMatrixTranslation(0, 1, 0));
         XMStoreFloat4x4(&entity.world, entityWorld);
         XMStoreFloat4x4(&entity.invWorld, DirectX::XMMatrixInverse(nullptr, entityWorld));
         memcpy(mapped, &entity, sizeof(entity));
     }
 
     mLightBuffer.Create(L"Light Buffer", sizeof(cbLights));
+
+    mAABBBuffer.Create(L"AABB Buffer", sizeof(cbIntersections));
+
+
+    const Mesh* m = codex.GetMesh(Muon::GetResourceID(L"cube.obj"));
+
+    cbIntersections intersections = {};
+    intersections.aabbCount = 1;
+    intersections.aabbs[0] = m->GetAABB();
+    //intersections.aabbs[0].min = DirectX::XMFLOAT3A(0, 1, 0);
+    if (m) {
+        UINT8* aabbPtr = mAABBBuffer.GetMappedPtr();
+        if (aabbPtr) {
+            memcpy(aabbPtr, &intersections, sizeof(intersections));
+        }
+    }
+
     mTimeBuffer.Create(L"Time", sizeof(cbTime));
 
     Muon::CloseCommandList();
@@ -229,6 +246,12 @@ void Game::Render()
             pCommandList->SetComputeRootConstantBufferView(cameraRootIdx, mCamera.GetGPUVirtualAddress());
         }
 
+        int32_t aabbIdx = mRaymarchPass.GetResourceRootIndex("AABBBuffer");
+        if (aabbIdx != ROOTIDX_INVALID)
+        {
+            pCommandList->SetComputeRootConstantBufferView(aabbIdx, mAABBBuffer.GetGPUVirtualAddress());
+        }
+
         int32_t inIdx = mRaymarchPass.GetResourceRootIndex("gInput");
         if (inIdx != ROOTIDX_INVALID)
         {
@@ -242,7 +265,7 @@ void Game::Render()
         }
 
         int32_t sdfNVDFIndex = mRaymarchPass.GetResourceRootIndex("sdfNvdfTex");
-        if (inIdx != ROOTIDX_INVALID)
+        if (sdfNVDFIndex != ROOTIDX_INVALID)
         {
             pCommandList->SetComputeRootDescriptorTable(sdfNVDFIndex, pSdfNVDF->GetSRVHandleGPU());
         }
@@ -305,6 +328,7 @@ Game::~Game()
     mWorldMatrixBuffer.Destroy();
     mLightBuffer.Destroy();
     mTimeBuffer.Destroy();
+    mAABBBuffer.Destroy();
     mCamera.Destroy();
     mInput.Destroy();
     mOpaquePass.Destroy();

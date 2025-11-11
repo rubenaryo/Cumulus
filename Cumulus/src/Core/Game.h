@@ -61,6 +61,7 @@ private:
     Muon::UploadBuffer mWorldMatrixBuffer;
     Muon::UploadBuffer mLightBuffer;
     Muon::UploadBuffer mTimeBuffer;
+    Muon::UploadBuffer mAABBBuffer;
 
     // Timer for the main game loop
     Muon::StepTimer mTimer;

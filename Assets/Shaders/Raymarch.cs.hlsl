@@ -1,4 +1,5 @@
 #include "VS_Common.hlsli"
+#include "Raymarch_Common.hlsli"
 
 static const int MAX_STEPS = 512;
 static const float MIN_DIST = 0.001;
@@ -50,6 +51,11 @@ bool RayBoxIntersect(
     return tExit > max(tEnter, 0.0);
 }
 
+bool RayAABBIntersect(float3 origin, float3 dir, AABB aabb, out float tEnter, out float tExit)
+{
+        return RayBoxIntersect(origin, dir, aabb.minBounds, aabb.maxBounds, tEnter, tExit);
+}
+
 float3 VolumeRaymarchNvdf(float3 eyePos, float3 dir, float3 bgColor)
 {
     float tEnter, tExit;
@@ -57,6 +63,25 @@ float3 VolumeRaymarchNvdf(float3 eyePos, float3 dir, float3 bgColor)
     {
         // Ray misses the volume entirely
         return float3(1, 1, 1);
+    }
+
+    float minBoxEnter = 9999;
+    float maxBoxExit = -9999;
+    // Check against AABBs
+    for (uint i = 0; i < aabbCount; ++i)
+    {
+        float aabbEnter, aabbExit;
+        if (RayAABBIntersect(eyePos, dir, aabbs[i], aabbEnter, aabbExit))
+        {
+            minBoxEnter = min(minBoxEnter, aabbEnter);
+            maxBoxExit = max(maxBoxExit, aabbExit);
+        }
+    }
+
+    //if intersected any AABB, return debug color:
+    if (maxBoxExit >= minBoxEnter)
+    {
+        return float3(1, 0, 0); // Red debug color
     }
 
     // Clamp to your global near/far
@@ -142,6 +167,5 @@ void main(int3 dispatchThreadID : SV_DispatchThreadID)
 
     // Volume composite against NVDF dimensional profile (green channel)
     float3 finalColor = VolumeRaymarchNvdf(eyePos, worldDir, bgColor);
-
     gOutput[dispatchThreadID.xy] = float4(finalColor, 1.0);
 }

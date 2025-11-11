@@ -14,7 +14,7 @@ Description : Mesh initialization logic, for DX12
 namespace Muon
 {
 
-bool Mesh::Create(const wchar_t* name, UINT vtxDataSize, UINT vtxStride, UINT vtxCount, UINT idxDataSize, UINT idxCount, DXGI_FORMAT idxFormat)
+bool Mesh::Create(const wchar_t* name, UINT vtxDataSize, UINT vtxStride, UINT vtxCount, UINT idxDataSize, UINT idxCount, DXGI_FORMAT idxFormat, AABB aabb)
 {
     if (!Muon::GetDevice() || vtxDataSize == 0)
         return false;
@@ -22,6 +22,8 @@ bool Mesh::Create(const wchar_t* name, UINT vtxDataSize, UINT vtxStride, UINT vt
     mName = name;
 
     {
+        this->aabb = aabb;
+
         // Creates as with default heap type. This is fast to read from the GPU but inaccessible from the CPU. 
         // We need to go through a staging buffer (UploadBuffer) to get the data to it.
         HRESULT hr = Muon::GetDevice()->CreateCommittedResource(
