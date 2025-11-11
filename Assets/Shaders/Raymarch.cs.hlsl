@@ -148,8 +148,7 @@ float3 VolumeRaymarchNvdf(float3 eyePos, float3 dir, float3 bgColor, int3 dispat
         // Pure SDF sphere-march; clamp to at least one voxel in world space
         float stepSize = max(sdfDistance, NVDF_TO_WORLD_SCALE);
 #endif
-        
-        // Later 
+
 #if USE_JITTERED_STEP
         float jitter = StaticStepJitter(dispathThreadID.xy, i); // [-0.5, 0.5]
         float jitterDistance = jitter * stepSize;
