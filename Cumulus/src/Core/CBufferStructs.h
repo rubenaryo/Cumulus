@@ -56,7 +56,6 @@ struct alignas(16) cbTime
 struct alignas(256) cbIntersections
 {
     uint32_t aabbCount;
- //  	float padding[3];
     AABB aabbs[1];
 };
 
