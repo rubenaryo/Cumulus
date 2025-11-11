@@ -1,7 +1,8 @@
 #include "VS_Common.hlsli"
 
 // Toggle features
-#define USE_ADAPTIVE_STEP 0 // Shows some artifact ATM. Will debug again after uprez. 
+#define USE_ADAPTIVE_STEP 1 // Shows some artifact ATM. Will debug again after uprez. 
+#define USE_JITTERED_STEP 1
 
 // Raymarch settings
 static const int MAX_STEPS = 1024; // Max steps per ray
@@ -72,10 +73,18 @@ float DecodeSdf(float encodedSdf)
 }
 
 // Take smaller steps near the camera
-float ComputeAdaptiveStepSize(float distanceFromCamera)
+float ComputeAdaptiveStepSize(float distanceWorld)
 {
-    return max(1.0, max(sqrt(distanceFromCamera), EPSILON) * 0.08);
+    // Convert world-space distance to NVDF-space distance
+    float distanceNvdf = distanceWorld / NVDF_TO_WORLD_SCALE;
+
+    // Original Nubis-style adaptive step in NVDF units
+    float adaptiveNvdf = max(1.0, max(sqrt(distanceNvdf), EPSILON) * 0.08);
+
+    // Convert step size back to world units
+    return adaptiveNvdf * NVDF_TO_WORLD_SCALE;
 }
+
 
 // The larger of the adaptiveStepSize and sdfDistance
 float ComputeBaseStepSize(float sdfDistance, float adaptiveStepSize)
@@ -83,7 +92,21 @@ float ComputeBaseStepSize(float sdfDistance, float adaptiveStepSize)
     return max(sdfDistance, adaptiveStepSize);
 }
 
-float3 VolumeRaymarchNvdf(float3 eyePos, float3 dir, float3 bgColor)
+// Hash a 2D coord + step index into [0,1)
+float Hash231(uint2 p, uint stepIndex)
+{
+    uint n = p.x * 1973u ^ p.y * 9277u ^ stepIndex * 26699u ^ 0x68bc21ebu;
+    n = (n << 13u) ^ n;
+    return frac((n * (n * n * 15731u + 789221u) + 1376312589u) / 4294967296.0);
+}
+
+// Turn into [-0.5, 0.5]
+float StaticStepJitter(uint2 pixelCoord, uint stepIndex)
+{
+    return Hash231(pixelCoord, stepIndex) - 0.5f;
+}
+
+float3 VolumeRaymarchNvdf(float3 eyePos, float3 dir, float3 bgColor, int3 dispathThreadID)
 {
     float tEnter, tExit;
     if (!RayBoxIntersect(eyePos, dir, VOLUME_MIN_WS, VOLUME_MAX_WS, tEnter, tExit))
@@ -105,46 +128,55 @@ float3 VolumeRaymarchNvdf(float3 eyePos, float3 dir, float3 bgColor)
     // Simple white cloud color for now
     const float3 cloudColor = float3(1.0, 1.0, 1.0);
 
-    float t = tEnter;
-    float stepSize = 0;
+    float distance = tEnter; 
     // Ray march until the ray exits the volume or max steps are reached
     [loop]
-    for (int i = 0; i < MAX_STEPS && t < tExit; ++i)
+    for (int i = 0; i < MAX_STEPS && distance < tExit; ++i)
     {
-        float3 worldPos = eyePos + t * dir;
-        float3 uvw = WorldToNvdfUV(worldPos);
+        float3 samplePos = eyePos + distance * dir;
 
         // Sample NVDF volume: .r = encoded SDF, .g = density (dimensional profile)
-        float4 nvdfSample = sdfNvdfTex.SampleLevel(linearWrap, uvw, 0.0f);
+        float4 sdfSample = sdfNvdfTex.SampleLevel(linearWrap, WorldToNvdfUV(samplePos), 0.0f);
         // Decode SDF from [0,1] texture range into NVDF space, then scale into world units
-        float sdfDistance = DecodeSdf(nvdfSample.r) * NVDF_TO_WORLD_SCALE;
-        float density = nvdfSample.g;
+        float sdfDistance = DecodeSdf(sdfSample.r) * NVDF_TO_WORLD_SCALE * 0.5;
         
 #if USE_ADAPTIVE_STEP
         // Step size: SDF-guided, but never smaller than the distance-based adaptive step
-        float adaptive = ComputeAdaptiveStepSize(t);
-        stepSize       = ComputeBaseStepSize(sdfDistance, adaptive);
+        float adaptive = ComputeAdaptiveStepSize(distance);
+        float stepSize = ComputeBaseStepSize(sdfDistance, adaptive);
 #else
         // Pure SDF sphere-march; clamp to at least one voxel in world space
-        stepSize = max(sdfDistance, NVDF_TO_WORLD_SCALE);
+        float stepSize = max(sdfDistance, NVDF_TO_WORLD_SCALE);
 #endif
         
-        // Map density to extinction
-        float sigma = density * DENSITY_SCALE;
-   
-        // Beer-Lambert: alpha for this step
-        float alpha = 1.0 - exp(-sigma * stepSize);
-
-        // How much new cloud light this step contributes to the pixel, after accounting for previous absorption
-        float3 contrib = cloudColor * alpha * transmittance;
-        accumColor += contrib;
+        // Later 
+#if USE_JITTERED_STEP
+        float jitter = StaticStepJitter(dispathThreadID.xy, i); // [-0.5, 0.5]
+        float jitterDistance = 0.1 * stepSize;
+        samplePos += dir * jitterDistance;
+#endif
         
-        // Less background color is left for further steps
-        transmittance *= (1.0 - alpha);
-        if (transmittance < MIN_TRANSMITTANCE)
-            break;
+        if (sdfDistance < 0.0)
+        {
+            // Map density to extinction
+            float4 nvdfSample = sdfNvdfTex.SampleLevel(linearWrap, WorldToNvdfUV(samplePos), 0.0f);
+            float density = nvdfSample.g;
+            float sigma = density * DENSITY_SCALE;
+   
+            // Beer-Lambert: alpha for this step
+            float alpha = 1.0 - exp(-sigma * stepSize);
 
-        t += stepSize;
+            // How much new cloud light this step contributes to the pixel, after accounting for previous absorption
+            float3 contrib = cloudColor * alpha * transmittance;
+            accumColor += contrib;
+        
+            // Less background color is left for further steps
+            transmittance *= (1.0 - alpha);
+            if (transmittance < MIN_TRANSMITTANCE)
+                break;
+        }
+
+        distance += stepSize;
     }
 
     // Composite over background
@@ -179,7 +211,7 @@ void main(int3 dispatchThreadID : SV_DispatchThreadID)
     float3 bgColor = gInput[pixelCoord].rgb;
 
     // Volume composite against NVDF dimensional profile (green channel)
-    float3 finalColor = VolumeRaymarchNvdf(eyePos, worldDir, bgColor);
+    float3 finalColor = VolumeRaymarchNvdf(eyePos, worldDir, bgColor, dispatchThreadID);
 
     gOutput[dispatchThreadID.xy] = float4(finalColor, 1.0);
 }
