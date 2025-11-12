@@ -31,6 +31,7 @@ VertexOut main(uint vid : SV_VertexID)
     
     // Map [0,1]^2 to NDC space
     // In DirectX, NDC space is [-1,1] for X and Y, [0,1] for Z
+    //vout.position = float4(texc.x, texc.y, 0.0f, 1.0f);
     vout.position = float4(2.0f * texc.x - 1.0f, 1.0f - 2.0f * texc.y, 0.0f, 1.0f);
     
     // Construct view ray:
@@ -41,6 +42,7 @@ VertexOut main(uint vid : SV_VertexID)
     float4 world_dir = mul(model_from_view, float4(view_space.xyz, 0.0));
     
     vout.view_ray = world_dir.xyz;
+    //vout.view_ray.y = ;
     
     return vout;
 }
