@@ -24,6 +24,13 @@ namespace Muon
         DirectX::XMFLOAT3A min;
         DirectX::XMFLOAT3A max;
     };
+
+    struct HullFace
+    {
+        int indices[3];
+        DirectX::XMFLOAT3A normal;
+        float dot;
+    };
 }
 
 #endif

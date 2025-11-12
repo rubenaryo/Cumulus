@@ -15,6 +15,7 @@ Description : Implementation of Game.h
 #include <Core/Shader.h>
 #include <Core/Texture.h>
 #include <Utils/Utils.h>
+#include "SBufferStructs.h"
 
 Game::Game() :
     mInput(),
@@ -101,8 +102,7 @@ bool Game::Init(HWND window, int width, int height)
 
     mAABBBuffer.Create(L"AABB Buffer", sizeof(cbIntersections));
 
-
-    const Mesh* m = codex.GetMesh(Muon::GetResourceID(L"cube.obj"));
+    const Mesh* m = codex.GetMesh(Muon::GetResourceID(L"rock_platform.obj"));
 
     cbIntersections intersections = {};
     intersections.aabbCount = 1;
@@ -111,6 +111,53 @@ bool Game::Init(HWND window, int width, int height)
         UINT8* aabbPtr = mAABBBuffer.GetMappedPtr();
         if (aabbPtr) {
             memcpy(aabbPtr, &intersections, sizeof(intersections));
+        }
+    }
+
+    //HULL:
+    //todo: concat all hulls
+    Hull h = m->GetHull();
+
+    mHullBuffer.Create(L"Hull Buffer", sizeof(sbConvexHull));
+    if (m) {
+        UINT8* hullPtr = mHullBuffer.GetMappedPtr();
+        if (hullPtr) {
+            sbConvexHull cHull = {};
+            cHull.faceCount = h.faces.size();
+            cHull.faceOffset = 0;
+
+            cHull.pointCount = h.hullPoints.size();
+            cHull.pointOffset = 0;
+
+            memcpy(hullPtr, &cHull, sizeof(cHull));
+        }
+    }
+
+    mHullFaceBuffer.Create(L"Hull Faces Buffer", sizeof(HullFace) * h.faces.size());
+    if (m && h.faces.size() > 0) {
+        UINT8* facePtr = mHullFaceBuffer.GetMappedPtr();
+        if (facePtr) {
+            memcpy(facePtr, &h.faces, sizeof(h.faces));
+        }
+    }
+
+    mHullPointBuffer.Create(L"Hull Points Buffer", sizeof(DirectX::XMFLOAT3) * h.hullPoints.size());
+
+    if (m && h.hullPoints.size() > 0) {
+        UINT8* pointsPtr = mHullPointBuffer.GetMappedPtr();
+        if (pointsPtr) {
+            //is this really necessary oh m  y god
+            std::vector<DirectX::XMFLOAT3A> float3s;
+            float3s.reserve(h.hullPoints.size());
+
+            for (const auto& v : h.hullPoints)
+            {
+                DirectX::XMFLOAT3A f3;
+                DirectX::XMStoreFloat3A(&f3, v);
+                float3s.push_back(f3);
+            }
+            
+            memcpy(pointsPtr, &float3s, sizeof(float3s));
         }
     }
 
@@ -224,7 +271,7 @@ void Game::Render()
             pCommandList->SetGraphicsRootConstantBufferView(timeRootIdx, mTimeBuffer.GetGPUVirtualAddress());
         }
 
-        const Mesh* pMesh = codex.GetMesh(GetResourceID(L"cube.obj"));
+        const Mesh* pMesh = codex.GetMesh(GetResourceID(L"rock_platform.obj"));
         if (pMesh)
         {
             pMesh->DrawIndexed(pCommandList);
@@ -247,6 +294,24 @@ void Game::Render()
         if (aabbIdx != ROOTIDX_INVALID)
         {
             pCommandList->SetComputeRootConstantBufferView(aabbIdx, mAABBBuffer.GetGPUVirtualAddress());
+        }
+
+        int32_t hullIdx = mRaymarchPass.GetResourceRootIndex("HullsBuffer");
+        if (hullIdx != ROOTIDX_INVALID)
+        {
+            pCommandList->SetComputeRootShaderResourceView(aabbIdx, mHullBuffer.GetGPUVirtualAddress());
+        }
+
+        int32_t hullFaceIdx = mRaymarchPass.GetResourceRootIndex("HullFacesBuffer");
+        if (hullFaceIdx != ROOTIDX_INVALID)
+        {
+            pCommandList->SetComputeRootShaderResourceView(hullFaceIdx, mHullFaceBuffer.GetGPUVirtualAddress());
+        }
+
+        int32_t hullPtsIdx = mRaymarchPass.GetResourceRootIndex("HullPointsBuffer");
+        if (hullPtsIdx != ROOTIDX_INVALID)
+        {
+            pCommandList->SetComputeRootShaderResourceView(hullPtsIdx, mHullPointBuffer.GetGPUVirtualAddress());
         }
 
         int32_t inIdx = mRaymarchPass.GetResourceRootIndex("gInput");
@@ -326,6 +391,9 @@ Game::~Game()
     mLightBuffer.Destroy();
     mTimeBuffer.Destroy();
     mAABBBuffer.Destroy();
+    mHullBuffer.Destroy();
+    mHullFaceBuffer.Destroy();
+    mHullPointBuffer.Destroy();
     mCamera.Destroy();
     mInput.Destroy();
     mOpaquePass.Destroy();

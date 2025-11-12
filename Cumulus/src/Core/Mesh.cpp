@@ -10,11 +10,12 @@ Description : Mesh initialization logic, for DX12
 #include <Core/ResourceCodex.h>
 #include <Utils/Utils.h>
 #include <d3dx12.h>
+#include <Core/Hull.h>
 
 namespace Muon
 {
 
-bool Mesh::Create(const wchar_t* name, UINT vtxDataSize, UINT vtxStride, UINT vtxCount, UINT idxDataSize, UINT idxCount, DXGI_FORMAT idxFormat, AABB aabb)
+bool Mesh::Create(const wchar_t* name, UINT vtxDataSize, UINT vtxStride, UINT vtxCount, UINT idxDataSize, UINT idxCount, DXGI_FORMAT idxFormat, AABB aabb, Hull hull)
 {
     if (!Muon::GetDevice() || vtxDataSize == 0)
         return false;
@@ -23,6 +24,7 @@ bool Mesh::Create(const wchar_t* name, UINT vtxDataSize, UINT vtxStride, UINT vt
 
     {
         this->aabb = aabb;
+        this->hull = hull;
 
         // Creates as with default heap type. This is fast to read from the GPU but inaccessible from the CPU. 
         // We need to go through a staging buffer (UploadBuffer) to get the data to it.
