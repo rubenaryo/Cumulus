@@ -15,7 +15,7 @@ namespace Muon
 
 // Constants from the original code
 constexpr double kPi = 3.1415926;
-constexpr double kSunAngularRadius = 0.00935 / 2.0;
+constexpr double kSunAngularRadius = 0.00935 * 0.5f;
 constexpr double kSunSolidAngle = kPi * kSunAngularRadius * kSunAngularRadius;
 constexpr double kLengthUnitInMeters = 1000.0;
 
@@ -24,7 +24,8 @@ DirectX::XMMATRIX CreateViewFromClipMatrix(float fovY_radians, float aspect_rati
 {
     // In the original OpenGL code:
     // const float kTanFovY = tan(kFovY / 2.0);
-    float tan_half_fov = tanf(fovY_radians / 2.0f);
+    float tan_half_fov = tanf(fovY_radians * 0.5f);
+    Muon::Printf("\ntanhalf F: %lf, aspect: %lf", tan_half_fov, aspect_ratio);
 
     // Original OpenGL matrix (column-major):
     // [ tan_fov_y * aspect,  0,           0,   0  ]
@@ -36,8 +37,8 @@ DirectX::XMMATRIX CreateViewFromClipMatrix(float fovY_radians, float aspect_rati
     float m[16] = {
         tan_half_fov * aspect_ratio, 0.0f,         0.0f,  0.0f,
         0.0f,                        tan_half_fov, 0.0f,  0.0f,
-        0.0f,                        0.0f,         0.0f, -1.0f,
-        0.0f,                        0.0f,         1.0f,  1.0f
+        0.0f,                        0.0f,         0.0f, 1.0f,
+        0.0f,                        0.0f,         -1.0f,  1.0f
     };
 
     return DirectX::XMMATRIX(m);
@@ -62,7 +63,23 @@ DirectX::XMMATRIX CreateModelFromViewMatrix(
     float sin_azimuth = sinf(view_azimuth_angle_radians);
     float cos_azimuth = cosf(view_azimuth_angle_radians);
 
-    // Camera position in world space (relative to earth center)
+    //// Unit vectors in right-handed system (same as OpenGL)
+    //float ux[3] = { -sin_azimuth, cos_azimuth, 0.0f };
+    //float uy[3] = { -cos_zenith * cos_azimuth, -cos_zenith * sin_azimuth, sin_zenith };
+    //float uz[3] = { sin_zenith * cos_azimuth, sin_zenith * sin_azimuth, cos_zenith };
+    //float l = view_distance_meters / kLengthUnitInMeters;
+
+    //// Build matrix exactly like OpenGL (right-handed, column-major)
+    //float m[16] = {
+    //    ux[0], uy[0], uz[0], 0.0f,
+    //    ux[1], uy[1], uz[1], 0.0f,
+    //    ux[2], uy[2], uz[2], 0.0f,
+    //    uz[0] * l, uz[1] * l, uz[2] * l, 1.0f
+    //};
+
+    //return XMMATRIX(m);
+
+    // camera position in world space (relative to earth center)
     XMVECTOR camera_pos = XMVectorSet(
         view_distance_meters * sin_zenith * cos_azimuth / kLengthUnitInMeters,
         view_distance_meters * sin_zenith * sin_azimuth / kLengthUnitInMeters,
@@ -70,14 +87,14 @@ DirectX::XMMATRIX CreateModelFromViewMatrix(
         1.0f
     );
 
-    // Create view matrix first, then invert it
+    // create view matrix first, then invert it
     XMVECTOR eye = camera_pos;
-    XMVECTOR at = XMVectorSet(0.0f, 0.0f, 0.0f, 1.0f); // Looking at earth center
-    XMVECTOR up = XMVectorSet(0.0f, 0.0f, 1.0f, 0.0f); // Z-up coordinate system
+    XMVECTOR at = XMVectorSet(0.0f, 0.0f, 0.0f, 1.0f); // looking at earth center
+    XMVECTOR up = XMVectorSet(0.0f, 0.0f, 1.0f, 0.0f); // z-up coordinate system
 
-    XMMATRIX view_matrix = XMMatrixLookAtLH(eye, at, up);
+    XMMATRIX view_matrix = XMMatrixLookAtRH(eye, at, up);
 
-    // Invert to get model_from_view (world from camera)
+    // invert to get model_from_view (world from camera)
     XMMATRIX model_from_view = XMMatrixInverse(nullptr, view_matrix);
 
     return model_from_view;
@@ -112,22 +129,14 @@ void UpdateAtmosphereConstants(
     XMStoreFloat4x4(&constants.view_from_clip,  (view_from_clip));
     XMStoreFloat4x4(&constants.model_from_view, (model_from_view));
 
-    // Camera position (in world space, in length units)
-    float sin_zenith = sinf(view_zenith_angle_radians);
-    float cos_zenith = cosf(view_zenith_angle_radians);
-    float sin_azimuth = sinf(view_azimuth_angle_radians);
-    float cos_azimuth = cosf(view_azimuth_angle_radians);
-
-    constants.camera_position = XMFLOAT3(
-        view_distance_meters * sin_zenith * cos_azimuth / kLengthUnitInMeters,
-        view_distance_meters * sin_zenith * sin_azimuth / kLengthUnitInMeters,
-        view_distance_meters * cos_zenith / kLengthUnitInMeters
-    );
+    // camera pos is grabbed from the calculation we already did
+    constants.camera_position = XMFLOAT3(constants.model_from_view._41, constants.model_from_view._42, constants.model_from_view._43);
 
     // Earth center (at origin in world space, but offset down in "length units")
     constants.earth_center = XMFLOAT3(0.0f, 0.0f, -6360.0f); // Earth radius in km
-
-    constants.sun_direction = XMFLOAT3(-0.935575f, 0.230531f, 0.267499f);
+    // -0.989970, -0.141117, 0.006796 -> preset 2
+    // -0.935575f, 0.230531f, 0.267499f -> preset 1
+    constants.sun_direction = XMFLOAT3(-0.989970f, -0.141117f, 0.006796f);
 
     // Normalize sun direction
     XMVECTOR sun_dir = XMLoadFloat3(&constants.sun_direction);
@@ -138,7 +147,7 @@ void UpdateAtmosphereConstants(
     constants.sun_size = XMFLOAT2(0.004675f, 0.999989f);
 
     // Exposure and white point for tone mapping
-    constants.exposure = 10.0f; // Adjust as needed
+    constants.exposure = 10.0f * 1e-5; // Adjust as needed
     constants.white_point = XMFLOAT3(1.082414f, 0.967556f, 0.950030f);
 }
 }

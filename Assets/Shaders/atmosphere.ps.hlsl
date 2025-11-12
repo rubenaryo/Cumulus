@@ -136,7 +136,7 @@ static const float3 kGroundAlbedo = float3(0.0, 0.0, 0.04);
 Texture2D transmittance_texture : register(t0);
 Texture2D irradiance_texture : register(t1);
 Texture3D scattering_texture : register(t2);
-SamplerState linearSampler : register(s0);
+SamplerState linearSampler : register(s1);
 
 //----------------------------
 // GENERAL UTILITY FUNCTIONS
@@ -280,6 +280,7 @@ float3 GetTransmittanceToTopAtmosphereBoundary(
     const Texture2D transmittance_tex,
     float r, float mu) {
     float2 uv = GetTransmittanceTextureUvFromRMu(atmosphere, r, mu);
+    uv.y = 1.0 - uv.y;
     return float3(transmittance_tex.Sample(linearSampler, uv).rgb);
 }
 
@@ -329,6 +330,7 @@ float3 GetExtrapolatedSingleMieScattering(
     if (scattering.r <= 0.0) {
         return float3(0.0, 0.0, 0.0);
     }
+    return scattering.aaa * 0.1;
     return scattering.rgb * scattering.a / scattering.r *
         (atmosphere.rayleigh_scattering.r / atmosphere.mie_scattering.r) *
         (atmosphere.mie_scattering / atmosphere.rayleigh_scattering);
@@ -341,20 +343,26 @@ float3 GetCombinedScattering(
     const Texture3D scattering_tex,
     float r, float mu, float mu_s, float nu,
     bool ray_r_mu_intersects_ground, out float3 single_mie_scattering) {
-    float4 uvwz = GetScatteringTextureUvwzFromRMuMuSNu(
-        atmosphere, r, mu, mu_s, nu, ray_r_mu_intersects_ground);
-    float tex_coord_x = uvwz.x * float(SCATTERING_TEXTURE_NU_SIZE - 1);
-    float tex_x = floor(tex_coord_x);
-    float lerp_factor = tex_coord_x - tex_x;
-    float3 uvw0 = float3((tex_x + uvwz.y) / float(SCATTERING_TEXTURE_NU_SIZE),
-        uvwz.z, uvwz.w);
-    float3 uvw1 = float3((tex_x + 1.0 + uvwz.y) / float(SCATTERING_TEXTURE_NU_SIZE),
-        uvwz.z, uvwz.w);
-    float4 combined_scattering =
-        scattering_tex.Sample(linearSampler, uvw0) * (1.0 - lerp_factor) +
-        scattering_tex.Sample(linearSampler, uvw1) * lerp_factor;
-    float3 scattering = float3(combined_scattering.rgb);
-    single_mie_scattering = GetExtrapolatedSingleMieScattering(atmosphere, combined_scattering);
+        float4 uvwz = GetScatteringTextureUvwzFromRMuMuSNu(atmosphere, r, mu, mu_s, nu, ray_r_mu_intersects_ground);
+        float tex_coord_x = uvwz.x * float(SCATTERING_TEXTURE_NU_SIZE - 1);
+        float tex_x = floor(tex_coord_x);
+        float lerp_factor = tex_coord_x - tex_x;
+        float3 uvw0 = float3((tex_x + uvwz.y) / float(SCATTERING_TEXTURE_NU_SIZE),
+            uvwz.z, uvwz.w);
+        float3 uvw1 = float3((tex_x + 1.0 + uvwz.y) / float(SCATTERING_TEXTURE_NU_SIZE),
+            uvwz.z, uvwz.w);
+        uvw0.y = 1.0 - uvw0.y;
+        uvw1.y = 1.0 - uvw1.y;
+    float4 tex0 = scattering_tex.Sample(linearSampler, uvw0);
+    float4 tex1 = scattering_tex.Sample(linearSampler, uvw1);
+    tex0.a = 1.0;
+    tex1.a = 1.0;
+        float4 combined_scattering =
+            tex0 * (1.0 - lerp_factor) +
+            tex1 * lerp_factor;
+        float3 scattering = float3(combined_scattering.rgb);
+        single_mie_scattering = GetExtrapolatedSingleMieScattering(atmosphere, combined_scattering);
+    
     return scattering;
 }
 
@@ -433,34 +441,48 @@ float3 GetSkyRadianceToPoint(
     float nu = dot(view_ray, sun_dir);
     float d = length(point_pos - camera_pos);
     bool ray_r_mu_intersects_ground = RayIntersectsGround(atmosphere, r, mu);
+    
+    // artifact pr fix
+    if (!ray_r_mu_intersects_ground)
+    {
+        float mu_horiz = -SafeSqrt(
+        1.0 - (atmosphere.bottom_radius / r) * (atmosphere.bottom_radius / r));
+        mu = max(mu, mu_horiz + 0.004);
+    }
     transmittance = GetTransmittance(atmosphere, transmittance_tex,
         r, mu, d, ray_r_mu_intersects_ground);
+    
     float3 single_mie_scattering;
     float3 scattering = GetCombinedScattering(
         atmosphere, scattering_tex,
         r, mu, mu_s, nu, ray_r_mu_intersects_ground,
         single_mie_scattering);
+    
     d = max(d - shadow_length, 0.0 * m);
     float r_p = ClampRadius(atmosphere, sqrt(d * d + 2.0 * r * mu * d + r * r));
     float mu_p = (r * mu + d) / r_p;
     float mu_s_p = (r * mu_s + d * nu) / r_p;
+    
     float3 single_mie_scattering_p;
     float3 scattering_p = GetCombinedScattering(
         atmosphere, scattering_tex,
         r_p, mu_p, mu_s_p, nu, ray_r_mu_intersects_ground,
         single_mie_scattering_p);
+    
     float3 shadow_transmittance = transmittance;
     if (shadow_length > 0.0 * m) {
         shadow_transmittance = GetTransmittance(atmosphere, transmittance_tex,
             r, mu, d, ray_r_mu_intersects_ground);
     }
     scattering = scattering - shadow_transmittance * scattering_p;
+    
     single_mie_scattering =
         single_mie_scattering - shadow_transmittance * single_mie_scattering_p;
     single_mie_scattering = GetExtrapolatedSingleMieScattering(
         atmosphere, float4(scattering, single_mie_scattering.r));
     single_mie_scattering = single_mie_scattering *
         smoothstep(float(0.0), float(0.01), mu_s);
+    
     return scattering * RayleighPhaseFunction(nu) + single_mie_scattering *
         MiePhaseFunction(atmosphere.mie_phase_function_g, nu);
 }
@@ -471,7 +493,10 @@ float3 GetIrradiance(
     const Texture2D irradiance_tex,
     float r, float mu_s) {
     float2 uv = GetIrradianceTextureUvFromRMuS(atmosphere, r, mu_s);
+    uv.y = 1.0 - uv.y;
     return float3(irradiance_tex.Sample(linearSampler, uv).rgb);
+    //return float3(uv.xy, 0.0) * 0.1;
+
 }
 
 // called by GetSunAndSkyIlluminance
@@ -593,14 +618,28 @@ struct PSInput
 //------------------
 float4 main(PSInput input) : SV_TARGET
 {
+    //Texture2D transmittance_texture : register(t0);
+    //Texture2D irradiance_texture : register(t1);
+    //Texture3D scattering_texture : register(t2);
+    float2 screenRes = float2(1280.f, 800.f);
+    float2 uv = input.position.xy / screenRes;
+    //uv.y = 1.0f - uv.y;
+    float3 uvw = float3(uv.x, uv.y, 31.f);
+    //float3 debuguvw = float3(0.03, input.position.y / screenRes.y, 0.f);
+    //float4 col = scattering_texture.Sample(linearSampler, uvw);
+    float4 col = transmittance_texture.Sample(linearSampler, uv);
+    //return float4(uv.xy, 0.f, 1.f);
+    //return col.aaaa * 0.5;
+    //return float4((input.view_ray.xyz + 1.0) * 0.5f, 1.0);
+    
     float4 color;
 
     float3 view_direction = normalize(input.view_ray);
     float fragment_angular_size =
-        length(ddx(input.view_ray) + ddy(input.view_ray)) / length(input.view_ray);
+        length(abs(ddx(input.view_ray)) + abs(ddy(input.view_ray))) / length(input.view_ray);
     float shadow_in;
     float shadow_out;
-    GetSphereShadowInOut(view_direction, sun_direction, shadow_in, shadow_out);
+    GetSphereShadowInOut(view_direction, sun_direction, shadow_in, shadow_out);    
     float lightshaft_fadein_hack = smoothstep(
         0.02, 0.04, dot(normalize(camera - earth_center), sun_direction));
     
@@ -621,7 +660,7 @@ float4 main(PSInput input) : SV_TARGET
             float ray_sphere_angular_distance = -ray_sphere_distance / p_dot_v;
             sphere_alpha =
                 min(ray_sphere_angular_distance / fragment_angular_size, 1.0);
-            
+ 
             float3 point_pos = camera + view_direction * distance_to_intersection;
             float3 norm = normalize(point_pos - kSphereCenter);
             float3 sky_irradiance;
@@ -629,10 +668,10 @@ float4 main(PSInput input) : SV_TARGET
                 point_pos - earth_center, norm, sun_direction, sky_irradiance);
             sphere_radiance =
                 kSphereAlbedo * (1.0 / PI) * (sun_irradiance + sky_irradiance);
-            
             float shadow_length =
                 max(0.0, min(shadow_out, distance_to_intersection) - shadow_in) *
                 lightshaft_fadein_hack;
+            
             float3 transmittance;
             float3 in_scatter = GetSkyLuminanceToPoint(camera - earth_center,
                 point_pos - earth_center, shadow_length, sun_direction, transmittance);
@@ -657,6 +696,7 @@ float4 main(PSInput input) : SV_TARGET
             float3 sky_irradiance;
             float3 sun_irradiance = GetSunAndSkyIlluminance(
                 point_pos - earth_center, norm, sun_direction, sky_irradiance);
+            
             ground_radiance = kGroundAlbedo * (1.0 / PI) * (
                 sun_irradiance * GetSunVisibility(point_pos, sun_direction) +
                 sky_irradiance * GetSkyVisibility(point_pos));
@@ -678,15 +718,16 @@ float4 main(PSInput input) : SV_TARGET
     float3 radiance = GetSkyLuminance(
         camera - earth_center, view_direction, shadow_length, sun_direction,
         transmittance);
+    
     if (dot(view_direction, sun_direction) > sun_size.y) {
         radiance = radiance + transmittance * GetSolarLuminance();
     }
     
     radiance = lerp(radiance, ground_radiance, ground_alpha);
     radiance = lerp(radiance, sphere_radiance, sphere_alpha);
+    
     color.rgb =
         pow(float3(1.0, 1.0, 1.0) - exp(-radiance / white_point * exposure), float3(1.0 / 2.2, 1.0 / 2.2, 1.0 / 2.2));
     color.a = 1.0;
-    
     return color;
 }
