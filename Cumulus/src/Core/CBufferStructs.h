@@ -59,5 +59,10 @@ struct alignas(256) cbIntersections
     AABB aabbs[1];
 };
 
+struct alignas(16) cbHullInfo
+{
+    uint32_t hullCount;
+};
+
 }
 #endif

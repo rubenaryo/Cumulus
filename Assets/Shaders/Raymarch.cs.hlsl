@@ -65,6 +65,85 @@ bool RayBoxIntersect(
     return tExit > max(tEnter, 0.0);
 }
 
+bool RayConvexHullIntersect(
+    float3 origin,
+    float3 dir,
+    ConvexHull hull,
+    out float tEnter,
+    out float tExit)
+{
+    // Early-out: test hull AABB first
+    float tA0, tA1;
+    // if (!RayBoxIntersect(origin, dir, hull.aabbMin, hull.aabbMax, tA0, tA1))
+    //     return false;
+
+    // Initialize slab interval
+    tEnter = -1e20;
+    tExit  =  1e20;
+
+    uint faceStart = hull.faceOffset;
+    uint faceEnd   = hull.faceOffset + hull.faceCount;
+
+    return faceStart < faceEnd;
+
+    for (uint fi = faceStart; fi < faceEnd; ++fi)
+    {
+        HullFace f = HullFacesBuffer[fi];
+        float dist0 = dot(f.normal, origin) + f.distance;   // signed distance at ray origin
+        float denom = dot(f.normal, dir);                   // rate of change along ray
+
+        // Ray parallel to plane
+        // if (abs(denom) < 1e-6)
+        // {
+        //     // If origin is outside this half-space -> miss
+        //     if (dist0 > 0.0)
+        //         return false;
+        //     else
+        //         continue; // parallel and inside the half-space, no clipping
+        // }
+
+        float tHit = -dist0 / denom;
+
+        // denom < 0 => ray enters this half-space at tHit
+        if (denom < 0.0)
+            tEnter = max(tEnter, tHit);
+        else // denom > 0 => ray exits this half-space at tHit
+            tExit = min(tExit, tHit);
+
+        // Early rejection
+        if (tEnter > tExit)
+            return false;
+    }
+
+    // Require intersection interval to be in front of ray (allowing origin inside hull)
+    return tExit > max(tEnter, 0.0);
+}
+
+// // Returns nearest intersection t and hull index (outHullIdx = 0xffffffff if none)
+// bool IntersectHulls(float3 origin, float3 dir, out float outT, out uint outHullIdx)
+// {
+//     outT = 1e20;
+//     outHullIdx = 0xffffffff;
+
+//     for (uint i = 0; i < hullCount; ++i)
+//     {
+//         ConvexHull ch = HullsBuffer[i];
+//         float te, tx;
+//         if (RayConvexHullIntersect(origin, dir, ch, te, tx))
+//         {
+//             float tFirst = max(te, 0.0);
+//             if (tFirst < outT)
+//             {
+//                 outT = tFirst;
+//                 outHullIdx = i;
+//             }
+//         }
+//     }
+
+//     return outHullIdx != 0xffffffff;
+// }
+
+
 // Encoded value in [0, 1]  ->  real SDF in [-256, 4096]
 float DecodeSdf(float encodedSdf)
 {
@@ -130,6 +209,26 @@ float3 VolumeRaymarchNvdf(float3 eyePos, float3 dir, float3 bgColor, int3 dispat
 #endif
         }
     }
+
+    if(HullsBuffer[0].pointCount != 1){
+        return float3(1, 0, 0); // Visualize hull intersection
+    }
+
+    // for(uint i = 0; i < hullCount; ++i)
+    // {
+    //     float hullEnter, hullExit;
+    //     ConvexHull ch = HullsBuffer[i];
+    //     if(ch.pointCount == 0){
+    //         return float3(1, 0, 0); // Visualize hull with no points
+    //     }
+
+    //     if (RayConvexHullIntersect(eyePos, dir, ch, hullEnter, hullExit))
+    //     {
+    //         // minBoxEnter = min(minBoxEnter, hullEnter);
+    //         // maxBoxExit = max(maxBoxExit, hullExit);
+    //         return float3(1, 0, 0); // Visualize hull intersection
+    //     }
+    // }
 
     // Clamp to your global near/far
     tEnter = max(tEnter, MIN_DIST);

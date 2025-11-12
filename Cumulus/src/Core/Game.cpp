@@ -116,6 +116,15 @@ bool Game::Init(HWND window, int width, int height)
 
     //HULL:
     //todo: concat all hulls
+    mHullInfoBuffer.Create(L"Hull Info Buffer", sizeof(cbHullInfo));
+    UINT8* hullInfoPointer = mHullInfoBuffer.GetMappedPtr();
+    if (hullInfoPointer) {
+        cbHullInfo hullInfo = {};
+        hullInfo.hullCount = 1;
+
+        memcpy(hullInfoPointer, &hullInfo, sizeof(hullInfo));
+    }
+
     Hull h = m->GetHull();
 
     mHullBuffer.Create(L"Hull Buffer", sizeof(sbConvexHull));
@@ -276,6 +285,8 @@ void Game::Render()
         {
             pMesh->DrawIndexed(pCommandList);
         }
+
+
     }
 
     if (mRaymarchPass.Bind(pCommandList))
@@ -296,10 +307,16 @@ void Game::Render()
             pCommandList->SetComputeRootConstantBufferView(aabbIdx, mAABBBuffer.GetGPUVirtualAddress());
         }
 
+        int32_t hullInfoIdx = mRaymarchPass.GetResourceRootIndex("HullInfoBuffer");
+        if (hullInfoIdx != ROOTIDX_INVALID)
+        {
+            pCommandList->SetComputeRootConstantBufferView(hullInfoIdx, mHullInfoBuffer.GetGPUVirtualAddress());
+        }
+
         int32_t hullIdx = mRaymarchPass.GetResourceRootIndex("HullsBuffer");
         if (hullIdx != ROOTIDX_INVALID)
         {
-            pCommandList->SetComputeRootShaderResourceView(aabbIdx, mHullBuffer.GetGPUVirtualAddress());
+            pCommandList->SetComputeRootShaderResourceView(hullIdx, mHullBuffer.GetGPUVirtualAddress());
         }
 
         int32_t hullFaceIdx = mRaymarchPass.GetResourceRootIndex("HullFacesBuffer");
@@ -391,6 +408,7 @@ Game::~Game()
     mLightBuffer.Destroy();
     mTimeBuffer.Destroy();
     mAABBBuffer.Destroy();
+    mHullInfoBuffer.Destroy();
     mHullBuffer.Destroy();
     mHullFaceBuffer.Destroy();
     mHullPointBuffer.Destroy();

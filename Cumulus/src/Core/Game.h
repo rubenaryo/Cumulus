@@ -66,6 +66,7 @@ private:
     Muon::UploadBuffer mHullBuffer;
     Muon::UploadBuffer mHullFaceBuffer;
     Muon::UploadBuffer mHullPointBuffer;
+    Muon::UploadBuffer mHullInfoBuffer;
 
     // Timer for the main game loop
     Muon::StepTimer mTimer;
