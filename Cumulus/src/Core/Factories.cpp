@@ -60,6 +60,8 @@ bool MeshFactory::LoadMesh(const wchar_t* fileName, UploadBuffer& stagingBuffer,
         std::vector<uint8_t> vertexData;
         std::vector<uint32_t> indices;
         uint32_t vertexCount = 0;
+        DirectX::XMFLOAT3A min;
+        DirectX::XMFLOAT3A max;
     };
     std::vector<MeshData> meshesData;
     meshesData.reserve(pScene->mNumMeshes);
@@ -106,10 +108,20 @@ bool MeshFactory::LoadMesh(const wchar_t* fileName, UploadBuffer& stagingBuffer,
         uint8_t* bufferStart = meshData.vertexData.data();
         uint8_t* writeHead = bufferStart;
 
+        DirectX::XMFLOAT3A max = DirectX::XMFLOAT3A(-1 * FLT_MAX, -1 * FLT_MAX, -1 * FLT_MAX);
+        DirectX::XMFLOAT3A min = DirectX::XMFLOAT3A(FLT_MAX, FLT_MAX, FLT_MAX);
+
         // Process Vertices for this mesh
         for (unsigned int j = 0; j != pMesh->mNumVertices; ++j)
         {
-            if (pMesh->HasPositions()) WriteFloat3(writeHead, pMesh->mVertices[j]);
+            if (pMesh->HasPositions()) {
+                WriteFloat3(writeHead, pMesh->mVertices[j]);
+
+                DirectX::XMFLOAT3A p = DirectX::XMFLOAT3A(pMesh->mVertices[j][0], pMesh->mVertices[j][1], pMesh->mVertices[j][2]);
+                min = DirectX::XMFLOAT3A(std::fmin(min.x, p.x), std::fmin(min.y, p.y), std::fmin(min.z, p.z));
+                max = DirectX::XMFLOAT3A(std::fmax(max.x, p.x), std::fmax(max.y, p.y), std::fmax(max.z, p.z));
+                Muon::Printf("p is (%f, %f, %f)\n", p.x, p.y, p.z);
+            }
             if (pMesh->HasNormals()) WriteFloat3(writeHead, pMesh->mNormals[j]);
             if (pMesh->HasTextureCoords(0)) WriteFloat2(writeHead, pMesh->mTextureCoords[0][j]);
             if (pMesh->HasTangentsAndBitangents()) { WriteFloat3(writeHead, pMesh->mTangents[j]); WriteFloat3(writeHead, pMesh->mBitangents[j]); }
@@ -117,7 +129,8 @@ bool MeshFactory::LoadMesh(const wchar_t* fileName, UploadBuffer& stagingBuffer,
         }
 
         meshData.indices.reserve(pMesh->mNumFaces * 3);
-    
+        meshData.min = min;
+        meshData.max = max;
         // Process Indices next
         for (unsigned int j = 0, ind = 0; j < pMesh->mNumFaces; ++j)
         {
@@ -135,8 +148,12 @@ bool MeshFactory::LoadMesh(const wchar_t* fileName, UploadBuffer& stagingBuffer,
 
     // TODO: Support scenes with multiple meshes. These meshData's need to be merged.
     MeshData& data = meshesData.at(0);
-    
-    bool success = outMesh.Create(fileName, (UINT)data.vertexData.size(), (UINT)data.vertexData.size() / data.vertexCount, (UINT)data.vertexCount, (UINT)data.indices.size() * sizeof(uint32_t), (UINT)data.indices.size(), DXGI_FORMAT_R32_UINT);
+
+    AABB boundingBox;
+    boundingBox.min = data.min;
+    boundingBox.max = data.max;
+
+    bool success = outMesh.Create(fileName, (UINT)data.vertexData.size(), (UINT)data.vertexData.size() / data.vertexCount, (UINT)data.vertexCount, (UINT)data.indices.size() * sizeof(uint32_t), (UINT)data.indices.size(), DXGI_FORMAT_R32_UINT, boundingBox);
     if (!success)
     {
         Muon::Printf(L"Error: Failed to create mesh: %s\n", fileName);

@@ -7,6 +7,7 @@ Description : Common header to hold shared types
 #define MUON_COMMONTYPES_H
 
 #include <stdint.h>
+#include <DirectXMath.h>
 
 namespace Muon
 {
@@ -17,6 +18,12 @@ namespace Muon
     static const ResourceID ResourceID_INVALID = IDTYPE_MAX;
 
     static const int32_t ROOTIDX_INVALID = -1;
+
+    struct AABB
+    {
+        DirectX::XMFLOAT3A min;
+        DirectX::XMFLOAT3A max;
+    };
 }
 
 #endif

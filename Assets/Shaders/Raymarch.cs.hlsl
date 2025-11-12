@@ -1,9 +1,10 @@
 #include "VS_Common.hlsli"
+#include "Raymarch_Common.hlsli"
 
 // Toggle features
 #define USE_ADAPTIVE_STEP 1 // Shows some artifact ATM. Will debug again after uprez. 
 #define USE_JITTERED_STEP 1
-
+#define DEBUG_AABB_INTERSECT 0
 // Raymarch settings
 static const int MAX_STEPS = 1024; // Max steps per ray
 static const float MIN_DIST = 0.001; // Global near distance
@@ -113,6 +114,21 @@ float3 VolumeRaymarchNvdf(float3 eyePos, float3 dir, float3 bgColor, int3 dispat
     {
         // Ray misses the volume entirely
         return float3(1, 1, 1);
+    }
+
+    float minBoxEnter = tEnter;
+    float maxBoxExit = tExit;
+    for (uint i = 0; i < aabbCount; ++i)
+    {
+        float aabbEnter, aabbExit;
+        if (RayBoxIntersect(eyePos, dir, aabbs[i].minBounds, aabbs[i].maxBounds, aabbEnter, aabbExit))
+        {
+            minBoxEnter = min(minBoxEnter, aabbEnter);
+            maxBoxExit = max(maxBoxExit, aabbExit);
+#if DEBUG_AABB_INTERSECT
+            return float3(1, 0, 0); // Visualize AABB intersection
+#endif
+        }
     }
 
     // Clamp to your global near/far
