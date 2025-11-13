@@ -90,10 +90,10 @@ bool Game::Init(HWND window, int width, int height)
 
         const float PI = 3.14159f;
         XMMATRIX entityWorld = DirectX::XMMatrixIdentity();
-        //entityWorld = XMMatrixMultiply(entityWorld, DirectX::XMMatrixRotationRollPitchYaw(0, 0, PI/2.0f));
-        //entityWorld = XMMatrixMultiply(entityWorld, DirectX::XMMatrixRotationRollPitchYaw(-PI/2.0f, 0,0));
-        //entityWorld = XMMatrixMultiply(entityWorld, DirectX::XMMatrixScaling(0.12f, 0.12f, 0.12f));
-        //entityWorld = XMMatrixMultiply(entityWorld, DirectX::XMMatrixTranslation(0, 1, 0));
+        entityWorld = XMMatrixMultiply(entityWorld, DirectX::XMMatrixRotationRollPitchYaw(0, 0, PI/2.0f));
+        entityWorld = XMMatrixMultiply(entityWorld, DirectX::XMMatrixRotationRollPitchYaw(-PI/2.0f, 0,0));
+        entityWorld = XMMatrixMultiply(entityWorld, DirectX::XMMatrixScaling(0.12f, 0.12f, 0.12f));
+        entityWorld = XMMatrixMultiply(entityWorld, DirectX::XMMatrixTranslation(0, 1, 0));
         XMStoreFloat4x4(&entity.world, entityWorld);
         XMStoreFloat4x4(&entity.invWorld, DirectX::XMMatrixInverse(nullptr, entityWorld));
         memcpy(mapped, &entity, sizeof(entity));
@@ -226,12 +226,16 @@ void Game::Render()
             pCommandList->SetGraphicsRootConstantBufferView(timeRootIdx, mTimeBuffer.GetGPUVirtualAddress());
         }
 
-        const Mesh* pMesh = codex.GetMesh(GetResourceID(L"cube.obj"));
+        const Mesh* pMesh = codex.GetMesh(GetResourceID(L"teapot.obj"));
         if (pMesh)
         {
             pMesh->DrawIndexed(pCommandList);
         }
     }
+
+    // After opaque pass, transition depth buffer to be bindable as a regular texture by other passes
+    pCommandList->ResourceBarrier(1, &CD3DX12_RESOURCE_BARRIER::Transition(GetDepthStencilResource(),
+        D3D12_RESOURCE_STATE_DEPTH_WRITE, D3D12_RESOURCE_STATE_NON_PIXEL_SHADER_RESOURCE));
 
     if (mRaymarchPass.Bind(pCommandList))
     {
@@ -284,8 +288,12 @@ void Game::Render()
             D3D12_RESOURCE_STATE_PRESENT, D3D12_RESOURCE_STATE_RENDER_TARGET));
 
         // Specify the buffers we are going to render to.
-        pCommandList->OMSetRenderTargets(1, &GetCurrentBackBufferView(), true, &GetDepthStencilView());
+        pCommandList->OMSetRenderTargets(1, &GetCurrentBackBufferView(), true, nullptr);
     }
+
+    // Get depth buffer ready to write depth again
+    pCommandList->ResourceBarrier(1, &CD3DX12_RESOURCE_BARRIER::Transition(GetDepthStencilResource(),
+        D3D12_RESOURCE_STATE_NON_PIXEL_SHADER_RESOURCE, D3D12_RESOURCE_STATE_DEPTH_WRITE));
 
     if (mPostProcessPass.Bind(pCommandList))
     {
