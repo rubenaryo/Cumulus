@@ -86,6 +86,7 @@ namespace Muon
     int GetSwapChainBufferCount() { return SWAP_CHAIN_BUFFER_COUNT; }
     D3D12_CPU_DESCRIPTOR_HANDLE GetCurrentBackBufferView() { return CD3DX12_CPU_DESCRIPTOR_HANDLE(gRTVHeap->GetCPUDescriptorHandleForHeapStart(), CurrentBackBuffer, gRTVSize); }
     D3D12_CPU_DESCRIPTOR_HANDLE GetDepthStencilView() { return gDSVHeap->GetCPUDescriptorHandleForHeapStart(); }
+    const TextureView& GetDepthStencilSRV() { return gDepthStencilSRV; }
     ID3D12Resource* GetDepthStencilResource() { return gDepthStencilBuffer.Get(); }
     D3D12_CLEAR_VALUE& GetGlobalClearValue() { return gClearValue; }
     HWND GetHwnd() { return gHwnd; }

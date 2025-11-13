@@ -20,6 +20,7 @@ namespace Muon
 {
 class DescriptorHeap;
 class Texture;
+struct TextureView;
 }
 
 namespace Muon
@@ -38,6 +39,7 @@ namespace Muon
 	int GetSwapChainBufferCount();
 	D3D12_CPU_DESCRIPTOR_HANDLE GetCurrentBackBufferView();
 	D3D12_CPU_DESCRIPTOR_HANDLE GetDepthStencilView();
+	const TextureView& GetDepthStencilSRV();
 	ID3D12Resource* GetDepthStencilResource();
 	D3D12_CLEAR_VALUE& GetGlobalClearValue();
 	HWND GetHwnd();

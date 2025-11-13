@@ -26,6 +26,7 @@ static const float DENSITY_SCALE = .3; // To be tuned / driven by NVDF
 
 Texture2D gInput : register(t0);
 Texture3D sdfNvdfTex : register(t1); // Sdf and model textures combined [sdf.r, model.r, model.g, model.b] 
+Texture2D depthStencilBuffer : register(t2); // The scene's depth-stencil buffer, bound here post-graphics passes.
 SamplerState linearClamp : register(s3); 
 RWTexture2D<float4> gOutput : register(u0);
 
@@ -228,5 +229,10 @@ void main(int3 dispatchThreadID : SV_DispatchThreadID)
     // Volume composite against NVDF dimensional profile (green channel)
     float3 finalColor = VolumeRaymarchNvdf(eyePos, worldDir, bgColor, dispatchThreadID);
 
+    float depth = depthStencilBuffer[dispatchThreadID.xy].r;
+    
+    // Example: Visulize depth
+    // finalColor = depth.rrr;
+    
     gOutput[dispatchThreadID.xy] = float4(finalColor, 1.0);
 }
