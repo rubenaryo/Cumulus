@@ -85,6 +85,7 @@ namespace Muon
     int GetSwapChainBufferCount() { return SWAP_CHAIN_BUFFER_COUNT; }
     D3D12_CPU_DESCRIPTOR_HANDLE GetCurrentBackBufferView() { return CD3DX12_CPU_DESCRIPTOR_HANDLE(gRTVHeap->GetCPUDescriptorHandleForHeapStart(), CurrentBackBuffer, gRTVSize); }
     D3D12_CPU_DESCRIPTOR_HANDLE GetDepthStencilView() { return gDSVHeap->GetCPUDescriptorHandleForHeapStart(); }
+    ID3D12Resource* GetDepthStencilResource() { return gDepthStencilBuffer.Get(); }
     D3D12_CLEAR_VALUE& GetGlobalClearValue() { return gClearValue; }
     HWND GetHwnd() { return gHwnd; }
 
@@ -530,12 +531,13 @@ namespace Muon
         pCommandList->ResourceBarrier(1, &CD3DX12_RESOURCE_BARRIER::Transition(gOffscreenTarget->GetResource(), 
             D3D12_RESOURCE_STATE_GENERIC_READ, D3D12_RESOURCE_STATE_RENDER_TARGET));
         
-        pCommandList->OMSetRenderTargets(1, &gOffscreenTarget->GetRTVHandleCPU(), FALSE, nullptr);
+        pCommandList->OMSetRenderTargets(1, &gOffscreenTarget->GetRTVHandleCPU(), FALSE, &GetDepthStencilView());
 
         // Clear the back buffer
         pCommandList->ClearRenderTargetView(gOffscreenTarget->GetRTVHandleCPU(), gClearValue.Color, 0, nullptr);
         
-        // TODO: Clear depth stencil once we need that
+        // Clear the depth buffer
+        pCommandList->ClearDepthStencilView(GetDepthStencilView(), D3D12_CLEAR_FLAG_DEPTH, 1.0f, 0, 0, nullptr);
 
         return true;
     }
@@ -706,7 +708,7 @@ namespace Muon
         success &= CreateDepthStencilBuffer(GetDevice(), GetCommandList(), GetCommandQueue(), width, height, gDepthStencilBuffer);
         CHECK_SUCCESS(success, "Error: Failed to create depth stencil buffer!\n");
 
-        success &= SetViewport(GetCommandList(), 0, 0, width, height, 0.001f, 1000.0f);
+        success &= SetViewport(GetCommandList(), 0, 0, width, height, 0.0f, 1.0f);
         CHECK_SUCCESS(success, "Error: Failed to set viewport!\n");
 
         success &= SetScissorRects(GetCommandList(), 0, 0, width, height);

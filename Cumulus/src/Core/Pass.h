@@ -64,6 +64,7 @@ public:
 
     void SetVertexShader(const VertexShader* pVS) { mpVS = pVS; }
     void SetPixelShader(const PixelShader* pPS) { mpPS = pPS; }
+    void SetEnableDepth(bool b) { mEnableDepth = b; }
 
 protected:
     virtual bool GatherShaderResources() override;
@@ -71,6 +72,7 @@ protected:
 
     const VertexShader* mpVS = nullptr;
     const PixelShader* mpPS = nullptr;
+    bool mEnableDepth = true;
 };
 
 class ComputePass : public Pass

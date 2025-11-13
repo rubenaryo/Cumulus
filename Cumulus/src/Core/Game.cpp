@@ -47,6 +47,7 @@ bool Game::Init(HWND window, int width, int height)
     {
         mOpaquePass.SetVertexShader(codex.GetVertexShader(GetResourceID(L"Phong.vs")));
         mOpaquePass.SetPixelShader(codex.GetPixelShader(GetResourceID(L"Phong_NormalMap.ps")));
+        mOpaquePass.SetEnableDepth(true);
 
         if (!mOpaquePass.Generate())
             Printf(L"Warning: %s failed to generate!\n", mOpaquePass.GetName());
@@ -72,6 +73,7 @@ bool Game::Init(HWND window, int width, int height)
     {
         mPostProcessPass.SetVertexShader(codex.GetVertexShader(GetResourceID(L"Passthrough.vs")));
         mPostProcessPass.SetPixelShader(codex.GetPixelShader(GetResourceID(L"Passthrough.ps")));
+        mPostProcessPass.SetEnableDepth(false);
 
         if (!mPostProcessPass.Generate())
             Printf(L"Warning: %s failed to generate!\n", mPostProcessPass.GetName());
