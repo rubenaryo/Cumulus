@@ -31,10 +31,10 @@ VertexOut main(uint vid : SV_VertexID)
     
     // Map [0,1]^2 to NDC space
     // In DirectX, NDC space is [-1,1] for X and Y, [0,1] for Z
-    //vout.position = float4(texc.x, texc.y, 0.0f, 1.0f);
     vout.position = float4(2.0f * texc.x - 1.0f, 1.0f - 2.0f * texc.y, 0.0f, 1.0f);
     
     // Construct view ray:
+    // NOTE: These matrices follow the OpenGL Conventions, since this code was ported from there and it works better here
     // 1. Transform vertex from clip space to view/camera space
     float4 view_space = mul(view_from_clip, vout.position);
     
@@ -42,7 +42,6 @@ VertexOut main(uint vid : SV_VertexID)
     float4 world_dir = mul(model_from_view, float4(view_space.xyz, 0.0));
     
     vout.view_ray = world_dir.xyz;
-    //vout.view_ray.y = ;
     
     return vout;
 }

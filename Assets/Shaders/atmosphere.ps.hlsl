@@ -37,14 +37,18 @@
 // Texture2D transmittance_texture : register(t0);
 // Texture2D irradiance_texture : register(t1);
 // Texture3D scattering_texture : register(t2);
+// These textures come from running his OpenGL version with the same settings as our
 
 
 #include "AtmosphereBuffer.hlsli"
+
+#define RENDERSPHERE 0
 
 //---------------------------
 // CONSTANTS AND DEFINITIONS
 //---------------------------
 
+// Texture dimensions
 static const int TRANSMITTANCE_TEXTURE_WIDTH = 256;
 static const int TRANSMITTANCE_TEXTURE_HEIGHT = 64;
 static const int SCATTERING_TEXTURE_R_SIZE = 32;
@@ -54,6 +58,7 @@ static const int SCATTERING_TEXTURE_NU_SIZE = 8;
 static const int IRRADIANCE_TEXTURE_WIDTH = 64;
 static const int IRRADIANCE_TEXTURE_HEIGHT = 16;
 
+// Units for physical quantities
 static const float m = 1.0;
 static const float nm = 1.0;
 static const float rad = 1.0;
@@ -76,6 +81,9 @@ static const float kcd = 1000.0 * cd;
 static const float cd_per_square_meter = cd / m2;
 static const float kcd_per_square_meter = kcd / m2;
 
+// An atmosphere layer of width 'width', and whose density is defined as
+// 'exp_term' * exp('exp_scale' * h) + 'linear_term' * h + 'constant_term',
+// clamped to [0,1], and where h is the altitude.
 struct DensityProfileLayer {
     float width;
     float exp_term;
@@ -84,27 +92,69 @@ struct DensityProfileLayer {
     float constant_term;
 };
 
+// An atmosphere density profile made of several layers on top of each other
+// (from bottom to top). The width of the last layer is ignored, i.e. it always
+// extend to the top atmosphere boundary. The profile values vary between 0
+// (null density) to 1 (maximum density).
 struct DensityProfile {
     DensityProfileLayer layers[2];
 };
 
-struct AtmosphereParameters {
+struct AtmosphereParameters
+{
+  // The solar irradiance at the top of the atmosphere.
     float3 solar_irradiance;
+  // The sun's angular radius. Warning: the implementation uses approximations
+  // that are valid only if this angle is smaller than 0.1 radians.
     float sun_angular_radius;
+  // The distance between the planet center and the bottom of the atmosphere.
     float bottom_radius;
+  // The distance between the planet center and the top of the atmosphere.
     float top_radius;
+  // The density profile of air molecules, i.e. a function from altitude to
+  // dimensionless values between 0 (null density) and 1 (maximum density).
     DensityProfile rayleigh_density;
+  // The scattering coefficient of air molecules at the altitude where their
+  // density is maximum (usually the bottom of the atmosphere), as a function of
+  // wavelength. The scattering coefficient at altitude h is equal to
+  // 'rayleigh_scattering' times 'rayleigh_density' at this altitude.
     float3 rayleigh_scattering;
+  // The density profile of aerosols, i.e. a function from altitude to
+  // dimensionless values between 0 (null density) and 1 (maximum density).
     DensityProfile mie_density;
+  // The scattering coefficient of aerosols at the altitude where their density
+  // is maximum (usually the bottom of the atmosphere), as a function of
+  // wavelength. The scattering coefficient at altitude h is equal to
+  // 'mie_scattering' times 'mie_density' at this altitude.
     float3 mie_scattering;
+  // The extinction coefficient of aerosols at the altitude where their density
+  // is maximum (usually the bottom of the atmosphere), as a function of
+  // wavelength. The extinction coefficient at altitude h is equal to
+  // 'mie_extinction' times 'mie_density' at this altitude.
     float3 mie_extinction;
+  // The asymetry parameter for the Cornette-Shanks phase function for the
+  // aerosols.
     float mie_phase_function_g;
+  // The density profile of air molecules that absorb light (e.g. ozone), i.e.
+  // a function from altitude to dimensionless values between 0 (null density)
+  // and 1 (maximum density).
     DensityProfile absorption_density;
+  // The extinction coefficient of molecules that absorb light (e.g. ozone) at
+  // the altitude where their density is maximum, as a function of wavelength.
+  // The extinction coefficient at altitude h is equal to
+  // 'absorption_extinction' times 'absorption_density' at this altitude.
     float3 absorption_extinction;
+  // The average albedo of the ground.
     float3 ground_albedo;
+  // The cosine of the maximum Sun zenith angle for which atmospheric scattering
+  // must be precomputed (for maximum precision, use the smallest Sun zenith
+  // angle yielding negligible sky light radiance values. For instance, for the
+  // Earth case, 102 degrees is a good choice - yielding mu_s_min = -0.2).
     float mu_s_min;
 };
 
+// These values were computed on CPU side in the original Bruneton code,
+// and their results are copied here to simplicity.
 static const AtmosphereParameters ATMOSPHERE = {
     float3(1.474000, 1.850400, 1.911980),
     0.004675,
@@ -122,12 +172,15 @@ static const AtmosphereParameters ATMOSPHERE = {
     -0.500000
 };
 
+// these top two values help with the precomputed illuminance values and are calculated on CPU in the Bruneton code
 static const float3 SKY_SPECTRAL_RADIANCE_TO_LUMINANCE = float3(683.000000, 683.000000, 683.000000);
 static const float3 SUN_SPECTRAL_RADIANCE_TO_LUMINANCE = float3(98242.786222, 69954.398112, 66475.012354);
 static const float kLengthUnitInMeters = 1000.0f;
+#if RENDERSPHERE
 static const float3 kSphereCenter = float3(0.0, 0.0, 1.0); // this reduces to 0, 0, 1..... float3(0.0, 0.0, 1000.0) / kLengthUnitInMeters;
 static const float kSphereRadius = 1.0; // this reduces to 1.... 1000.0 / kLengthUnitInMeters;
 static const float3 kSphereAlbedo = float3(0.8, 0.8, 0.8); // NOTE: Change these albedos later for diff ground colors and for moon
+#endif
 static const float3 kGroundAlbedo = float3(0.0, 0.0, 0.04);
 
 //--------------------------
@@ -185,6 +238,13 @@ bool RayIntersectsGround(const AtmosphereParameters atmosphere,
         atmosphere.bottom_radius * atmosphere.bottom_radius >= 0.0 * m2;
 }
 
+/*
+Note that we added the solar irradiance and the scattering coefficient terms
+that we omitted in ComputeSingleScatteringIntegrand, but not the
+phase function terms - they are added at render time
+for better angular precision. We provide them here for completeness:
+*/
+
 // called by GetSkyRadiance
 float RayleighPhaseFunction(float nu)
 {
@@ -200,6 +260,21 @@ float MiePhaseFunction(float g, float nu)
     return k * (1.0 + nu * nu) / pow(1.0 + g * g - 2.0 * g * nu, 1.5);
 }
 
+/* Computing Transmittance to Top Atmosphere Boundary is quite costly.
+Fortunately it depends on only two parameters and is quite smooth, so
+we can precompute it in a small 2D texture to optimize its evaluation.
+This becomes our precomputed Transmittance Texture.
+
+For this we need mapping between the function parameters (r, mu)
+and the texture coordinates (u, v),  because these parameters do
+not have the same units and range of values.
+And even if it was the case, storing a function from the [0, 1] interval in
+a texture of size n would sample the function at 0.5, 1.5/n, ... (n-0.5)/n,
+because texture samples are at the center oftexels. Therefore, this texture
+would only give us extrapolated function values at the domain boundaries
+(0 and 1). To avoid this we need to store f(0) at the center of texel 0 and
+f(1) at the center of texel n-1. This can be done with the following mapping
+from values x in [0,1] to texture coordinates u in [0.5/n,1-0.5/n]: */
 // called by GetIrradianceTextureUvFromRMuS
 // called by GetTransmittanceTextureUvFromRMu
 // called by GetScatteringTextureUvwzFromRMuMuSNu
@@ -208,6 +283,13 @@ float GetTextureCoordFromUnitRange(float x, int texture_size)
     return 0.5 / float(texture_size) + x * (1.0 - 1.0 / float(texture_size));
 }
 
+/*
+In order to precompute the ground irradiance in a texture we need a mapping
+from the ground irradiance parameters to texture coordinates. Since we
+precompute the ground irradiance only for horizontal surfaces, this irradiance
+depends only on r and mu_s, so we need a mapping from (r,mu_s) to
+(u,v) texture coordinates. The simplest, affine mapping is sufficient here,
+because the ground irradiance function is very smooth: */
 // called by GetIrradiance
 float2 GetIrradianceTextureUvFromRMuS(const AtmosphereParameters atmosphere,
 float r, float mu_s) {
@@ -218,6 +300,7 @@ float x_mu_s = mu_s * 0.5 + 0.5;
                   GetTextureCoordFromUnitRange(x_r, IRRADIANCE_TEXTURE_HEIGHT));
 }
 
+// Same as above pretty much, but for transmittance
 // called by GetTransmittanceToTopAtmosphereBoundary
 float2 GetTransmittanceTextureUvFromRMu(const AtmosphereParameters atmosphere,
     float r, float mu)
@@ -235,6 +318,7 @@ float2 GetTransmittanceTextureUvFromRMu(const AtmosphereParameters atmosphere,
                   GetTextureCoordFromUnitRange(x_r, TRANSMITTANCE_TEXTURE_HEIGHT));
 }
 
+// Same as above pretty much, but for Scattering
 // called by GetCombinedScattering
 float4 GetScatteringTextureUvwzFromRMuMuSNu(
     const AtmosphereParameters atmosphere,
@@ -272,6 +356,10 @@ float4 GetScatteringTextureUvwzFromRMuMuSNu(
     return float4(u_nu, u_mu_s, u_mu, u_r);
 }
 
+/*
+With the help of the precomputed texture, we can now get the
+transmittance between a point and the top atmosphere boundary with a single
+texture lookup (assuming there is no intersection with the ground): */
 // called by GetTransmittanceToSun
 // called by GetTransmittance
 // called by GetSkyRadiance
@@ -284,6 +372,15 @@ float3 GetTransmittanceToTopAtmosphereBoundary(
     return float3(transmittance_tex.Sample(linearSampler, uv).rgb);
 }
 
+/*
+Also, with r_d=sqrt{d^2+2r\mu d+r^2} and mu_d=(r\mu+d)/r_d the values of
+r and mu at bq, we can get the transmittance between two arbitrary
+points bp and bq inside the atmosphere with only two texture lookups
+(recall that the transmittance between bp and bq is the transmittance
+between bp and the top atmosphere boundary, divided by the transmittance
+between bq and the top atmosphere boundary, or the reverse - we continue to
+assume that the segment between the two points does not intersect the ground):
+*/
 // called by GetSkyRadianceToPoint
 // called by GetSkyRadiance
 float3 GetTransmittance(
@@ -309,6 +406,34 @@ float3 GetTransmittance(
     }
 }
 
+/*Where ray_r_mu_intersects_ground should be true if the ray
+defined by r and mu intersects the ground. We don't compute it here with
+RayIntersectsGround because the result could be wrong for rays
+very close to the horizon, due to the finite precision and rounding errors of
+floating point operations. And also because the caller generally has more robust
+ways to know whether a ray intersects the ground or not (see below).
+
+Finally, we will also need the transmittance between a point in the
+atmosphere and the Sun. The Sun is not a point light source, so this is an
+integral of the transmittance over the Sun disc. Here we consider that the
+transmittance is constant over this disc, except below the horizon, where the
+transmittance is 0. As a consequence, the transmittance to the Sun can be
+computed with GetTransmittanceToTopAtmosphereBoundary, times the
+fraction of the Sun disc which is above the horizon.
+
+This fraction varies from 0 when the Sun zenith angle theta_s is larger
+than the horizon zenith angle theta_h plus the Sun angular radius alpha_s,
+to 1 when theta_s is smaller than theta_h-alpha_s. Equivalently, it
+varies from 0 when mu_s=cos theta_s is smaller than
+cos(theta_h+alpha_s)approx cos theta_h-alpha_s sin theta_h to 1 when
+mu_s is larger than
+cos(theta_h-alpha_s)approx cos theta_h+alpha_s sin theta_h. In between,
+the visible Sun disc fraction varies approximately like a smoothstep (this can
+be verified by plotting the area of  https://en.wikipedia.org/wiki/Circular_segment
+as a function of its "https://en.wikipedia.org/wiki/Sagitta_(geometry). 
+Therefore, since sin theta_h=r_{mathrm{bottom}}/r, we can
+approximate the transmittance to the Sun with the following function:
+*/
 // called by GetSunAndSkyIrradiance
 float3 GetTransmittanceToSun(
     const AtmosphereParameters atmosphere,
@@ -323,6 +448,8 @@ float3 GetTransmittanceToSun(
                    mu_s - cos_theta_h);
 }
 
+// Since we combined scattering textures, we need to extract the mie information from it
+// However, it seems like scattering.a is just 1... so I am confusion, but it looks good.
 // called by GetCombinedScattering
 // called by GetSkyRadianceToPoint
 float3 GetExtrapolatedSingleMieScattering(
@@ -336,6 +463,14 @@ float3 GetExtrapolatedSingleMieScattering(
         (atmosphere.mie_scattering / atmosphere.rayleigh_scattering);
 }
 
+/*
+We can then retrieve all the scattering components (Rayleigh + multiple
+scattering on one side, and single Mie scattering on the other side) with the
+following function, based on single_scattering_lookup (we duplicate
+some code here, instead of using two calls to GetScattering, to
+make sure that the texture coordinates computation is shared between the lookups
+in scattering_texture and the mie extrapolation:
+*/
 // called by GetSkyRadianceToPoint
 // called by GetSkyRadiance
 float3 GetCombinedScattering(
@@ -366,6 +501,16 @@ float3 GetCombinedScattering(
     return scattering;
 }
 
+/*
+To render the sky we simply need to display the sky radiance, which we can
+get with a lookup in the precomputed scattering texture(s), multiplied by the
+phase function terms that were omitted during precomputation. We can also return
+the transmittance of the atmosphere (which we can get with a single lookup in
+the precomputed transmittance texture), which is needed to correctly render the
+objects in space (such as the Sun and the Moon). This leads to the following
+function, where most of the computations are used to correctly handle the case
+of viewers outside the atmosphere, and the case of light shafts:
+*/
 // called by GetSkyLuminance
 float3 GetSkyRadiance(
     const AtmosphereParameters atmosphere,
@@ -419,6 +564,19 @@ float3 GetSkyRadiance(
         MiePhaseFunction(atmosphere.mie_phase_function_g, nu);
 }
 
+/*
+To render the aerial perspective we need the transmittance and the scattering
+between two points (i.e. between the viewer and a point on the ground, which can
+at an arbibrary altitude). We already have a function to compute the
+transmittance between two points (using 2 lookups in a texture which only
+contains the transmittance to the top of the atmosphere), but we don't have one
+for the scattering between 2 points. Hopefully, the scattering between 2 points
+can be computed from two lookups in a texture which contains the scattering to
+the nearest atmosphere boundary, as for the transmittance (except that here the
+two lookup results must be subtracted, instead of divided). This is what we
+implement in the following function (the initial computations are used to
+correctly handle the case of viewers outside the atmosphere):
+*/
 // called by GetSkyLuminanceToPoint
 float3 GetSkyRadianceToPoint(
     const AtmosphereParameters atmosphere,
@@ -487,6 +645,7 @@ float3 GetSkyRadianceToPoint(
         MiePhaseFunction(atmosphere.mie_phase_function_g, nu);
 }
 
+// The Bruneton comment here was 150 lines, so it is ommitted here for brevity.
 // called by GetSunAndSkyIrradiance
 float3 GetIrradiance(
     const AtmosphereParameters atmosphere,
@@ -495,10 +654,18 @@ float3 GetIrradiance(
     float2 uv = GetIrradianceTextureUvFromRMuS(atmosphere, r, mu_s);
     uv.y = 1.0 - uv.y;
     return float3(irradiance_tex.Sample(linearSampler, uv).rgb);
-    //return float3(uv.xy, 0.0) * 0.1;
-
 }
 
+/*
+To render the ground we need the irradiance received on the ground after 0 or
+more bounce(s) in the atmosphere or on the ground. The direct irradiance can be
+computed with a lookup in the transmittance texture,
+via GetTransmittanceToSun, while the indirect irradiance is given
+by a lookup in the precomputed irradiance texture (this texture only contains
+the irradiance for horizontal surfaces; we use the approximation defined in our
+https://hal.inria.fr/inria-00288758/en paper for the other cases).
+The function below returns the direct and indirect irradiances separately:
+*/
 // called by GetSunAndSkyIlluminance
 float3 GetSunAndSkyIrradiance(
     const AtmosphereParameters atmosphere,
@@ -547,6 +714,14 @@ float3 GetSunAndSkyIlluminance(
     return sun_irradiance * SUN_SPECTRAL_RADIANCE_TO_LUMINANCE;
 }
 
+#if RENDERSPHERE
+/*
+Testing if a point is in the shadow of the sphere S is equivalent to test if the
+corresponding light ray intersects the sphere, which is very simple to do.
+However, this is only valid for a punctual light source, which is not the case
+of the Sun. In the following function we compute an approximate (and biased)
+soft shadow by taking the angular size of the Sun into account:
+*/
 float GetSunVisibility(float3 point_pos, float3 sun_dir) {
     float3 p = point_pos - kSphereCenter;
     float p_dot_v = dot(p, sun_dir);
@@ -566,6 +741,13 @@ float GetSunVisibility(float3 point_pos, float3 sun_dir) {
     return 1.0;
 }
 
+/*
+The sphere also partially occludes the sky light, and we approximate this
+effect with an ambient occlusion factor. The ambient occlusion factor due to a
+sphere is given in http://webserver.dmt.upm.es/~isidoro/tc3/Radiation%20View%20factors.pdf
+Radiation View Factors (Isidoro Martinez, 1995). In the simple case where
+the sphere is fully visible, it is given by the following function:
+*/
 float GetSkyVisibility(float3 point_pos) {
     float3 p = point_pos - kSphereCenter;
     float p_dot_p = dot(p, p);
@@ -573,6 +755,12 @@ float GetSkyVisibility(float3 point_pos) {
         1.0 + p.z / sqrt(p_dot_p) * kSphereRadius * kSphereRadius / p_dot_p;
 }
 
+/*
+To compute light shafts we need the intersections of the view ray with the
+shadow volume of the sphere S. Since the Sun is not a punctual light source this
+shadow volume is not a cylinder but a cone (for the umbra, plus another cone for
+the penumbra, but we ignore it here):
+*/
 void GetSphereShadowInOut(float3 view_direction, float3 sun_dir,
     out float d_in, out float d_out) {
     //float3 camera = float3(invView[0][3], invView[1][3], invView[2][3]); // from the 4th column instead of row..
@@ -605,6 +793,7 @@ void GetSphereShadowInOut(float3 view_direction, float3 sun_dir,
         d_out = 0.0;
     }
 }
+#endif
 
 // Pixel Shader Input
 struct PSInput
@@ -618,32 +807,19 @@ struct PSInput
 //------------------
 float4 main(PSInput input) : SV_TARGET
 {
-    //Texture2D transmittance_texture : register(t0);
-    //Texture2D irradiance_texture : register(t1);
-    //Texture3D scattering_texture : register(t2);
-    float2 screenRes = float2(1280.f, 800.f);
-    float2 uv = input.position.xy / screenRes;
-    //uv.y = 1.0f - uv.y;
-    float3 uvw = float3(uv.x, uv.y, 31.f);
-    //float3 debuguvw = float3(0.03, input.position.y / screenRes.y, 0.f);
-    //float4 col = scattering_texture.Sample(linearSampler, uvw);
-    float4 col = transmittance_texture.Sample(linearSampler, uv);
-    //return float4(uv.xy, 0.f, 1.f);
-    //return col.aaaa * 0.5;
-    //return float4((input.view_ray.xyz + 1.0) * 0.5f, 1.0);
-    
     float4 color;
 
     float3 view_direction = normalize(input.view_ray);
     float fragment_angular_size =
         length(abs(ddx(input.view_ray)) + abs(ddy(input.view_ray))) / length(input.view_ray);
-    float shadow_in;
-    float shadow_out;
-    GetSphereShadowInOut(view_direction, sun_direction, shadow_in, shadow_out);    
+    float shadow_in = 0.0f;
+    float shadow_out = 0.0f;
     float lightshaft_fadein_hack = smoothstep(
         0.02, 0.04, dot(normalize(camera - earth_center), sun_direction));
     
-    // Test sphere S intersection
+#if RENDERSPHERE
+    GetSphereShadowInOut(view_direction, sun_direction, shadow_in, shadow_out);
+
     float3 p = camera - kSphereCenter;
     float p_dot_v = dot(p, view_direction);
     float p_dot_p = dot(p, p);
@@ -652,9 +828,11 @@ float4 main(PSInput input) : SV_TARGET
         kSphereRadius * kSphereRadius - ray_sphere_center_squared_distance;
     float sphere_alpha = 0.0;
     float3 sphere_radiance = float3(0.0, 0.0, 0.0);
-    if (discriminant >= 0.0) {
+    if (discriminant >= 0.0)
+    {
         float distance_to_intersection = -p_dot_v - sqrt(discriminant);
-        if (distance_to_intersection > 0.0) {
+        if (distance_to_intersection > 0.0)
+        {
             float ray_sphere_distance =
                 kSphereRadius - sqrt(ray_sphere_center_squared_distance);
             float ray_sphere_angular_distance = -ray_sphere_distance / p_dot_v;
@@ -678,14 +856,23 @@ float4 main(PSInput input) : SV_TARGET
             sphere_radiance = sphere_radiance * transmittance + in_scatter;
         }
     }
-    
-    // Test planet sphere P intersection
     p = camera - earth_center;
     p_dot_v = dot(p, view_direction);
     p_dot_p = dot(p, p);
     float ray_earth_center_squared_distance = p_dot_p - p_dot_v * p_dot_v;
     discriminant =
         earth_center.z * earth_center.z - ray_earth_center_squared_distance;
+    
+#else
+    
+    // Test planet sphere P intersection
+    float3 p = camera - earth_center;
+    float p_dot_v = dot(p, view_direction);
+    float p_dot_p = dot(p, p);
+    float ray_earth_center_squared_distance = p_dot_p - p_dot_v * p_dot_v;
+    float discriminant =
+        earth_center.z * earth_center.z - ray_earth_center_squared_distance;
+#endif
     float ground_alpha = 0.0;
     float3 ground_radiance = float3(0.0, 0.0, 0.0);
     if (discriminant >= 0.0) {
@@ -696,13 +883,17 @@ float4 main(PSInput input) : SV_TARGET
             float3 sky_irradiance;
             float3 sun_irradiance = GetSunAndSkyIlluminance(
                 point_pos - earth_center, norm, sun_direction, sky_irradiance);
-            
+#if RENDERSPHERE
             ground_radiance = kGroundAlbedo * (1.0 / PI) * (
                 sun_irradiance * GetSunVisibility(point_pos, sun_direction) +
                 sky_irradiance * GetSkyVisibility(point_pos));
             float shadow_length =
                 max(0.0, min(shadow_out, distance_to_intersection) - shadow_in) *
                 lightshaft_fadein_hack;
+#else
+            ground_radiance = kGroundAlbedo * (1.0 / PI) * sky_irradiance;
+            float shadow_length = 0.0f;
+#endif
             float3 transmittance;
             float3 in_scatter = GetSkyLuminanceToPoint(camera - earth_center,
                 point_pos - earth_center, shadow_length, sun_direction, transmittance);
@@ -724,7 +915,9 @@ float4 main(PSInput input) : SV_TARGET
     }
     
     radiance = lerp(radiance, ground_radiance, ground_alpha);
+#if RENDERSPHERE
     radiance = lerp(radiance, sphere_radiance, sphere_alpha);
+#endif
     
     color.rgb =
         pow(float3(1.0, 1.0, 1.0) - exp(-radiance / white_point * exposure), float3(1.0 / 2.2, 1.0 / 2.2, 1.0 / 2.2));
