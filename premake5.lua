@@ -36,7 +36,9 @@ project (APP_NAME)
     includedirs
     {
 		"external/**/include/",
-        "%{prj.name}/src"
+        "%{prj.name}/src",
+        "external/imgui/",
+        "external/imgui/backends/"
     }
 
     libdirs
@@ -103,3 +105,22 @@ project "Shaders"
 		
 	filter { "files:**.cs.hlsl" }
         shadertype "Compute"
+
+project "ImGui"
+    location "external/imgui"
+    kind "ConsoleApp"
+
+    objdir ("_int/" .. outputdir .. "/%{prj.name}")
+
+    files
+    {
+        "%{!wks.location}/external/imgui/**.h",
+        "%{!wks.location}/external/imgui/**.cpp",
+        "%{!wks.location}/external/imgui/backends/imgui_impl_dx12.h",
+        "%{!wks.location}/external/imgui/backends/imgui_impl_dx12.cpp",
+        "%{!wks.location}/external/imgui/backends/imgui_impl_win32.h",
+        "%{!wks.location}/external/imgui/backends/imgui_impl_win32.cpp",
+        "%{!wks.location}/external/imgui/misc/cpp/imgui_stdlib.*",
+        "%{!wks.location}/external/imgui/debuggesr/cpp/imgui_stdlib.*",
+        
+    }
