@@ -13,16 +13,16 @@ static const float EPSILON = 0.001; // Small epsilon for safety
 static const float MIN_TRANSMITTANCE = 0.01; // Early-out when mostly opaque
 
 // Volume bounds in world space
-static const float SIDE_LENGTH = 100.0;
+static const float SIDE_LENGTH = 4000.0;
 static const float3 VOLUME_MIN_WS = float3(-SIDE_LENGTH / 2, 0.0, -SIDE_LENGTH / 2);
 static const float3 VOLUME_MAX_WS = float3(SIDE_LENGTH / 2, SIDE_LENGTH / 8, SIDE_LENGTH / 2);
 
 // Mapping from NVDF authoring space to world space
-static const float NVDF_DOMAIN_SIDE_LENGTH = 4096.0; // authoring space extent
+static const float NVDF_DOMAIN_SIDE_LENGTH = 4000.0; // authoring space extent
 static const float NVDF_TO_WORLD_SCALE = SIDE_LENGTH / NVDF_DOMAIN_SIDE_LENGTH;
 
 // Density -> extinction scaling
-static const float DENSITY_SCALE = .3; // To be tuned / driven by NVDF
+static const float DENSITY_SCALE = .04; // To be tuned / driven by NVDF
 
 Texture2D gInput : register(t0);
 Texture3D sdfNvdfTex : register(t1); // Sdf and model textures combined [sdf.r, model.r, model.g, model.b] 
