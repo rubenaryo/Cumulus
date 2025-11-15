@@ -50,7 +50,9 @@ project (APP_NAME)
     links
     {
         "external/assimp/assimp",
-		"external/directxtex/%{cfg.buildcfg}/DirectXTex"
+        "external/directxtex/%{cfg.buildcfg}/DirectXTex",
+        "dxgi",
+        "d3d12"
     }
 
     prebuildcommands
@@ -108,19 +110,31 @@ project "Shaders"
 
 project "ImGui"
     location "external/imgui"
-    kind "ConsoleApp"
+    kind "StaticLib"
 
     objdir ("_int/" .. outputdir .. "/%{prj.name}")
 
+    includedirs
+    {
+        "external/imgui/",
+        "external/imgui/backends/"
+    }
+
+    links
+    {
+        "dxgi",
+        "d3d12"
+    }
+
     files
     {
-        "%{!wks.location}/external/imgui/**.h",
-        "%{!wks.location}/external/imgui/**.cpp",
+        "%{!wks.location}/external/imgui/*.h",
+        "%{!wks.location}/external/imgui/*.cpp",
         "%{!wks.location}/external/imgui/backends/imgui_impl_dx12.h",
         "%{!wks.location}/external/imgui/backends/imgui_impl_dx12.cpp",
         "%{!wks.location}/external/imgui/backends/imgui_impl_win32.h",
         "%{!wks.location}/external/imgui/backends/imgui_impl_win32.cpp",
         "%{!wks.location}/external/imgui/misc/cpp/imgui_stdlib.*",
-        "%{!wks.location}/external/imgui/debuggesr/cpp/imgui_stdlib.*",
+        "%{!wks.location}/external/imgui/misc/debuggers/cpp/imgui_stdlib.*",
         
     }
