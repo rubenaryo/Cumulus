@@ -11,11 +11,16 @@ Description : Implementation of Game.h
 #include <Core/Camera.h>
 #include <Core/COMException.h>
 #include <Core/Factories.h>
+#include <Core/MuonImgui.h>
 #include <Core/ResourceCodex.h>
 #include <Core/Shader.h>
 #include <Core/Texture.h>
 #include <Utils/Utils.h>
 #include <Utils/AtmosphereUtils.h>
+
+#include <imgui.h>
+#include <imgui_impl_win32.h>
+#include <imgui_impl_dx12.h>
 
 Game::Game() :
     mInput(),
@@ -34,6 +39,13 @@ bool Game::Init(HWND window, int width, int height)
     using namespace Muon;
 
     bool success = Muon::InitDX12(window, width, height);
+
+    success &= Muon::ImguiInit();
+    if (!success)
+    {
+        Print(L"Error: ImguiInit() failed!\n");
+        return false;
+    }
 
     ResourceCodex::Init();
 
@@ -201,6 +213,8 @@ void Game::Render()
     ResetCommandList(nullptr);
     PrepareForRender();
 
+    ImguiNewFrame();
+
     // Fetch the desired material from the codex
     ResourceCodex& codex = ResourceCodex::GetSingleton();
     ResourceID phongMatId = GetResourceID(L"Phong");
@@ -223,7 +237,6 @@ void Game::Render()
         const Texture* pTransmittanceTex = codex.GetTexture(GetResourceID(L"transmittance_high.hdr"));
         const Texture* pIrradianceTex = codex.GetTexture(GetResourceID(L"irradiance_high.hdr"));
         const Texture* pScatteringTex = codex.GetTexture(GetResourceID(L"TestHDR_3D"));// L"scatter_tex_full.dds"));    // .dds seems to work the same
-
 
         int32_t cameraRootIdx = mAtmospherePass.GetResourceRootIndex("VSCamera");
         if (cameraRootIdx != ROOTIDX_INVALID)
@@ -385,6 +398,7 @@ void Game::Render()
         pCommandList->DrawInstanced(6, 1, 0, 0);
     }
 
+    ImguiRender();
     FinalizeRender();
     CloseCommandList();
     ExecuteCommandList();
@@ -419,6 +433,7 @@ Game::~Game()
     mRaymarchPass.Destroy();
     mPostProcessPass.Destroy();
 
+    Muon::ImguiShutdown();
     Muon::ResourceCodex::Destroy();
     Muon::DestroyDX12();
 }
