@@ -263,7 +263,7 @@ void Game::Render()
         pCommandList->DrawInstanced(6, 1, 0, 0);
     }
 
-    if (0 && mOpaquePass.Bind(pCommandList))
+    if (mOpaquePass.Bind(pCommandList))
     {
         // Bind's the materials parameter buffer and textures.
         mOpaquePass.BindMaterial(*pPhongMaterial, pCommandList);
