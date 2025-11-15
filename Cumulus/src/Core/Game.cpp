@@ -59,6 +59,7 @@ bool Game::Init(HWND window, int width, int height)
     {
         mAtmospherePass.SetVertexShader(codex.GetVertexShader(GetResourceID(L"atmosphere.vs")));
         mAtmospherePass.SetPixelShader(codex.GetPixelShader(GetResourceID(L"atmosphere.ps")));
+        mAtmospherePass.SetEnableDepth(false);
 
         if (!mAtmospherePass.Generate())
             Printf(L"Warning: %s failed to generate!\n", mAtmospherePass.GetName());
@@ -217,6 +218,51 @@ void Game::Render()
     ID3D12GraphicsCommandList* pCommandList = GetCommandList();
     pCommandList->SetDescriptorHeaps(1, GetSRVHeap()->GetHeapAddr());
 
+    if (mAtmospherePass.Bind(pCommandList))
+    {
+        const Texture* pTransmittanceTex = codex.GetTexture(GetResourceID(L"transmittance_high.hdr"));
+        const Texture* pIrradianceTex = codex.GetTexture(GetResourceID(L"irradiance_high.hdr"));
+        const Texture* pScatteringTex = codex.GetTexture(GetResourceID(L"TestHDR_3D"));// L"scatter_tex_full.dds"));    // .dds seems to work the same
+
+
+        int32_t cameraRootIdx = mAtmospherePass.GetResourceRootIndex("VSCamera");
+        if (cameraRootIdx != ROOTIDX_INVALID)
+        {
+            mCamera.Bind(cameraRootIdx, pCommandList);
+        }
+
+        int32_t atmosphereRootIdx = mAtmospherePass.GetResourceRootIndex("cbAtmosphere");
+        if (atmosphereRootIdx != ROOTIDX_INVALID)
+        {
+            pCommandList->SetGraphicsRootConstantBufferView(atmosphereRootIdx, mAtmosphereBuffer.GetGPUVirtualAddress());
+        }
+
+        int32_t transmittanceIdx = mAtmospherePass.GetResourceRootIndex("transmittance_texture");
+        if (pTransmittanceTex && transmittanceIdx != ROOTIDX_INVALID)
+        {
+            pCommandList->SetGraphicsRootDescriptorTable(transmittanceIdx, pTransmittanceTex->GetSRVHandleGPU());
+        }
+
+        int32_t irradianceIdx = mAtmospherePass.GetResourceRootIndex("irradiance_texture");
+        if (pIrradianceTex && irradianceIdx != ROOTIDX_INVALID)
+        {
+            pCommandList->SetGraphicsRootDescriptorTable(irradianceIdx, pIrradianceTex->GetSRVHandleGPU());
+        }
+
+        int32_t scatterIdx = mAtmospherePass.GetResourceRootIndex("scattering_texture");
+        if (pScatteringTex && scatterIdx != ROOTIDX_INVALID)
+        {
+            pCommandList->SetGraphicsRootDescriptorTable(scatterIdx, pScatteringTex->GetSRVHandleGPU());
+        }
+
+        // Draw fullscreen quad
+        pCommandList->IASetVertexBuffers(0, 1, nullptr);
+        pCommandList->IASetIndexBuffer(nullptr);
+        pCommandList->IASetPrimitiveTopology(D3D_PRIMITIVE_TOPOLOGY_TRIANGLELIST);
+
+        pCommandList->DrawInstanced(6, 1, 0, 0);
+    }
+
     if (0 && mOpaquePass.Bind(pCommandList))
     {
         // Bind's the materials parameter buffer and textures.
@@ -329,51 +375,6 @@ void Game::Render()
         if (edgeMapIdx != ROOTIDX_INVALID)
         {
             pCommandList->SetGraphicsRootDescriptorTable(edgeMapIdx, pComputeOutput->GetSRVHandleGPU());
-        }
-
-        // Draw fullscreen quad
-        pCommandList->IASetVertexBuffers(0, 1, nullptr);
-        pCommandList->IASetIndexBuffer(nullptr);
-        pCommandList->IASetPrimitiveTopology(D3D_PRIMITIVE_TOPOLOGY_TRIANGLELIST);
-
-        pCommandList->DrawInstanced(6, 1, 0, 0);
-    }
-
-    if (mAtmospherePass.Bind(pCommandList))
-    {
-        const Texture* pTransmittanceTex = codex.GetTexture(GetResourceID(L"transmittance_high.hdr"));
-        const Texture* pIrradianceTex = codex.GetTexture(GetResourceID(L"irradiance_high.hdr"));
-        const Texture* pScatteringTex = codex.GetTexture(GetResourceID(L"TestHDR_3D"));// L"scatter_tex_full.dds"));    // .dds seems to work the same
-
-
-        int32_t cameraRootIdx = mAtmospherePass.GetResourceRootIndex("VSCamera");
-        if (cameraRootIdx != ROOTIDX_INVALID)
-        {
-            mCamera.Bind(cameraRootIdx, pCommandList);
-        }
-
-        int32_t atmosphereRootIdx = mAtmospherePass.GetResourceRootIndex("cbAtmosphere");
-        if (atmosphereRootIdx != ROOTIDX_INVALID)
-        {
-            pCommandList->SetGraphicsRootConstantBufferView(atmosphereRootIdx, mAtmosphereBuffer.GetGPUVirtualAddress());
-        }
-
-        int32_t transmittanceIdx = mAtmospherePass.GetResourceRootIndex("transmittance_texture");
-        if (pTransmittanceTex && transmittanceIdx != ROOTIDX_INVALID)
-        {
-            pCommandList->SetGraphicsRootDescriptorTable(transmittanceIdx, pTransmittanceTex->GetSRVHandleGPU());
-        }
-
-        int32_t irradianceIdx = mAtmospherePass.GetResourceRootIndex("irradiance_texture");
-        if (pIrradianceTex && irradianceIdx != ROOTIDX_INVALID)
-        {
-            pCommandList->SetGraphicsRootDescriptorTable(irradianceIdx, pIrradianceTex->GetSRVHandleGPU());
-        }
-
-        int32_t scatterIdx = mAtmospherePass.GetResourceRootIndex("scattering_texture");
-        if (pScatteringTex && scatterIdx != ROOTIDX_INVALID)
-        {
-            pCommandList->SetGraphicsRootDescriptorTable(scatterIdx, pScatteringTex->GetSRVHandleGPU());
         }
 
         // Draw fullscreen quad

@@ -25,7 +25,7 @@ or "Introduction to 3D Game Programming with DirectX 12" by Frank Luna
 do {                                \
     if (!s)                         \
     {                               \
-        Muon::Print(msg);           \
+        Print(msg);           \
         return false;               \
     }                               \
 } while (0)                         \
@@ -161,7 +161,7 @@ namespace Muon
         }
         else
         {
-            Muon::Print("WARNING:  Unable to enable D3D12 debug validation layer\n");
+            Print("WARNING:  Unable to enable D3D12 debug validation layer\n");
             return false;
         }
 
@@ -207,13 +207,13 @@ namespace Muon
             Microsoft::WRL::ComPtr<ID3D12Device> testDevice;
             if (FAILED(D3D12CreateDevice(pAdapter.Get(), D3D_FEATURE_LEVEL_12_0, IID_PPV_ARGS(testDevice.GetAddressOf()))))
             {
-                Muon::Print("Error: Failed to create device!\n");
+                Print("Error: Failed to create device!\n");
                 continue;
             }
 
             if (!IsDirectXRaytracingSupported(testDevice.Get()))
             {
-                Muon::Print("Warning: Found device does NOT support DXR raytracing.\n");
+                Print("Warning: Found device does NOT support DXR raytracing.\n");
             }
 
             // By default, search for the adapter with the most memory because that's usually the dGPU.
@@ -222,7 +222,7 @@ namespace Muon
 
             MaxSize = desc.DedicatedVideoMemory;
             pTempDevice = testDevice;
-            Muon::Printf(L"Selected GPU:  %s (%u MB)\n", desc.Description, desc.DedicatedVideoMemory >> 20);
+            Printf(L"Selected GPU:  %s (%u MB)\n", desc.Description, desc.DedicatedVideoMemory >> 20);
         }
 
         if (pTempDevice.Get() != nullptr)
@@ -254,7 +254,7 @@ namespace Muon
     {
         if (!pDevice)
         {
-            Muon::Print("Failed to create fence because of null device!\n");
+            Print("Failed to create fence because of null device!\n");
             return false;
         }
 
@@ -272,7 +272,7 @@ namespace Muon
     {
         if (!pDevice)
         {
-            Muon::Print("Failed to get descriptor sizes because of null device!\n");
+            Print("Failed to get descriptor sizes because of null device!\n");
             return false;
         }
 
@@ -410,7 +410,7 @@ return SUCCEEDED(hr);
     {
         if (!pDevice || !pCommandList)
         {
-            Muon::Print("Error: Failed to create depth stencil buffer! Null device or command list\n");
+            Print("Error: Failed to create depth stencil buffer! Null device or command list\n");
             return false;
         }
 
@@ -477,7 +477,7 @@ return SUCCEEDED(hr);
     {
         if (!pCommandList)
         {
-            Muon::Print("Error: Failed to set viewport due to null command list!\n");
+            Print("Error: Failed to set viewport due to null command list!\n");
             return false;
         }
 
@@ -536,7 +536,7 @@ return SUCCEEDED(hr);
     {
         if (!gOffscreenTarget)
         {
-            Muon::Printf("Fatal Error: Offscreen target pointer not set in DXCore!\n");
+            Printf("Fatal Error: Offscreen target pointer not set in DXCore!\n");
             return false;
         }
 
@@ -749,21 +749,21 @@ return SUCCEEDED(hr);
         Microsoft::WRL::ComPtr<IDXGIDebug1> dxgiDebug;
         if (SUCCEEDED(DXGIGetDebugInterface1(0, IID_PPV_ARGS(&dxgiDebug))))
         {
-            Muon::Print("\n========================================\n");
-            Muon::Print("D3D12 & DXGI Live Objects Report\n");
-            Muon::Print("========================================\n");
+            Print("\n========================================\n");
+            Print("D3D12 & DXGI Live Objects Report\n");
+            Print("========================================\n");
             DXGI_DEBUG_RLO_FLAGS flags = (DXGI_DEBUG_RLO_FLAGS)(DXGI_DEBUG_RLO_DETAIL | DXGI_DEBUG_RLO_IGNORE_INTERNAL);
             HRESULT hr = dxgiDebug->ReportLiveObjects(DXGI_DEBUG_ALL, flags);
 
             if (SUCCEEDED(hr))
             {
-                Muon::Print("If you see no DXGI/D3D12 warnings above, cleanup was successful\n");
+                Print("If you see no DXGI/D3D12 warnings above, cleanup was successful\n");
             }
             else
             {
-                Muon::Printf("Failed to generate report. HRESULT: 0x%08X\n", hr);
+                Printf("Failed to generate report. HRESULT: 0x%08X\n", hr);
             }
-            Muon::Print("========================================\n\n");
+            Print("========================================\n\n");
         }
     }
 #endif

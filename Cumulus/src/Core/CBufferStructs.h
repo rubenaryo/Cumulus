@@ -57,7 +57,7 @@ struct alignas(256) cbIntersections
 {
     uint32_t aabbCount;
     AABB aabbs[1];
-}
+};
 
 struct alignas(16) cbAtmosphere
 {
@@ -80,5 +80,7 @@ struct alignas(16) cbAtmosphere
     DirectX::XMFLOAT3 white_point;
     float pad4;
 };
+
+}
 
 #endif

@@ -390,16 +390,6 @@ namespace Muon
                 dst.Visibility = D3D12_SHADER_VISIBILITY_ALL;
         };
 
-        // Merge resources - combine from both shaders
-        // VS resources come first, then PS resources
-        std::unordered_map<std::string, size_t> resNameToIndex;
-
-        auto MergeResources = [](ShaderResourceBinding& dst, const ShaderResourceBinding& src)
-        {
-            if (dst.Visibility != src.Visibility)
-                dst.Visibility = D3D12_SHADER_VISIBILITY_ALL;
-        };
-
         for (const auto& res : vsData.Resources)
         {
             resNameToIndex[res.Name] = outResources.size();
