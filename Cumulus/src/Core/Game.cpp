@@ -17,6 +17,10 @@ Description : Implementation of Game.h
 #include <Utils/Utils.h>
 #include <Utils/AtmosphereUtils.h>
 
+#include <imgui.h>
+#include <imgui_impl_win32.h>
+#include <imgui_impl_dx12.h>
+
 Game::Game() :
     mInput(),
     mCamera(),

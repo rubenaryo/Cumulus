@@ -52,7 +52,8 @@ project (APP_NAME)
         "external/assimp/assimp",
         "external/directxtex/%{cfg.buildcfg}/DirectXTex",
         "dxgi",
-        "d3d12"
+        "d3d12",
+        "ImGui"
     }
 
     prebuildcommands
