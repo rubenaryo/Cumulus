@@ -189,7 +189,7 @@ static const float3 kGroundAlbedo = float3(0.0, 0.0, 0.04);
 Texture2D transmittance_texture : register(t0);
 Texture2D irradiance_texture : register(t1);
 Texture3D scattering_texture : register(t2);
-SamplerState linearSampler : register(s1);
+SamplerState linearWrapSampler : register(s2);
 
 //----------------------------
 // GENERAL UTILITY FUNCTIONS
@@ -369,7 +369,7 @@ float3 GetTransmittanceToTopAtmosphereBoundary(
     float r, float mu) {
     float2 uv = GetTransmittanceTextureUvFromRMu(atmosphere, r, mu);
     uv.y = 1.0 - uv.y;
-    return float3(transmittance_tex.Sample(linearSampler, uv).rgb);
+    return float3(transmittance_tex.Sample(linearWrapSampler, uv).rgb);
 }
 
 /*
@@ -488,8 +488,8 @@ float3 GetCombinedScattering(
             uvwz.z, uvwz.w);
         uvw0.y = 1.0 - uvw0.y;
         uvw1.y = 1.0 - uvw1.y;
-    float4 tex0 = scattering_tex.Sample(linearSampler, uvw0);
-    float4 tex1 = scattering_tex.Sample(linearSampler, uvw1);
+    float4 tex0 = scattering_tex.Sample(linearWrapSampler, uvw0);
+    float4 tex1 = scattering_tex.Sample(linearWrapSampler, uvw1);
     tex0.a = 1.0;
     tex1.a = 1.0;
         float4 combined_scattering =
@@ -653,7 +653,7 @@ float3 GetIrradiance(
     float r, float mu_s) {
     float2 uv = GetIrradianceTextureUvFromRMuS(atmosphere, r, mu_s);
     uv.y = 1.0 - uv.y;
-    return float3(irradiance_tex.Sample(linearSampler, uv).rgb);
+    return float3(irradiance_tex.Sample(linearWrapSampler, uv).rgb);
 }
 
 /*
