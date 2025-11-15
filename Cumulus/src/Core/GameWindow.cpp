@@ -6,7 +6,8 @@ Description : Implementation of Message Loop
 #include <Core/Game.h>
 
 #include "GameWindow.h"
-
+#include <imgui.h>
+#include <imgui_impl_win32.h>
 
 GameWindow::GameWindow()
 {
@@ -18,6 +19,10 @@ GameWindow::~GameWindow()
 
 LRESULT GameWindow::HandleMessage(UINT uMsg, WPARAM wParam, LPARAM lParam)
 {
+    extern IMGUI_IMPL_API LRESULT ImGui_ImplWin32_WndProcHandler(HWND hWnd, UINT msg, WPARAM wParam, LPARAM lParam);
+    if (ImGui_ImplWin32_WndProcHandler(m_hwnd, uMsg, wParam, lParam))
+        return TRUE;
+
     switch (uMsg)
     {
     case WM_MOUSEMOVE:

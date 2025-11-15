@@ -6,9 +6,12 @@ Description : Helpers for initializing/using ImGui
 #ifndef MUONIMGUI_H
 #define MUONIMGUI_H
 
+#include <Core/WinApp.h>
+
 namespace Muon
 {
-	void ImguiInit();
+	bool ImguiInit();
+	bool ImguiInitWin32(HWND hwnd);
 	void ImguiShutdown();
 
 	void ImguiNewFrame();

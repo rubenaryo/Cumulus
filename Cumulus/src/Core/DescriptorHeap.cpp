@@ -64,6 +64,21 @@ bool DescriptorHeap::Allocate(D3D12_CPU_DESCRIPTOR_HANDLE& outCPU, D3D12_GPU_DES
     return true;
 }
 
+
+bool DescriptorHeap::Allocate(D3D12_CPU_DESCRIPTOR_HANDLE* outCPU, D3D12_GPU_DESCRIPTOR_HANDLE* outGPU)
+{
+    if (mFreeIndices.empty())
+        return false;
+
+    UINT idx = mFreeIndices.back();
+    mFreeIndices.pop_back();
+
+    outCPU->ptr = mCPUStart.ptr + (idx * mDescriptorSize);
+    outGPU->ptr = mGPUStart.ptr + (idx * mDescriptorSize);
+
+    return true;
+}
+
 void DescriptorHeap::Free(D3D12_CPU_DESCRIPTOR_HANDLE out_cpu_desc_handle, D3D12_GPU_DESCRIPTOR_HANDLE out_gpu_desc_handle)
 {
     int cpu_idx = (int)((out_cpu_desc_handle.ptr - mCPUStart.ptr) / mDescriptorSize);
