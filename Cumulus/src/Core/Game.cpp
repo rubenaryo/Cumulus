@@ -11,15 +11,22 @@ Description : Implementation of Game.h
 #include <Core/Camera.h>
 #include <Core/COMException.h>
 #include <Core/Factories.h>
+#include <Core/MuonImgui.h>
 #include <Core/ResourceCodex.h>
 #include <Core/Shader.h>
 #include <Core/Texture.h>
 #include <Utils/Utils.h>
+#include <Utils/AtmosphereUtils.h>
+
+#include <imgui.h>
+#include <imgui_impl_win32.h>
+#include <imgui_impl_dx12.h>
 
 Game::Game() :
     mInput(),
     mCamera(),
     mOpaquePass(L"OpaquePass"),
+    mAtmospherePass(L"AtmospherePass"),
     mSobelPass(L"SobelPass"),
     mRaymarchPass(L"RaymarchPass"),
     mPostProcessPass(L"PostProcessPass")
@@ -32,6 +39,13 @@ bool Game::Init(HWND window, int width, int height)
     using namespace Muon;
 
     bool success = Muon::InitDX12(window, width, height);
+
+    success &= Muon::ImguiInit();
+    if (!success)
+    {
+        Print(L"Error: ImguiInit() failed!\n");
+        return false;
+    }
 
     ResourceCodex::Init();
 
@@ -51,6 +65,16 @@ bool Game::Init(HWND window, int width, int height)
 
         if (!mOpaquePass.Generate())
             Printf(L"Warning: %s failed to generate!\n", mOpaquePass.GetName());
+    }
+
+    // Assemble atmosphere render pass
+    {
+        mAtmospherePass.SetVertexShader(codex.GetVertexShader(GetResourceID(L"atmosphere.vs")));
+        mAtmospherePass.SetPixelShader(codex.GetPixelShader(GetResourceID(L"atmosphere.ps")));
+        mAtmospherePass.SetEnableDepth(false);
+
+        if (!mAtmospherePass.Generate())
+            Printf(L"Warning: %s failed to generate!\n", mAtmospherePass.GetName());
     }
 
     // Assemble compute filter pass
@@ -100,6 +124,17 @@ bool Game::Init(HWND window, int width, int height)
     }
 
     mLightBuffer.Create(L"Light Buffer", sizeof(cbLights));
+    mTimeBuffer.Create(L"Time", sizeof(cbTime));
+    mAtmosphereBuffer.Create(L"Atmosphere CB", sizeof(cbAtmosphere));
+
+    cbAtmosphere atmosphereParams;
+    UpdateAtmosphereConstants(atmosphereParams, width, height);
+
+    mapped = mAtmosphereBuffer.GetMappedPtr();
+    if (mapped)
+    {
+        memcpy(mapped, &atmosphereParams, sizeof(cbAtmosphere));
+    }
 
     mAABBBuffer.Create(L"AABB Buffer", sizeof(cbIntersections));
 
@@ -178,6 +213,8 @@ void Game::Render()
     ResetCommandList(nullptr);
     PrepareForRender();
 
+    ImguiNewFrame();
+
     // Fetch the desired material from the codex
     ResourceCodex& codex = ResourceCodex::GetSingleton();
     ResourceID phongMatId = GetResourceID(L"Phong");
@@ -194,6 +231,50 @@ void Game::Render()
 
     ID3D12GraphicsCommandList* pCommandList = GetCommandList();
     pCommandList->SetDescriptorHeaps(1, GetSRVHeap()->GetHeapAddr());
+
+    if (mAtmospherePass.Bind(pCommandList))
+    {
+        const Texture* pTransmittanceTex = codex.GetTexture(GetResourceID(L"transmittance_high.hdr"));
+        const Texture* pIrradianceTex = codex.GetTexture(GetResourceID(L"irradiance_high.hdr"));
+        const Texture* pScatteringTex = codex.GetTexture(GetResourceID(L"TestHDR_3D"));// L"scatter_tex_full.dds"));    // .dds seems to work the same
+
+        int32_t cameraRootIdx = mAtmospherePass.GetResourceRootIndex("VSCamera");
+        if (cameraRootIdx != ROOTIDX_INVALID)
+        {
+            mCamera.Bind(cameraRootIdx, pCommandList);
+        }
+
+        int32_t atmosphereRootIdx = mAtmospherePass.GetResourceRootIndex("cbAtmosphere");
+        if (atmosphereRootIdx != ROOTIDX_INVALID)
+        {
+            pCommandList->SetGraphicsRootConstantBufferView(atmosphereRootIdx, mAtmosphereBuffer.GetGPUVirtualAddress());
+        }
+
+        int32_t transmittanceIdx = mAtmospherePass.GetResourceRootIndex("transmittance_texture");
+        if (pTransmittanceTex && transmittanceIdx != ROOTIDX_INVALID)
+        {
+            pCommandList->SetGraphicsRootDescriptorTable(transmittanceIdx, pTransmittanceTex->GetSRVHandleGPU());
+        }
+
+        int32_t irradianceIdx = mAtmospherePass.GetResourceRootIndex("irradiance_texture");
+        if (pIrradianceTex && irradianceIdx != ROOTIDX_INVALID)
+        {
+            pCommandList->SetGraphicsRootDescriptorTable(irradianceIdx, pIrradianceTex->GetSRVHandleGPU());
+        }
+
+        int32_t scatterIdx = mAtmospherePass.GetResourceRootIndex("scattering_texture");
+        if (pScatteringTex && scatterIdx != ROOTIDX_INVALID)
+        {
+            pCommandList->SetGraphicsRootDescriptorTable(scatterIdx, pScatteringTex->GetSRVHandleGPU());
+        }
+
+        // Draw fullscreen quad
+        pCommandList->IASetVertexBuffers(0, 1, nullptr);
+        pCommandList->IASetIndexBuffer(nullptr);
+        pCommandList->IASetPrimitiveTopology(D3D_PRIMITIVE_TOPOLOGY_TRIANGLELIST);
+
+        pCommandList->DrawInstanced(6, 1, 0, 0);
+    }
 
     if (mOpaquePass.Bind(pCommandList))
     {
@@ -317,6 +398,7 @@ void Game::Render()
         pCommandList->DrawInstanced(6, 1, 0, 0);
     }
 
+    ImguiRender();
     FinalizeRender();
     CloseCommandList();
     ExecuteCommandList();
@@ -342,13 +424,16 @@ Game::~Game()
     mLightBuffer.Destroy();
     mTimeBuffer.Destroy();
     mAABBBuffer.Destroy();
+    mAtmosphereBuffer.Destroy();
     mCamera.Destroy();
     mInput.Destroy();
     mOpaquePass.Destroy();
+    mAtmospherePass.Destroy();
     mSobelPass.Destroy();
     mRaymarchPass.Destroy();
     mPostProcessPass.Destroy();
 
+    Muon::ImguiShutdown();
     Muon::ResourceCodex::Destroy();
     Muon::DestroyDX12();
 }
