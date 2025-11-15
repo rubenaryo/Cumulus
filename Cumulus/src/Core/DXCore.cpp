@@ -56,6 +56,7 @@ namespace Muon
     Microsoft::WRL::ComPtr<IDXGISwapChain3> gSwapChain;
     Microsoft::WRL::ComPtr<ID3D12Resource> gSwapChainBuffers[SWAP_CHAIN_BUFFER_COUNT];
     Microsoft::WRL::ComPtr<ID3D12Resource> gDepthStencilBuffer;
+    TextureView gDepthStencilSRV;
 
     Texture* gOffscreenTarget = nullptr;
 
@@ -85,6 +86,8 @@ namespace Muon
     int GetSwapChainBufferCount() { return SWAP_CHAIN_BUFFER_COUNT; }
     D3D12_CPU_DESCRIPTOR_HANDLE GetCurrentBackBufferView() { return CD3DX12_CPU_DESCRIPTOR_HANDLE(gRTVHeap->GetCPUDescriptorHandleForHeapStart(), CurrentBackBuffer, gRTVSize); }
     D3D12_CPU_DESCRIPTOR_HANDLE GetDepthStencilView() { return gDSVHeap->GetCPUDescriptorHandleForHeapStart(); }
+    const TextureView& GetDepthStencilSRV() { return gDepthStencilSRV; }
+    ID3D12Resource* GetDepthStencilResource() { return gDepthStencilBuffer.Get(); }
     D3D12_CLEAR_VALUE& GetGlobalClearValue() { return gClearValue; }
     HWND GetHwnd() { return gHwnd; }
 
@@ -355,7 +358,7 @@ namespace Muon
         hr = swapChain.As(&out_swapchain);
         CurrentBackBuffer = out_swapchain->GetCurrentBackBufferIndex();
 
-        return SUCCEEDED(hr);
+return SUCCEEDED(hr);
     }
 
     bool CreateDescriptorHeaps(ID3D12Device* pDevice,
@@ -422,7 +425,7 @@ namespace Muon
         depthStencilDesc.SampleDesc.Quality = GetMSAAQualityLevel();
         depthStencilDesc.Layout = D3D12_TEXTURE_LAYOUT_UNKNOWN;
         depthStencilDesc.Flags = D3D12_RESOURCE_FLAG_ALLOW_DEPTH_STENCIL;
-        depthStencilDesc.Format = DepthStencilFormat;
+        depthStencilDesc.Format = DXGI_FORMAT_R24G8_TYPELESS;
 
         D3D12_CLEAR_VALUE optClear;
         optClear.Format = DepthStencilFormat;
@@ -444,6 +447,22 @@ namespace Muon
         dsvDesc.Format = DepthStencilFormat;
         dsvDesc.Texture2D.MipSlice = 0;
         pDevice->CreateDepthStencilView(out_depthStencilBuffer.Get(), &dsvDesc, GetDepthStencilView());
+
+        // Create an SRV for the depth buffer so we can bind it and use it in other parts of the pipeline
+        D3D12_SHADER_RESOURCE_VIEW_DESC srvDesc = {};
+        srvDesc.Shader4ComponentMapping = D3D12_DEFAULT_SHADER_4_COMPONENT_MAPPING;
+        srvDesc.Format = DXGI_FORMAT_R24_UNORM_X8_TYPELESS;
+        srvDesc.ViewDimension = D3D12_SRV_DIMENSION_TEXTURE2D;
+        srvDesc.Texture2D.MipLevels = 1;
+        srvDesc.Texture2D.MostDetailedMip = 0;
+
+        if (!gSRVHeap->Allocate(gDepthStencilSRV.HandleCPU, gDepthStencilSRV.HandleGPU))
+        {
+            Muon::Print("Error: Failed to allocate CPU/GPU handles for Depth Stencil SRV!\n");
+            return false;
+        }
+
+        pDevice->CreateShaderResourceView(out_depthStencilBuffer.Get(), &srvDesc, gDepthStencilSRV.HandleCPU);
 
         // Transition from initial -> depth buffer use
         pCommandList->Reset(GetCommandAllocator(), nullptr);
@@ -530,12 +549,13 @@ namespace Muon
         pCommandList->ResourceBarrier(1, &CD3DX12_RESOURCE_BARRIER::Transition(gOffscreenTarget->GetResource(), 
             D3D12_RESOURCE_STATE_GENERIC_READ, D3D12_RESOURCE_STATE_RENDER_TARGET));
         
-        pCommandList->OMSetRenderTargets(1, &gOffscreenTarget->GetRTVHandleCPU(), FALSE, nullptr);
+        pCommandList->OMSetRenderTargets(1, &gOffscreenTarget->GetRTVHandleCPU(), FALSE, &GetDepthStencilView());
 
         // Clear the back buffer
         pCommandList->ClearRenderTargetView(gOffscreenTarget->GetRTVHandleCPU(), gClearValue.Color, 0, nullptr);
         
-        // TODO: Clear depth stencil once we need that
+        // Clear the depth buffer
+        pCommandList->ClearDepthStencilView(GetDepthStencilView(), D3D12_CLEAR_FLAG_DEPTH, 1.0f, 0, 0, nullptr);
 
         return true;
     }
@@ -706,7 +726,7 @@ namespace Muon
         success &= CreateDepthStencilBuffer(GetDevice(), GetCommandList(), GetCommandQueue(), width, height, gDepthStencilBuffer);
         CHECK_SUCCESS(success, "Error: Failed to create depth stencil buffer!\n");
 
-        success &= SetViewport(GetCommandList(), 0, 0, width, height, 0.001f, 1000.0f);
+        success &= SetViewport(GetCommandList(), 0, 0, width, height, 0.0f, 1.0f);
         CHECK_SUCCESS(success, "Error: Failed to set viewport!\n");
 
         success &= SetScissorRects(GetCommandList(), 0, 0, width, height);
