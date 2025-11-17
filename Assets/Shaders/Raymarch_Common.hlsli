@@ -30,22 +30,20 @@ struct ConvexHull
     // float3 aabbMax;
 };
 
-struct HullFace
+cbuffer HullsBuffer : register(b4)
 {
-    float3 normal;
-    float distance;     // plane equation: dot(normal, P) + distance = 0
+	uint hullCount;
+	ConvexHull hulls[1];
 };
 
-cbuffer HullInfoBuffer : register(b4)
+cbuffer HullPointsBuffer : register(b5)
 {
-    uint hullCount;
+	float4 hullPoints[2048];
+};	
+
+cbuffer HullFacesBuffer : register(b6)
+{
+	float4 hullFaces[1024];
 };
-
-
-
-// Buffers
-StructuredBuffer<ConvexHull> HullsBuffer      : register(t2);
-StructuredBuffer<float4>     HullPointsBuffer : register(t3);
-StructuredBuffer<HullFace>   HullFacesBuffer  : register(t4);
 
 #endif

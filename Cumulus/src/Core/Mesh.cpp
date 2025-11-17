@@ -104,10 +104,31 @@ bool Mesh::Draw(ID3D12GraphicsCommandList* pCommandList) const
 
 bool Mesh::DrawIndexed(ID3D12GraphicsCommandList* pCommandList) const
 {
+    Microsoft::WRL::ComPtr<ID3D12InfoQueue> infoQueue;
+    Muon::GetDevice()->QueryInterface(IID_PPV_ARGS(&infoQueue));
+
+
+
     pCommandList->IASetPrimitiveTopology(D3D_PRIMITIVE_TOPOLOGY_TRIANGLELIST);
     pCommandList->IASetVertexBuffers(0, 1, &VertexBufferView);
     pCommandList->IASetIndexBuffer(&IndexBufferView);
     pCommandList->DrawIndexedInstanced(IndexCount, 1, 0, 0, 0);
+
+    UINT64 numMessages = infoQueue->GetNumStoredMessages();
+    for (UINT64 i = 0; i < numMessages; i++)
+    {
+        SIZE_T messageLength = 0;
+        infoQueue->GetMessage(i, nullptr, &messageLength);
+
+        std::vector<char> bytes(messageLength);
+        D3D12_MESSAGE* message = reinterpret_cast<D3D12_MESSAGE*>(bytes.data());
+
+        infoQueue->GetMessage(i, message, &messageLength);
+
+        printf("DX12: %s\n", message->pDescription);
+    }
+    infoQueue->ClearStoredMessages();
+
     return true;
 }
 

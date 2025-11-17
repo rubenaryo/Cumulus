@@ -116,43 +116,49 @@ bool Game::Init(HWND window, int width, int height)
 
     //HULL:
     //todo: concat all hulls
-    mHullInfoBuffer.Create(L"Hull Info Buffer", sizeof(cbHullInfo));
-    UINT8* hullInfoPointer = mHullInfoBuffer.GetMappedPtr();
-    if (hullInfoPointer) {
-        cbHullInfo hullInfo = {};
-        hullInfo.hullCount = 1;
-
-        memcpy(hullInfoPointer, &hullInfo, sizeof(hullInfo));
-    }
-
     Hull h = m->GetHull();
+    mHullBuffer.Create(L"Hull Buffer", sizeof(cbHulls));
 
-    mHullBuffer.Create(L"Hull Buffer", sizeof(sbConvexHull));
-    if (m) {
-        UINT8* hullPtr = mHullBuffer.GetMappedPtr();
-        if (hullPtr) {
-            sbConvexHull cHull = {};
-            cHull.faceCount = h.faces.size();
-            cHull.faceOffset = 0;
+    if (m && mHullBuffer.GetMappedPtr())
+    {
+        cbHulls hulls = {};
+        cbConvexHull cHull = {};
+        cHull.faceCount = (uint32_t)h.faces.size();
+        cHull.faceOffset = 0;
+        cHull.pointCount = (uint32_t)h.hullPoints.size();
+        cHull.pointOffset = 0;
 
-            cHull.pointCount = h.hullPoints.size();
-            cHull.pointOffset = 0;
+        hulls.hulls[0] = cHull;
+        hulls.hullCount = 1;
 
-            memcpy(hullPtr, &cHull, sizeof(cHull));
-        }
+        memcpy(mHullBuffer.GetMappedPtr(), &hulls, sizeof(hulls));
     }
 
-    mHullFaceBuffer.Create(L"Hull Faces Buffer", sizeof(HullFace) * h.faces.size());
+    mHullFaceBuffer.Create(L"Hull Faces Buffer", sizeof(cbHullFaces));
     if (m && h.faces.size() > 0) {
         UINT8* facePtr = mHullFaceBuffer.GetMappedPtr();
+        cbHullFaces faces = {};
+
+        for (size_t i = 0; i < h.faces.size(); i++)
+        {
+            faces.faces[i] = DirectX::XMFLOAT4(
+                h.faces[i].normal.x,
+                h.faces[i].normal.y,
+                h.faces[i].normal.z,
+                h.faces[i].distance
+            );
+        }
+
         if (facePtr) {
-            memcpy(facePtr, &h.faces, sizeof(h.faces));
+            memcpy(facePtr, &faces, sizeof(faces));
         }
     }
 
-    mHullPointBuffer.Create(L"Hull Points Buffer", sizeof(DirectX::XMFLOAT3) * h.hullPoints.size());
+    mHullPointBuffer.Create(L"Hull Points Buffer", sizeof(cbHullPoints));
 
     if (m && h.hullPoints.size() > 0) {
+        cbHullPoints points = {};
+
         UINT8* pointsPtr = mHullPointBuffer.GetMappedPtr();
         if (pointsPtr) {
             //is this really necessary oh m  y god
@@ -165,8 +171,8 @@ bool Game::Init(HWND window, int width, int height)
                 DirectX::XMStoreFloat3A(&f3, v);
                 float3s.push_back(f3);
             }
-            
-            memcpy(pointsPtr, &float3s, sizeof(float3s));
+            copy(float3s.begin(), float3s.end(), points.points);
+            memcpy(pointsPtr, &points, sizeof(points));
         }
     }
 
@@ -307,28 +313,22 @@ void Game::Render()
             pCommandList->SetComputeRootConstantBufferView(aabbIdx, mAABBBuffer.GetGPUVirtualAddress());
         }
 
-        int32_t hullInfoIdx = mRaymarchPass.GetResourceRootIndex("HullInfoBuffer");
-        if (hullInfoIdx != ROOTIDX_INVALID)
-        {
-            pCommandList->SetComputeRootConstantBufferView(hullInfoIdx, mHullInfoBuffer.GetGPUVirtualAddress());
-        }
-
         int32_t hullIdx = mRaymarchPass.GetResourceRootIndex("HullsBuffer");
         if (hullIdx != ROOTIDX_INVALID)
         {
-            pCommandList->SetComputeRootShaderResourceView(hullIdx, mHullBuffer.GetGPUVirtualAddress());
+            pCommandList->SetComputeRootConstantBufferView(hullIdx, mHullBuffer.GetGPUVirtualAddress());
         }
 
         int32_t hullFaceIdx = mRaymarchPass.GetResourceRootIndex("HullFacesBuffer");
         if (hullFaceIdx != ROOTIDX_INVALID)
         {
-            pCommandList->SetComputeRootShaderResourceView(hullFaceIdx, mHullFaceBuffer.GetGPUVirtualAddress());
+            pCommandList->SetComputeRootConstantBufferView(hullFaceIdx, mHullFaceBuffer.GetGPUVirtualAddress());
         }
 
         int32_t hullPtsIdx = mRaymarchPass.GetResourceRootIndex("HullPointsBuffer");
         if (hullPtsIdx != ROOTIDX_INVALID)
         {
-            pCommandList->SetComputeRootShaderResourceView(hullPtsIdx, mHullPointBuffer.GetGPUVirtualAddress());
+            pCommandList->SetComputeRootConstantBufferView(hullPtsIdx, mHullPointBuffer.GetGPUVirtualAddress());
         }
 
         int32_t inIdx = mRaymarchPass.GetResourceRootIndex("gInput");
@@ -408,7 +408,6 @@ Game::~Game()
     mLightBuffer.Destroy();
     mTimeBuffer.Destroy();
     mAABBBuffer.Destroy();
-    mHullInfoBuffer.Destroy();
     mHullBuffer.Destroy();
     mHullFaceBuffer.Destroy();
     mHullPointBuffer.Destroy();

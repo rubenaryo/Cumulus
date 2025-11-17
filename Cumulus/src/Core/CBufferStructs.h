@@ -59,9 +59,30 @@ struct alignas(256) cbIntersections
     AABB aabbs[1];
 };
 
-struct alignas(16) cbHullInfo
+struct alignas(16) cbConvexHull
+{
+    uint32_t pointOffset;
+    uint32_t pointCount;
+
+    uint32_t faceOffset;
+    uint32_t faceCount;
+};
+
+struct alignas(16) cbHulls
 {
     uint32_t hullCount;
+    cbConvexHull hulls[1];
+};
+
+
+struct alignas(16) cbHullFaces
+{
+    DirectX::XMFLOAT4 faces[1024];
+};
+
+struct alignas(16) cbHullPoints
+{
+    DirectX::XMFLOAT3A points[2048];
 };
 
 }

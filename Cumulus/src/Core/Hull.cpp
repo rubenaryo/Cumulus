@@ -1,5 +1,7 @@
 #include "Hull.h"
 #include <assimp/vector3.h>
+#include <unordered_map>
+using namespace DirectX;
 
 namespace Muon
 {
@@ -10,6 +12,14 @@ namespace Muon
     {
         BuildHull(points, pointsCount);
     }
+
+    bool FaceVisibleFromPoint(const HullFace& face, XMVECTOR P)
+    {
+        XMVECTOR N = XMLoadFloat3(&face.normal);
+        float side = XMVectorGetX(XMVector3Dot(N, P)) + face.distance;
+        return side > 1e-6f;
+    }
+
 
     void Hull::BuildHull(const aiVector3D* points, int pointsCount)
     {
@@ -25,9 +35,7 @@ namespace Muon
         int minXIndex = -1;
         int maxXIndex = -1;
 
-        // ---------------------------------------------------------
         // Step 1: find extreme X points
-        // ---------------------------------------------------------
         for (int i = 0; i < pointsCount; ++i)
         {
             float x = points[i].x;
@@ -50,15 +58,13 @@ namespace Muon
             return;
         }
 
-        DirectX::XMVECTOR A = DirectX::XMLoadFloat3(reinterpret_cast<const DirectX::XMFLOAT3*>(&points[minXIndex]));
-        DirectX::XMVECTOR B = DirectX::XMLoadFloat3(reinterpret_cast<const DirectX::XMFLOAT3*>(&points[maxXIndex]));
+        XMVECTOR A = XMLoadFloat3(reinterpret_cast<const XMFLOAT3*>(&points[minXIndex]));
+        XMVECTOR B = XMLoadFloat3(reinterpret_cast<const XMFLOAT3*>(&points[maxXIndex]));
 
 
-        // ---------------------------------------------------------
         // Step 2: find point C farthest from AB line
-        // ---------------------------------------------------------
-        DirectX::XMVECTOR AB = DirectX::XMVectorSubtract(B, A);
-        DirectX::XMVECTOR ABn = DirectX::XMVector3Normalize(AB);
+        XMVECTOR AB = XMVectorSubtract(B, A);
+        XMVECTOR ABn = XMVector3Normalize(AB);
 
         int topIndex = -1;
         float maxDistFromLine = 0.0f;
@@ -68,11 +74,11 @@ namespace Muon
             if (i == minXIndex || i == maxXIndex)
                 continue;
 
-            DirectX::XMVECTOR P = DirectX::XMLoadFloat3(reinterpret_cast<const DirectX::XMFLOAT3*>(&points[i]));
-            DirectX::XMVECTOR AP = DirectX::XMVectorSubtract(P, A);
+            XMVECTOR P = XMLoadFloat3(reinterpret_cast<const XMFLOAT3*>(&points[i]));
+            XMVECTOR AP = XMVectorSubtract(P, A);
             // perpendicular distance to line AB = |AP × ABn|
-            DirectX::XMVECTOR crossProd = DirectX::XMVector3Cross(AP, ABn);
-            float dist = DirectX::XMVectorGetX(DirectX::XMVector3Length(crossProd));
+            XMVECTOR crossProd = XMVector3Cross(AP, ABn);
+            float dist = XMVectorGetX(XMVector3Length(crossProd));
 
             if (dist > maxDistFromLine)
             {
@@ -87,27 +93,25 @@ namespace Muon
             return;
         }
 
-        DirectX::XMVECTOR C = DirectX::XMLoadFloat3(reinterpret_cast<const DirectX::XMFLOAT3*>(&points[topIndex]));
+        XMVECTOR C = XMLoadFloat3(reinterpret_cast<const XMFLOAT3*>(&points[topIndex]));
 
-        // ---------------------------------------------------------
         // Step 3: find point D farthest from plane ABC
-        // ---------------------------------------------------------
-        DirectX::XMVECTOR ABv = DirectX::XMVectorSubtract(B, A);
-        DirectX::XMVECTOR ACv = DirectX::XMVectorSubtract(C, A);
-        DirectX::XMVECTOR n = DirectX::XMVector3Normalize(DirectX::XMVector3Cross(ABv, ACv));
+        XMVECTOR ABv = XMVectorSubtract(B, A);
+        XMVECTOR ACv = XMVectorSubtract(C, A);
+        XMVECTOR n = XMVector3Normalize(XMVector3Cross(ABv, ACv));
 
         float maxPlaneDist = 0.0f;
         int dIndex = -1;
 
-        float planeD = DirectX::XMVectorGetX(DirectX::XMVector3Dot(n, A)); // plane eq: n·x = d
+        float planeD = XMVectorGetX(XMVector3Dot(n, A)); // plane eq: n·x = d
 
         for (int i = 0; i < pointsCount; ++i)
         {
             if (i == minXIndex || i == maxXIndex || i == topIndex)
                 continue;
 
-            DirectX::XMVECTOR P = DirectX::XMLoadFloat3(reinterpret_cast<const DirectX::XMFLOAT3*>(&points[i]));
-            float dist = fabsf(DirectX::XMVectorGetX(DirectX::XMVector3Dot(n, P)) - planeD);
+            XMVECTOR P = XMLoadFloat3(reinterpret_cast<const XMFLOAT3*>(&points[i]));
+            float dist = fabsf(XMVectorGetX(XMVector3Dot(n, P)) - planeD);
 
             if (dist > maxPlaneDist)
             {
@@ -122,12 +126,10 @@ namespace Muon
             return;
         }
 
-        DirectX::XMVECTOR D = DirectX::XMLoadFloat3(reinterpret_cast<const DirectX::XMFLOAT3*>(&points[dIndex]));
+        XMVECTOR D = XMLoadFloat3(reinterpret_cast<const XMFLOAT3*>(&points[dIndex]));
 
 
-        // ---------------------------------------------------------
         // Step 4: Build tetrahedron faces
-        // ---------------------------------------------------------
         hullPoints.clear();
         faces.clear();
 
@@ -143,16 +145,16 @@ namespace Muon
                 face.indices[1] = i1;
                 face.indices[2] = i2;
 
-                DirectX::XMVECTOR p0 = hullPoints[i0];
-                DirectX::XMVECTOR p1 = hullPoints[i1];
-                DirectX::XMVECTOR p2 = hullPoints[i2];
-                DirectX::XMVECTOR n = DirectX::XMVector3Normalize(DirectX::XMVector3Cross(DirectX::XMVectorSubtract(p1, p0), DirectX::XMVectorSubtract(p2, p0)));
-                float d = DirectX::XMVectorGetX(DirectX::XMVector3Dot(n, p0));
+                XMVECTOR p0 = hullPoints[i0];
+                XMVECTOR p1 = hullPoints[i1];
+                XMVECTOR p2 = hullPoints[i2];
+                XMVECTOR n = XMVector3Normalize(XMVector3Cross(XMVectorSubtract(p1, p0), XMVectorSubtract(p2, p0)));
+                float d = -XMVectorGetX(XMVector3Dot(n, p0));
 
-                DirectX::XMFLOAT3A out;
-                DirectX::XMStoreFloat3A(&out, n);
+                XMFLOAT3A out;
+                XMStoreFloat3A(&out, n);
                 face.normal = out;
-                face.dot = d;
+                face.distance = d;
 
                 faces.push_back(face);
             };
@@ -163,11 +165,7 @@ namespace Muon
         AddFace(0, 3, 1);
         AddFace(1, 3, 2);
 
-        // ---------------------------------------------------------
-        // Step 5: Ensure outward normals (optional)
-        // ---------------------------------------------------------
-        // For each face, check if the remaining vertex lies on positive side.
-        // If so, flip the face winding.
+        // Step 5: Ensure outward normals
         for (int fi = 0; fi < (int)faces.size(); ++fi)
         {
             Muon::HullFace face = faces[fi];
@@ -183,23 +181,58 @@ namespace Muon
             }
             if (opp == -1) continue;
 
-            DirectX::XMVECTOR N = DirectX::XMLoadFloat3(reinterpret_cast<const DirectX::XMFLOAT3*>(&face.normal));
+            XMVECTOR N = XMLoadFloat3(reinterpret_cast<const XMFLOAT3*>(&face.normal));
 
-            float side = DirectX::XMVectorGetX(DirectX::XMVector3Dot(N, hullPoints[opp])) - face.dot;
+            float side = XMVectorGetX(XMVector3Dot(N, hullPoints[opp])) - face.distance;
             if (side > 0)
             {
                 // inward normal — flip winding
                 std::swap(face.indices[1], face.indices[2]);
-                DirectX::XMVECTOR p0 = hullPoints[face.indices[0]];
-                DirectX::XMVECTOR p1 = hullPoints[face.indices[1]];
-                DirectX::XMVECTOR p2 = hullPoints[face.indices[2]];
+                XMVECTOR p0 = hullPoints[face.indices[0]];
+                XMVECTOR p1 = hullPoints[face.indices[1]];
+                XMVECTOR p2 = hullPoints[face.indices[2]];
 
-                DirectX::XMFLOAT3A outNorm;
-                auto & norm = DirectX::XMVector3Normalize(DirectX::XMVector3Cross(DirectX::XMVectorSubtract(p1, p0), DirectX::XMVectorSubtract(p2, p0)));
-                DirectX::XMStoreFloat3A(&outNorm, norm);
+                XMFLOAT3A outNorm;
+                auto & norm = XMVector3Normalize(XMVector3Cross(XMVectorSubtract(p1, p0), XMVectorSubtract(p2, p0)));
+                XMStoreFloat3A(&outNorm, norm);
                 face.normal = outNorm;
-                face.dot = DirectX::XMVectorGetX(DirectX::XMVector3Dot(N, p0));
+                face.distance = XMVectorGetX(XMVector3Dot(N, p0));
             }
         }
+
+        std::unordered_map<int, std::vector<int>> faceToClosestPoints;
+        std::unordered_map<int, double> pointToFaceDistance;
+
+        //Step 6: find points outside faces
+        for (int i = 0; i < pointsCount; ++i)
+        {
+            //tetra verts
+            if (i == minXIndex || i == maxXIndex || i == topIndex || i == dIndex)
+                continue;
+
+            XMVECTOR P = XMLoadFloat3(reinterpret_cast<const XMFLOAT3*>(&points[i]));
+
+            float maxDist = 0;
+            int bestFace = -1;
+
+            for (int f = 0; f < faces.size(); ++f)
+            {
+                XMVECTOR N = XMLoadFloat3(&faces[f].normal);
+                float dist = XMVectorGetX(XMVector3Dot(N, P)) + faces[f].distance;
+
+                if (dist > maxDist)
+                {
+                    maxDist = dist;
+                    bestFace = f;
+                }
+            }
+
+
+            if (bestFace != -1) {
+                faceToClosestPoints[bestFace].push_back(i);
+                pointToFaceDistance[i] = maxDist;
+            }
+        }
+
     }
 }

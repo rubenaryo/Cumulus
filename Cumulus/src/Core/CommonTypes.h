@@ -29,7 +29,7 @@ namespace Muon
     {
         int indices[3];
         DirectX::XMFLOAT3A normal;
-        float dot;
+        float distance;
     };
 }
 
