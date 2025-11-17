@@ -13,13 +13,14 @@ static const float EPSILON = 0.001; // Small epsilon for safety
 static const float MIN_TRANSMITTANCE = 0.01; // Early-out when mostly opaque
 
 // Volume bounds in world space
-static const float SIDE_LENGTH = 4000.0;
+static const float SIDE_LENGTH = 4000.0; 
 static const float3 VOLUME_MIN_WS = float3(-SIDE_LENGTH / 2, 0.0, -SIDE_LENGTH / 2);
 static const float3 VOLUME_MAX_WS = float3(SIDE_LENGTH / 2, SIDE_LENGTH / 8, SIDE_LENGTH / 2);
 
-// Mapping from NVDF authoring space to world space
-static const float NVDF_DOMAIN_SIDE_LENGTH = 4000.0; // authoring space extent
-static const float NVDF_TO_WORLD_SCALE = SIDE_LENGTH / NVDF_DOMAIN_SIDE_LENGTH;
+// Mapping from NVDF authoring space to world 
+static const float NVDF_DOMAIN_SIDE_LENGTH = 4000.0; // NVDF authoring domain: 4km x 4km x 0.5km (matches the world volume).
+static const float NOISE_DOMAIN_SIDE_LENGTH = 100.0; // Noise domain: 3D noise pattern repeats every 100m in X/Y/Z.
+static const float AUTHORING_TO_WORLD_SCALE = SIDE_LENGTH / NVDF_DOMAIN_SIDE_LENGTH;
 
 // Density -> extinction scaling
 static const float DENSITY_SCALE = .04; // To be tuned / driven by NVDF
@@ -27,6 +28,7 @@ static const float DENSITY_SCALE = .04; // To be tuned / driven by NVDF
 Texture2D gInput : register(t0);
 Texture3D sdfNvdfTex : register(t1); // Sdf and model textures combined [sdf.r, model.r, model.g, model.b] 
 Texture2D depthStencilBuffer : register(t2); // The scene's depth-stencil buffer, bound here post-graphics passes.
+SamplerState linearWrap : register(s2);
 SamplerState linearClamp : register(s3); 
 RWTexture2D<float4> gOutput : register(u0);
 
@@ -78,13 +80,13 @@ float DecodeSdf(float encodedSdf)
 float ComputeAdaptiveStepSize(float distanceWorld)
 {
     // Convert world-space distance to NVDF-space distance
-    float distanceNvdf = distanceWorld / NVDF_TO_WORLD_SCALE;
+    float distanceNvdf = distanceWorld / AUTHORING_TO_WORLD_SCALE;
 
     // Original Nubis-style adaptive step in NVDF units
     float adaptiveNvdf = max(1.0, max(sqrt(distanceNvdf), EPSILON) * 0.08);
 
     // Convert step size back to world units
-    return adaptiveNvdf * NVDF_TO_WORLD_SCALE;
+    return adaptiveNvdf * AUTHORING_TO_WORLD_SCALE;
 }
 
 
@@ -119,12 +121,26 @@ float ValueErosion(float baseValue, float erosionValue)
 
 // Compute uprezzed voxel cloud density from dimensional profile, type and density scale.
 float GetUprezzedVoxelCloudDensity(
-    float3 inSamplePosition,
-    float inDimensionalProfile,
-    float inType,
-    float inDensityScale)
+    float3 samplePositionWS,
+    float dimensionalProfile,
+    float type,
+    float densityScale)
 {
-    return 0.0; 
+    // Convert world position into NVDF authoring space (so noise sticks to authored asset, not world scale).
+    float3 samplePosNvdf = samplePositionWS / AUTHORING_TO_WORLD_SCALE;
+    
+    // Map NVDF space into noise UVW: one noise tile spans NOISE_DOMAIN_SIDE_LENGTH author units.
+    float nvdfToNoiseScale = 1.0 / NOISE_DOMAIN_SIDE_LENGTH;
+    float3 noiseUVW = samplePosNvdf * nvdfToNoiseScale;
+
+    // 3D noise look-up in authoring-relative space.
+    float4 noise = Cloud3DNoiseTextureC.SampleLevel(
+        linearWrap,
+        noiseUVW,
+        0.0f // TODO: plug in distance-based mip
+    );
+    
+    return dimensionalProfile;
 }
 
 float3 VolumeRaymarchNvdf(float3 eyePos, float3 dir, float3 bgColor, int3 dispathThreadID)
@@ -174,7 +190,7 @@ float3 VolumeRaymarchNvdf(float3 eyePos, float3 dir, float3 bgColor, int3 dispat
         // Sample NVDF volume: .r = encoded SDF, .g = density (dimensional profile)
         float4 sdfSample = sdfNvdfTex.SampleLevel(linearClamp, WorldToNvdfUV(samplePos), 0.0f);
         // Decode SDF from [0,1] texture range into NVDF space, then scale into world units
-        float sdfDistance = DecodeSdf(sdfSample.r) * NVDF_TO_WORLD_SCALE;
+        float sdfDistance = DecodeSdf(sdfSample.r) * AUTHORING_TO_WORLD_SCALE;
         
 #if USE_ADAPTIVE_STEP
         // Step size: SDF-guided, but never smaller than the distance-based adaptive step
@@ -182,7 +198,7 @@ float3 VolumeRaymarchNvdf(float3 eyePos, float3 dir, float3 bgColor, int3 dispat
         float stepSize = ComputeBaseStepSize(sdfDistance, adaptive);
 #else
         // Pure SDF sphere-march; clamp to at least one voxel in world space
-        float stepSize = max(sdfDistance, NVDF_TO_WORLD_SCALE);
+        float stepSize = max(sdfDistance, AUTHORING_TO_WORLD_SCALE);
 #endif
 
 #if USE_JITTERED_STEP
@@ -193,10 +209,16 @@ float3 VolumeRaymarchNvdf(float3 eyePos, float3 dir, float3 bgColor, int3 dispat
         
         if (sdfDistance < 0.0)
         {
-            // Map density to extinction
             float4 nvdfSample = sdfNvdfTex.SampleLevel(linearClamp, WorldToNvdfUV(samplePos), 0.0f);
-            float density = nvdfSample.g;
-            float sigma = density * DENSITY_SCALE;
+            float dimensionalProfile = sdfSample.g;
+            float detailType = sdfSample.b;
+            float densityScale = sdfSample.a;
+            
+            // Get uprezzed density by eroding dimensional profile with noise
+            float density = GetUprezzedVoxelCloudDensity(samplePos, dimensionalProfile, detailType, densityScale);
+            
+            // Map density to extinction 
+            float sigma = dimensionalProfile * DENSITY_SCALE;
    
             // Beer-Lambert: alpha for this step
             float alpha = 1.0 - exp(-sigma * stepSize);
