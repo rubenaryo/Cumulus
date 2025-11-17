@@ -108,6 +108,25 @@ float StaticStepJitter(uint2 pixelCoord, uint stepIndex)
     return Hash231(pixelCoord, stepIndex) - 0.5f;
 }
 
+// Erode normalized base value by erosionValue (noise), re-normalizing remaining range into [0,1].
+float ValueErosion(float baseValue, float erosionValue)
+{
+    // baseValue: [0,1], erosionValue: [0,1]
+    float denom = max(1e-4, 1.0 - erosionValue);
+    float v = (baseValue - erosionValue) / denom;
+    return saturate(v);
+}
+
+// Compute uprezzed voxel cloud density from dimensional profile, type and density scale.
+float GetUprezzedVoxelCloudDensity(
+    float3 inSamplePosition,
+    float inDimensionalProfile,
+    float inType,
+    float inDensityScale)
+{
+    return 0.0; 
+}
+
 float3 VolumeRaymarchNvdf(float3 eyePos, float3 dir, float3 bgColor, int3 dispathThreadID)
 {
     float tEnter, tExit;
