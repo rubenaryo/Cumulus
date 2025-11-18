@@ -27,10 +27,13 @@ static const float DENSITY_SCALE = .04; // To be tuned / driven by NVDF
 
 Texture2D gInput : register(t0);
 Texture3D sdfNvdfTex : register(t1); // Sdf and model textures combined [sdf.r, model.r, model.g, model.b] 
-Texture2D depthStencilBuffer : register(t2); // The scene's depth-stencil buffer, bound here post-graphics passes.
+Texture3D noiseTex : register(t2); // Low frequency, high frequency noises for wispy and billowy clouds 
+Texture2D depthStencilBuffer : register(t3); // The scene's depth-stencil buffer, bound here post-graphics passes.
 SamplerState linearWrap : register(s2);
 SamplerState linearClamp : register(s3); 
 RWTexture2D<float4> gOutput : register(u0);
+
+
 
 float3 WorldToNvdfUV(float3 worldPos)
 {
@@ -134,13 +137,13 @@ float GetUprezzedVoxelCloudDensity(
     float3 noiseUVW = samplePosNvdf * nvdfToNoiseScale;
 
     // 3D noise look-up in authoring-relative space.
-    float4 noise = Cloud3DNoiseTextureC.SampleLevel(
+    float4 noise = noiseTex.SampleLevel(
         linearWrap,
         noiseUVW,
         0.0f // TODO: plug in distance-based mip
     );
     
-    return dimensionalProfile;
+    return noise.r;
 }
 
 float3 VolumeRaymarchNvdf(float3 eyePos, float3 dir, float3 bgColor, int3 dispathThreadID)
@@ -218,7 +221,7 @@ float3 VolumeRaymarchNvdf(float3 eyePos, float3 dir, float3 bgColor, int3 dispat
             float density = GetUprezzedVoxelCloudDensity(samplePos, dimensionalProfile, detailType, densityScale);
             
             // Map density to extinction 
-            float sigma = dimensionalProfile * DENSITY_SCALE;
+            float sigma = density * DENSITY_SCALE;
    
             // Beer-Lambert: alpha for this step
             float alpha = 1.0 - exp(-sigma * stepSize);
