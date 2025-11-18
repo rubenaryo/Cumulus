@@ -68,14 +68,48 @@ void ImguiShutdown()
     ImGui::DestroyContext();
 }
 
-void ImguiNewFrame()
+void ImguiNewFrame(float gameTime, const Camera& cam, DirectX::XMFLOAT3 sunDir, bool& isSunDynamic, int& timeOfDay)
 {
     // (Your code process and dispatch Win32 messages)
     // Start the Dear ImGui frame
     ImGui_ImplDX12_NewFrame();
     ImGui_ImplWin32_NewFrame();
     ImGui::NewFrame();
-    ImGui::ShowDemoWindow(); // Show demo window! :)
+    //ImGui::ShowDemoWindow(); // Show demo window! :)
+
+    ImGui::Begin("CUMULUS");
+    ImGui::Text("Game Time(s): %f", gameTime);
+    ImGui::Text("Add some more standard analytics here");
+
+    ImGuiTabBarFlags tabFlags = ImGuiTabBarFlags_None;
+    if (ImGui::BeginTabBar("Tabs", tabFlags))
+    {   
+        if (ImGui::BeginTabItem("Cam Info"))
+        {
+            using namespace DirectX;
+            XMFLOAT3 cam_pos;
+            XMFLOAT3 cam_target;
+            XMStoreFloat3(&cam_pos, cam.GetPosition());
+            XMStoreFloat3(&cam_target, cam.GetTarget());
+            ImGui::Text("Eye: %f, %f, %f", cam_pos.x, cam_pos.y, cam_pos.z);
+            ImGui::Text("Target: %f, %f, %f", cam_target.x, cam_target.y, cam_target.z);
+
+            ImGui::EndTabItem();
+        }
+        if (ImGui::BeginTabItem("Atmosphere"))
+        {
+            ImGui::Text("Sun Direction: %f, %f, %f", sunDir.x, sunDir.y, sunDir.z);
+            ImGui::Checkbox("Toggle Dynamic Sun", &isSunDynamic);
+            if (!isSunDynamic)
+            {
+                ImGui::SliderInt("Time Of Day", &timeOfDay, 0, 2400);
+            }
+
+            ImGui::EndTabItem();
+        }
+        ImGui::EndTabBar();
+    }
+    ImGui::End();
 }
 
 void ImguiRender()

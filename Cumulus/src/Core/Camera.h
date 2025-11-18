@@ -53,6 +53,8 @@ public:
     
     void GetPosition3A(DirectX::XMFLOAT3A* out_pos) const;
     DirectX::XMVECTOR   GetPosition() const;
+    DirectX::XMVECTOR   GetTarget() const;
+    void GetAxes(DirectX::XMVECTOR& forward, DirectX::XMVECTOR& right, DirectX::XMVECTOR& up) const;
 
     void SetTarget(DirectX::XMVECTOR target);
 

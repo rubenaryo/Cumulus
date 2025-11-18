@@ -128,7 +128,7 @@ bool Game::Init(HWND window, int width, int height)
     mAtmosphereBuffer.Create(L"Atmosphere CB", sizeof(cbAtmosphere));
 
     cbAtmosphere atmosphereParams;
-    UpdateAtmosphereConstants(atmosphereParams, width, height);
+    InitializeAtmosphereConstants(atmosphereParams, width, height);
 
     mapped = mAtmosphereBuffer.GetMappedPtr();
     if (mapped)
@@ -198,6 +198,18 @@ void Game::Update(Muon::StepTimer const& timer)
     UINT8* timeBuf = mTimeBuffer.GetMappedPtr();
     if (timeBuf)
         memcpy(timeBuf, &time, sizeof(Muon::cbTime));
+
+    // Updating Atmosphere
+    Muon::cbAtmosphere atmosphereParams;
+    Muon::UpdateAtmosphere(atmosphereParams, mCamera, mIsSunDynamic, mTimeOfDay, time.totalTime);
+    //Muon::InitializeAtmosphereConstants(atmosphereParams, 1280, 800);
+    mSunDir = atmosphereParams.sun_direction;
+
+    mapped = mAtmosphereBuffer.GetMappedPtr();
+    if (mapped)
+    {
+        memcpy(mapped, &atmosphereParams, sizeof(Muon::cbAtmosphere));
+    }
 }
 
 void Game::Render()
@@ -213,7 +225,7 @@ void Game::Render()
     ResetCommandList(nullptr);
     PrepareForRender();
 
-    ImguiNewFrame();
+    ImguiNewFrame(mTimer.GetElapsedSeconds(), mCamera, mSunDir, mIsSunDynamic, mTimeOfDay);
 
     // Fetch the desired material from the codex
     ResourceCodex& codex = ResourceCodex::GetSingleton();

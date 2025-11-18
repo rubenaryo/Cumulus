@@ -118,6 +118,18 @@ XMVECTOR Camera::GetPosition() const
     return mPosition;
 }
 
+XMVECTOR Camera::GetTarget() const
+{
+    return mTarget;
+}
+
+void Camera::GetAxes(DirectX::XMVECTOR& forward, DirectX::XMVECTOR& right, DirectX::XMVECTOR& up) const
+{
+    forward = mForward;
+    right = mRight;
+    up = mUp;
+}
+
 void Camera::SetTarget(DirectX::XMVECTOR target)
 {
     mTarget = target;
