@@ -23,12 +23,12 @@ static const float NOISE_DOMAIN_SIDE_LENGTH = 100.0; // Noise domain: 3D noise p
 static const float AUTHORING_TO_WORLD_SCALE = SIDE_LENGTH / NVDF_DOMAIN_SIDE_LENGTH;
 
 // Density -> extinction scaling
-static const float DENSITY_SCALE = .04; // To be tuned / driven by NVDF
+static const float DENSITY_SCALE = 1; // To be tuned / driven by NVDF
 
 Texture2D gInput : register(t0);
 Texture3D sdfNvdfTex : register(t1); // Sdf and model textures combined [sdf.r, model.r, model.g, model.b] 
 Texture3D noiseTex : register(t2); // Low frequency, high frequency noises for wispy and billowy clouds 
-Texture2D depthStencilBuffer : register(t3); // The scene's depth-stencil buffer, bound here post-graphics passes.
+Texture2D depthStencilBuffer : register(t3); // The scene's depth-stencil buffer, bound here post-graphics passes
 SamplerState linearWrap : register(s2);
 SamplerState linearClamp : register(s3); 
 RWTexture2D<float4> gOutput : register(u0);
@@ -160,7 +160,30 @@ float GetUprezzedVoxelCloudDensity(
         0.0f // TODO: plug in distance-based mip
     ));
     
-    return noise.lowFreqBillow;
+    // Define wispy noise
+    float wispy_noise = lerp(noise.lowFreqWispy, noise.highFreqWispy, dimensionalProfile);
+
+    // Define billowy noise
+    float billowy_type_gradient = pow(dimensionalProfile, 0.25);
+    float billowy_noise = lerp(noise.lowFreqBillow * 0.3, noise.highFreqBillow * 0.3, billowy_type_gradient);
+    
+    // Define Noise composite - blend to wispy as the density scale decreases.
+    float noise_composite = lerp(wispy_noise, billowy_noise, type);
+    
+    // TODO - Use HF details for parts near camera
+    
+    // Composite Noises and use as a Value Erosion
+    float uprezzed_density = ValueErosion(dimensionalProfile, noise_composite);
+    
+    // Modify User density scale
+    float powered_density_scale = pow(saturate(densityScale), 4.0);
+    
+    // Apply User Density Scale Data to Result
+    uprezzed_density *= powered_density_scale;
+    
+    // TODO - Sharpen result and lower Density close to camera to both add details and reduce undersampling noise
+    
+    return uprezzed_density;
 }
 
 float3 VolumeRaymarchNvdf(float3 eyePos, float3 dir, float3 bgColor, int3 dispathThreadID)
