@@ -51,6 +51,35 @@ NoiseSample MakeNoiseSample(float4 sample)
     return ns;
 }
 
+struct RayMarchInfo
+{
+    // Ray segment within the volume in world units
+    float tEnter; // where we start marching inside the volume
+    float tExit; // where we stop marching inside the volume
+
+    // Current marching state
+    float distance; // current param along the ray (world units)
+    float stepSize; // step size for this iteration
+
+    // Optical state
+    float transmittance; // remaining light (1 = fully transparent, 0 = fully opaque)
+    float3 accumColor; // accumulated in-scattered radiance / cloud color
+
+    // Bookkeeping
+    uint stepIndex; // current step index in the loop (for jitter, etc.)
+};
+
+void InitRayMarchInfo(out RayMarchInfo info, float tEnter, float tExit)
+{
+    info.tEnter = tEnter;
+    info.tExit = tExit;
+    info.distance = tEnter;
+    info.stepSize = 0.0f;
+    info.transmittance = 1.0f;
+    info.accumColor = float3(0.0f, 0.0f, 0.0f);
+    info.stepIndex = 0;
+}
+
 
 float3 WorldToNvdfUV(float3 worldPos)
 {
@@ -186,7 +215,7 @@ float GetUprezzedVoxelCloudDensity(
     return uprezzed_density;
 }
 
-float3 VolumeRaymarchNvdf(float3 eyePos, float3 dir, float3 bgColor, int3 dispathThreadID)
+float3 VolumeRaymarchNvdf(float3 eyePos, float3 dir, float3 bgColor, int3 dispatchThreadID)
 {
     float tEnter, tExit;
     if (!RayBoxIntersect(eyePos, dir, VOLUME_MIN_WS, VOLUME_MAX_WS, tEnter, tExit))
@@ -217,72 +246,67 @@ float3 VolumeRaymarchNvdf(float3 eyePos, float3 dir, float3 bgColor, int3 dispat
     if (tExit <= tEnter)
         return bgColor;
 
-    float3 accumColor = float3(0.0, 0.0, 0.0);
-    float transmittance = 1.0;
-
-    // Simple white cloud color for now
     const float3 cloudColor = float3(1.0, 1.0, 1.0);
 
-    float distance = tEnter; 
+    RayMarchInfo march;
+    InitRayMarchInfo(march, tEnter, tExit);
+
     // Ray march until the ray exits the volume or max steps are reached
     [loop]
-    for (int i = 0; i < MAX_STEPS && distance < tExit; ++i)
+    for (int i = 0; i < MAX_STEPS && march.distance < march.tExit; ++i)
     {
-        float3 samplePos = eyePos + distance * dir;
+        march.stepIndex = i;
+
+        float3 samplePos = eyePos + march.distance * dir;
 
         // Sample NVDF volume: .r = encoded SDF, .g = density (dimensional profile)
         float4 sdfSample = sdfNvdfTex.SampleLevel(linearClamp, WorldToNvdfUV(samplePos), 0.0f);
-        // Decode SDF from [0,1] texture range into NVDF space, then scale into world units
         float sdfDistance = DecodeSdf(sdfSample.r) * AUTHORING_TO_WORLD_SCALE;
-        
+
 #if USE_ADAPTIVE_STEP
-        // Step size: SDF-guided, but never smaller than the distance-based adaptive step
-        float adaptive = ComputeAdaptiveStepSize(distance);
-        float stepSize = ComputeBaseStepSize(sdfDistance, adaptive);
+        float adaptive = ComputeAdaptiveStepSize(march.distance);
+        march.stepSize = ComputeBaseStepSize(sdfDistance, adaptive);
 #else
-        // Pure SDF sphere-march; clamp to at least one voxel in world space
-        float stepSize = max(sdfDistance, AUTHORING_TO_WORLD_SCALE);
+        march.stepSize = max(sdfDistance, AUTHORING_TO_WORLD_SCALE);
 #endif
 
 #if USE_JITTERED_STEP
-        float jitter = StaticStepJitter(dispathThreadID.xy, i); // [-0.5, 0.5]
-        float jitterDistance = jitter * stepSize;
+        float jitter = StaticStepJitter(dispatchThreadID.xy, march.stepIndex); // [-0.5, 0.5]
+        float jitterDistance = jitter * march.stepSize;
         samplePos += dir * jitterDistance;
 #endif
         
         if (sdfDistance < 0.0)
         {
-            float4 nvdfSample = sdfNvdfTex.SampleLevel(linearClamp, WorldToNvdfUV(samplePos), 0.0f);
             float dimensionalProfile = sdfSample.g;
             float detailType = sdfSample.b;
             float densityScale = sdfSample.a;
             
-            // Get uprezzed density by eroding dimensional profile with noise
-            float density = GetUprezzedVoxelCloudDensity(samplePos, dimensionalProfile, detailType, densityScale);
+            float density = GetUprezzedVoxelCloudDensity(
+                samplePos,
+                dimensionalProfile,
+                detailType,
+                densityScale
+            );
             
-            // Map density to extinction 
             float sigma = density * DENSITY_SCALE;
-   
-            // Beer-Lambert: alpha for this step
-            float alpha = 1.0 - exp(-sigma * stepSize);
+            float alpha = 1.0 - exp(-sigma * march.stepSize);
 
-            // How much new cloud light this step contributes to the pixel, after accounting for previous absorption
-            float3 contrib = cloudColor * alpha * transmittance;
-            accumColor += contrib;
+            float3 contrib = cloudColor * alpha * march.transmittance;
+            march.accumColor += contrib;
         
-            // Less background color is left for further steps
-            transmittance *= (1.0 - alpha);
-            if (transmittance < MIN_TRANSMITTANCE)
+            march.transmittance *= (1.0 - alpha);
+            if (march.transmittance < MIN_TRANSMITTANCE)
                 break;
         }
 
-        distance += stepSize;
+        march.distance += march.stepSize;
     }
 
-    // Composite over background
-    float3 finalColor = accumColor + bgColor * transmittance;
+    float3 finalColor = march.accumColor + bgColor * march.transmittance;
     return finalColor;
 }
+
 
 [numthreads(16, 16, 1)]
 void main(int3 dispatchThreadID : SV_DispatchThreadID)
