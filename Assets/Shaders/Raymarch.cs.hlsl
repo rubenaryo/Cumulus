@@ -25,7 +25,7 @@ static const float NOISE_DOMAIN_SIDE_LENGTH = 100.0; // Noise domain: 3D noise p
 static const float AUTHORING_TO_WORLD_SCALE = SIDE_LENGTH / NVDF_DOMAIN_SIDE_LENGTH;
 
 // Density -> extinction scaling
-static const float DENSITY_SCALE = 1; // To be tuned / driven by NVDF
+static const float DENSITY_SCALE = .035; // To be tuned / driven by NVDF
 
 Texture2D gInput : register(t0);
 Texture3D sdfNvdfTex : register(t1); // Sdf and model textures combined [sdf.r, model.r, model.g, model.b] 
@@ -214,6 +214,11 @@ float ApplyHighHighFreqNoise(
     return lerp(hhfNoise, baseNoise, t);
 }
 
+float GetFractionFromValue(float x, float minVal, float maxVal)
+{
+    float t = (x - minVal) / (maxVal - minVal);
+    return saturate(t);
+}
 
 // Compute uprezzed voxel cloud density from dimensional profile, type and density scale.
 float GetUprezzedVoxelCloudDensity(
@@ -262,7 +267,13 @@ float GetUprezzedVoxelCloudDensity(
     // Apply User Density Scale Data to Result
     uprezzed_density *= powered_density_scale;
     
-    // TODO - Sharpen result and lower Density close to camera to both add details and reduce undersampling noise
+    // Sharpen result and lower Density close to camera to both add details and reduce undersampling noise
+    uprezzed_density = pow(uprezzed_density, lerp(0.3, 0.6, max(EPSILON, powered_density_scale)));
+    
+#if USE_HIGH_HIGH_FREQUENCY
+    float distance_range_blender = GetFractionFromValue(rayMarchInfo.distance, 50.0, 150.0);
+    uprezzed_density = pow(uprezzed_density, lerp(0.5, 1.0, distance_range_blender)) * lerp(0.666, 1.0, distance_range_blender);
+#endif
     
     return uprezzed_density;
 }
