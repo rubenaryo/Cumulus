@@ -33,6 +33,23 @@ SamplerState linearWrap : register(s2);
 SamplerState linearClamp : register(s3); 
 RWTexture2D<float4> gOutput : register(u0);
 
+struct NoiseSample
+{
+    float lowFreqWispy;
+    float highFreqWispy;
+    float lowFreqBillow;
+    float highFreqBillow;
+};
+
+NoiseSample MakeNoiseSample(float4 sample)
+{
+    NoiseSample ns;
+    ns.lowFreqWispy = sample.x;
+    ns.highFreqWispy = sample.y;
+    ns.lowFreqBillow = sample.z;
+    ns.highFreqBillow = sample.w;
+    return ns;
+}
 
 
 float3 WorldToNvdfUV(float3 worldPos)
@@ -137,13 +154,13 @@ float GetUprezzedVoxelCloudDensity(
     float3 noiseUVW = samplePosNvdf * nvdfToNoiseScale;
 
     // 3D noise look-up in authoring-relative space.
-    float4 noise = noiseTex.SampleLevel(
+    NoiseSample noise = MakeNoiseSample(noiseTex.SampleLevel(
         linearWrap,
         noiseUVW,
         0.0f // TODO: plug in distance-based mip
-    );
+    ));
     
-    return noise.r;
+    return noise.lowFreqBillow;
 }
 
 float3 VolumeRaymarchNvdf(float3 eyePos, float3 dir, float3 bgColor, int3 dispathThreadID)
