@@ -4,7 +4,9 @@
 // Toggle features
 #define USE_ADAPTIVE_STEP 1 // Shows some artifact ATM. Will debug again after uprez. 
 #define USE_JITTERED_STEP 1
+#define USE_HIGH_HIGH_FREQUENCY 1
 #define DEBUG_AABB_INTERSECT 0
+
 // Raymarch settings
 static const int MAX_STEPS = 1024; // Max steps per ray
 static const float MIN_DIST = 0.001; // Global near distance
@@ -168,11 +170,57 @@ float ValueErosion(float baseValue, float erosionValue)
     return saturate(v);
 }
 
+float FoldedNoise(float n, float power)
+{
+    float folded = abs(abs(n * 2.0 - 1.0) * 2.0 - 1.0);
+    return pow(folded, power);
+}
+
+float ComputeHighHighFreqNoise(NoiseSample noiseSample, float detailType)
+{
+    // Wispy branch: inverted, sharper (power 4)
+    float wispyFolded = 1.0 - FoldedNoise(noiseSample.highFreqWispy, 4.0);
+    
+    // Billow branch: less sharp (power 2)
+    float billowFolded = FoldedNoise(noiseSample.highFreqBillow, 2.0);
+
+    // Blend between the two based on detailType
+    float hhf = lerp(wispyFolded, billowFolded, detailType);
+
+    return saturate(hhf);
+}
+
+float ValueRemap(float x, float inMin, float inMax, float outMin, float outMax)
+{
+    // Normalize x into [0,1] in the input range
+    float t = (x - inMin) / (inMax - inMin);
+    t = saturate(t);
+
+    // Remap into the output range
+    return lerp(outMin, outMax, t);
+}
+
+
+float ApplyHighHighFreqNoise(
+    float baseNoise, // existing noise_composite
+    float hhfNoise, // from ComputeHighHighFreqNoise
+    float distanceWorld // rayMarchInfo.distance
+)
+{
+    // Strong near camera, fades out by 150m
+    float t = ValueRemap(distanceWorld, 50.0, 150.0, 0.9, 1.0);
+    t = saturate(t);
+
+    return lerp(hhfNoise, baseNoise, t);
+}
+
+
 // Compute uprezzed voxel cloud density from dimensional profile, type and density scale.
 float GetUprezzedVoxelCloudDensity(
+    RayMarchInfo rayMarchInfo,
     float3 samplePositionWS,
     float dimensionalProfile,
-    float type,
+    float detailType,
     float densityScale)
 {
     // Convert world position into NVDF authoring space (so noise sticks to authored asset, not world scale).
@@ -183,23 +231,27 @@ float GetUprezzedVoxelCloudDensity(
     float3 noiseUVW = samplePosNvdf * nvdfToNoiseScale;
 
     // 3D noise look-up in authoring-relative space.
-    NoiseSample noise = MakeNoiseSample(noiseTex.SampleLevel(
+    NoiseSample noiseSample = MakeNoiseSample(noiseTex.SampleLevel(
         linearWrap,
         noiseUVW,
         0.0f // TODO: plug in distance-based mip
     ));
     
     // Define wispy noise
-    float wispy_noise = lerp(noise.lowFreqWispy, noise.highFreqWispy, dimensionalProfile);
+    float wispy_noise = lerp(noiseSample.lowFreqWispy, noiseSample.highFreqWispy, dimensionalProfile);
 
     // Define billowy noise
     float billowy_type_gradient = pow(dimensionalProfile, 0.25);
-    float billowy_noise = lerp(noise.lowFreqBillow * 0.3, noise.highFreqBillow * 0.3, billowy_type_gradient);
+    float billowy_noise = lerp(noiseSample.lowFreqBillow * 0.3, noiseSample.highFreqBillow * 0.3, billowy_type_gradient);
     
     // Define Noise composite - blend to wispy as the density scale decreases.
-    float noise_composite = lerp(wispy_noise, billowy_noise, type);
-    
-    // TODO - Use HF details for parts near camera
+    float noise_composite = lerp(wispy_noise, billowy_noise, detailType);
+
+#if USE_HIGH_HIGH_FREQUENCY
+    //Use HF details for parts near camera
+    float hhf = ComputeHighHighFreqNoise(noiseSample, detailType);
+    noise_composite = ApplyHighHighFreqNoise(noise_composite, hhf, rayMarchInfo.distance);
+#endif
     
     // Composite Noises and use as a Value Erosion
     float uprezzed_density = ValueErosion(dimensionalProfile, noise_composite);
@@ -283,6 +335,7 @@ float3 VolumeRaymarchNvdf(float3 eyePos, float3 dir, float3 bgColor, int3 dispat
             float densityScale = sdfSample.a;
             
             float density = GetUprezzedVoxelCloudDensity(
+                march,
                 samplePos,
                 dimensionalProfile,
                 detailType,
