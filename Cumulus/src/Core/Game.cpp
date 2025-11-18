@@ -225,7 +225,7 @@ void Game::Render()
     ResetCommandList(nullptr);
     PrepareForRender();
 
-    ImguiNewFrame(mTimer.GetElapsedSeconds(), mCamera, mSunDir, mIsSunDynamic, mTimeOfDay);
+    ImguiNewFrame(mTimer.GetTotalSeconds(), mCamera, mSunDir, mIsSunDynamic, mTimeOfDay);
 
     // Fetch the desired material from the codex
     ResourceCodex& codex = ResourceCodex::GetSingleton();

@@ -48,7 +48,8 @@ DirectX::XMMATRIX CreateViewFromClipMatrix(float fovY_radians, float aspect_rati
 DirectX::XMMATRIX CreateModelFromViewMatrix(
     float view_distance_meters,
     float view_zenith_angle_radians,
-    float view_azimuth_angle_radians)
+    float view_azimuth_angle_radians,
+    DirectX::XMVECTOR at = DirectX::XMVectorSet(0.0f, 0.0f, 0.0f, 1.0f))    // looking at earth center
 {
     using namespace DirectX;
 
@@ -73,7 +74,6 @@ DirectX::XMMATRIX CreateModelFromViewMatrix(
 
     // create view matrix first, then invert it
     XMVECTOR eye = camera_pos;
-    XMVECTOR at = XMVectorSet(0.0f, 0.0f, 0.0f, 1.0f); // looking at earth center
     XMVECTOR up = XMVectorSet(0.0f, 0.0f, 1.0f, 0.0f); // z-up coordinate system
 
     // Important that this is RH like OpenGL instead of LH
@@ -159,9 +159,9 @@ DirectX::XMFLOAT3 GetSunDirection(int time)
 }
 
 void UpdateAtmosphere(cbAtmosphere& constants,
-    Camera& mCamera,
-    bool mIsSunDynamic,
-    int mTimeOfDay,
+    Camera& camera,
+    bool isSunDynamic,
+    int timeOfDay,
     float gameTime,
     float viewport_width = 1280,
     float viewport_height = 800,
@@ -177,12 +177,20 @@ void UpdateAtmosphere(cbAtmosphere& constants,
     // FOV setup (50 degrees as in original)
     const float kFovY = 50.0f / 180.0f * static_cast<float>(kPi);
 
+
+    view_zenith_angle_radians = camera.GetZenith();
+    view_azimuth_angle_radians = camera.GetAzimuth();
+    // set at to be Y up coordinate system
+    XMVECTOR target = camera.GetTarget();
+    XMVECTOR at = XMVectorSet(XMVectorGetX(target), XMVectorGetZ(target), XMVectorGetY(target), 0.0f);
     // Create matrices
+    // NOTE: Ideally we woudln't want to recalculate view from clip every time
     XMMATRIX view_from_clip = CreateViewFromClipMatrix(kFovY, aspect_ratio);
     XMMATRIX model_from_view = CreateModelFromViewMatrix(
         view_distance_meters,
         view_zenith_angle_radians,
-        view_azimuth_angle_radians
+        view_azimuth_angle_radians,
+        at
     );
 
     // Store matrices (DirectX math uses row-major in memory, but these will actually still be like OpenGL column-major)
@@ -198,7 +206,7 @@ void UpdateAtmosphere(cbAtmosphere& constants,
     // -0.935575f, 0.230531f, 0.267499f -> preset 1
     // -0.03931, 0.25845, -0.36024 is the resulting axis
     //constants.sun_direction = XMFLOAT3(-0.935575f, 0.230531f, 0.267499f);
-    if (mIsSunDynamic)
+    if (isSunDynamic)
     {
         // current game time is an hour per second
         float mapped_time = fmodf(gameTime * 60.f, 2400.f);
@@ -206,7 +214,7 @@ void UpdateAtmosphere(cbAtmosphere& constants,
     }
     else
     {
-        constants.sun_direction = GetSunDirection(mTimeOfDay);
+        constants.sun_direction = GetSunDirection(timeOfDay);
     }
     Muon::Printf("Sun Direction: %f, %f, %f \n", constants.sun_direction.x, constants.sun_direction.y, constants.sun_direction.z);
     // Normalize sun direction
