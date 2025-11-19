@@ -5,7 +5,7 @@
 #define USE_ADAPTIVE_STEP 1 // Shows some artifact ATM. Will debug again after uprez. 
 #define USE_JITTERED_STEP 1
 #define USE_HIGH_HIGH_FREQUENCY 1
-#define DEBUG_AABB_INTERSECT 0
+#define DEBUG_AABB_INTERSECT 1
 
 // Raymarch settings
 static const int MAX_STEPS = 1024; // Max steps per ray
@@ -117,6 +117,63 @@ bool RayBoxIntersect(
     tExit = min(min(tMax.x, tMax.y), tMax.z);
 
     // Need a positive interval where enter < exit
+    return tExit > max(tEnter, 0.0);
+}
+
+bool RayConvexHullIntersect(
+    float3 origin,
+    float3 dir,
+    ConvexHull hull,
+    out float tEnter,
+    out float tExit)
+{
+    // Initial interval: (-∞, +∞)
+    tEnter = -1e20;
+    tExit  =  1e20;
+
+    uint faceStart = hull.faceOffset;
+    uint faceEnd   = hull.faceOffset + hull.faceCount;
+
+    float3 localOrigin = mul(hull.invWorld, float4(origin, 1.0)).xyz;
+    float3 localDir    = mul(hull.invWorld, float4(dir, 0.0)).xyz;
+
+
+    for (uint fi = faceStart; fi < faceEnd; ++fi)
+    {
+        float4 face = hullFaces[fi];
+        float distance = face.w;
+        float4 normal = float4(face.xyz, 0.0);
+
+        float dist0 = dot(normal, localOrigin) + distance;
+        float denom = dot(normal, localDir);
+
+        if (abs(denom) < 1e-8)
+        {
+            // Ray is parallel to plane
+            if (dist0 > 0.0)
+                return false;   // outside → cannot intersect
+            else
+                continue;       // inside → this plane imposes no limit
+        }
+
+        float tHit = -dist0 / denom;
+
+        if (denom < 0.0)
+        {
+            // entering half-space
+            tEnter = max(tEnter, tHit);
+        }
+        else
+        {
+            // exiting half-space
+            tExit = min(tExit, tHit);
+        }
+
+        if (tEnter > tExit)
+            return false;
+    }
+
+    // Need exit to be after enter, and at least one must be in front
     return tExit > max(tEnter, 0.0);
 }
 
@@ -311,7 +368,23 @@ float3 VolumeRaymarchNvdf(float3 eyePos, float3 dir, float3 bgColor, int3 dispat
             minBoxEnter = min(minBoxEnter, aabbEnter);
             maxBoxExit = max(maxBoxExit, aabbExit);
 #if DEBUG_AABB_INTERSECT
-            return float3(1, 0, 0); // Visualize AABB intersection
+           // return float3(1, 0, 0) * bgColor; // Visualize AABB intersection
+#endif
+        }
+    }
+
+
+    for(uint i = 0; i < hullCount; ++i)
+    {
+        float hullEnter, hullExit;
+        ConvexHull ch = hulls[i];
+
+        if (RayConvexHullIntersect(eyePos, dir, ch, hullEnter, hullExit))
+        {
+            // minBoxEnter = min(minBoxEnter, hullEnter);
+            // maxBoxExit = max(maxBoxExit, hullExit);
+#if DEBUG_AABB_INTERSECT
+            return float3(1, 0, 0) * bgColor; // Visualize hull intersection
 #endif
         }
     }

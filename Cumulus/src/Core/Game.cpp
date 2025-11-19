@@ -107,19 +107,21 @@ bool Game::Init(HWND window, int width, int height)
     mWorldMatrixBuffer.Create(L"world matrix buffer", sizeof(cbPerEntity));
     UINT8* mapped = mWorldMatrixBuffer.GetMappedPtr();
     assert(mapped);
+
+
+    const float PI = 3.14159f;
+    DirectX::XMMATRIX debugEntityWorld = DirectX::XMMatrixIdentity();
+    debugEntityWorld = XMMatrixMultiply(debugEntityWorld, DirectX::XMMatrixRotationRollPitchYaw(0, 0, PI / 2.0f));
+    debugEntityWorld = XMMatrixMultiply(debugEntityWorld, DirectX::XMMatrixRotationRollPitchYaw(-PI / 2.0f, 0, 0));
+    debugEntityWorld = XMMatrixMultiply(debugEntityWorld, DirectX::XMMatrixScaling(0.12f, 0.12f, 0.12f));
+    debugEntityWorld = XMMatrixMultiply(debugEntityWorld, DirectX::XMMatrixTranslation(0, 1, 0));
+
     if (mapped)
     {
         using namespace DirectX;
         cbPerEntity entity;
-
-        const float PI = 3.14159f;
-        XMMATRIX entityWorld = DirectX::XMMatrixIdentity();
-        entityWorld = XMMatrixMultiply(entityWorld, DirectX::XMMatrixRotationRollPitchYaw(0, 0, PI/2.0f));
-        entityWorld = XMMatrixMultiply(entityWorld, DirectX::XMMatrixRotationRollPitchYaw(-PI/2.0f, 0,0));
-        entityWorld = XMMatrixMultiply(entityWorld, DirectX::XMMatrixScaling(0.12f, 0.12f, 0.12f));
-        entityWorld = XMMatrixMultiply(entityWorld, DirectX::XMMatrixTranslation(0, 1, 0));
-        XMStoreFloat4x4(&entity.world, entityWorld);
-        XMStoreFloat4x4(&entity.invWorld, DirectX::XMMatrixInverse(nullptr, entityWorld));
+        XMStoreFloat4x4(&entity.world, debugEntityWorld);
+        XMStoreFloat4x4(&entity.invWorld, DirectX::XMMatrixInverse(nullptr, debugEntityWorld));
         memcpy(mapped, &entity, sizeof(entity));
     }
 
@@ -128,7 +130,7 @@ bool Game::Init(HWND window, int width, int height)
     mAtmosphereBuffer.Create(L"Atmosphere CB", sizeof(cbAtmosphere));
 
     cbAtmosphere atmosphereParams;
-    UpdateAtmosphereConstants(atmosphereParams, width, height);
+    InitializeAtmosphereConstants(atmosphereParams, width, height);
 
     mapped = mAtmosphereBuffer.GetMappedPtr();
     if (mapped)
@@ -138,8 +140,7 @@ bool Game::Init(HWND window, int width, int height)
 
     mAABBBuffer.Create(L"AABB Buffer", sizeof(cbIntersections));
 
-
-    const Mesh* m = codex.GetMesh(Muon::GetResourceID(L"cube.obj"));
+    const Mesh* m = codex.GetMesh(Muon::GetResourceID(L"teapot.obj"));
 
     cbIntersections intersections = {};
     intersections.aabbCount = 1;
@@ -148,6 +149,47 @@ bool Game::Init(HWND window, int width, int height)
         UINT8* aabbPtr = mAABBBuffer.GetMappedPtr();
         if (aabbPtr) {
             memcpy(aabbPtr, &intersections, sizeof(intersections));
+        }
+    }
+
+    //HULL:
+    //todo: concat all hulls
+    Hull h = m->GetHull();
+    mHullBuffer.Create(L"Hull Buffer", sizeof(cbHulls));
+
+    if (m && mHullBuffer.GetMappedPtr())
+    {
+        cbHulls hulls = {};
+        cbConvexHull cHull = {};
+        cHull.faceCount = (uint32_t)h.faces.size();
+        cHull.faceOffset = 0;
+
+
+        XMStoreFloat4x4(&cHull.world, debugEntityWorld);
+        XMStoreFloat4x4(&cHull.invWorld, DirectX::XMMatrixInverse(nullptr, debugEntityWorld));
+
+        hulls.hulls[0] = cHull;
+        hulls.hullCount = 1;
+        memcpy(mHullBuffer.GetMappedPtr(), &hulls, sizeof(hulls));
+    }
+
+    mHullFaceBuffer.Create(L"Hull Faces Buffer", sizeof(cbHullFaces));
+    if (m && h.faces.size() > 0) {
+        UINT8* facePtr = mHullFaceBuffer.GetMappedPtr();
+        cbHullFaces faces = {};
+
+        for (size_t i = 0; i < h.faces.size(); i++)
+        {
+            faces.faces[i] = DirectX::XMFLOAT4(
+                h.faces[i].normal.x,
+                h.faces[i].normal.y,
+                h.faces[i].normal.z,
+                h.faces[i].distance
+            );
+        }
+
+        if (facePtr) {
+            memcpy(facePtr, &faces, sizeof(faces));
         }
     }
 
@@ -198,6 +240,18 @@ void Game::Update(Muon::StepTimer const& timer)
     UINT8* timeBuf = mTimeBuffer.GetMappedPtr();
     if (timeBuf)
         memcpy(timeBuf, &time, sizeof(Muon::cbTime));
+
+    // Updating Atmosphere
+    Muon::cbAtmosphere atmosphereParams;
+    Muon::UpdateAtmosphere(atmosphereParams, mCamera, settings.isSunDynamic, settings.timeOfDay, time.totalTime);
+    //Muon::InitializeAtmosphereConstants(atmosphereParams, 1280, 800);
+    settings.sunDir = atmosphereParams.sun_direction;
+
+    mapped = mAtmosphereBuffer.GetMappedPtr();
+    if (mapped)
+    {
+        memcpy(mapped, &atmosphereParams, sizeof(Muon::cbAtmosphere));
+    }
 }
 
 void Game::Render()
@@ -213,7 +267,7 @@ void Game::Render()
     ResetCommandList(nullptr);
     PrepareForRender();
 
-    ImguiNewFrame();
+    ImguiNewFrame(mTimer.GetTotalSeconds(), mCamera, settings);
 
     // Fetch the desired material from the codex
     ResourceCodex& codex = ResourceCodex::GetSingleton();
@@ -339,6 +393,18 @@ void Game::Render()
             pCommandList->SetComputeRootConstantBufferView(aabbIdx, mAABBBuffer.GetGPUVirtualAddress());
         }
 
+        int32_t hullIdx = mRaymarchPass.GetResourceRootIndex("HullsBuffer");
+        if (hullIdx != ROOTIDX_INVALID)
+        {
+            pCommandList->SetComputeRootConstantBufferView(hullIdx, mHullBuffer.GetGPUVirtualAddress());
+        }
+
+        int32_t hullFaceIdx = mRaymarchPass.GetResourceRootIndex("HullFacesBuffer");
+        if (hullFaceIdx != ROOTIDX_INVALID)
+        {
+            pCommandList->SetComputeRootConstantBufferView(hullFaceIdx, mHullFaceBuffer.GetGPUVirtualAddress());
+        }
+
         int32_t inIdx = mRaymarchPass.GetResourceRootIndex("gInput");
         if (inIdx != ROOTIDX_INVALID)
         {
@@ -440,6 +506,8 @@ Game::~Game()
     mTimeBuffer.Destroy();
     mAABBBuffer.Destroy();
     mAtmosphereBuffer.Destroy();
+    mHullBuffer.Destroy();
+    mHullFaceBuffer.Destroy();
     mCamera.Destroy();
     mInput.Destroy();
     mOpaquePass.Destroy();

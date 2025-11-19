@@ -18,6 +18,7 @@
 #include <Core/DXCore.h>
 #include <Utils/Utils.h>
 #include <unordered_map>
+#include "Hull.h"
 
 namespace Muon
 {
@@ -62,6 +63,7 @@ bool MeshFactory::LoadMesh(const wchar_t* fileName, UploadBuffer& stagingBuffer,
         uint32_t vertexCount = 0;
         DirectX::XMFLOAT3A min;
         DirectX::XMFLOAT3A max;
+        Hull hull;
     };
     std::vector<MeshData> meshesData;
     meshesData.reserve(pScene->mNumMeshes);
@@ -120,7 +122,6 @@ bool MeshFactory::LoadMesh(const wchar_t* fileName, UploadBuffer& stagingBuffer,
                 DirectX::XMFLOAT3A p = DirectX::XMFLOAT3A(pMesh->mVertices[j][0], pMesh->mVertices[j][1], pMesh->mVertices[j][2]);
                 min = DirectX::XMFLOAT3A(std::fmin(min.x, p.x), std::fmin(min.y, p.y), std::fmin(min.z, p.z));
                 max = DirectX::XMFLOAT3A(std::fmax(max.x, p.x), std::fmax(max.y, p.y), std::fmax(max.z, p.z));
-                Muon::Printf("p is (%f, %f, %f)\n", p.x, p.y, p.z);
             }
             if (pMesh->HasNormals()) WriteFloat3(writeHead, pMesh->mNormals[j]);
             if (pMesh->HasTextureCoords(0)) WriteFloat2(writeHead, pMesh->mTextureCoords[0][j]);
@@ -131,6 +132,13 @@ bool MeshFactory::LoadMesh(const wchar_t* fileName, UploadBuffer& stagingBuffer,
         meshData.indices.reserve(pMesh->mNumFaces * 3);
         meshData.min = min;
         meshData.max = max;
+
+        //convex hull calc:
+        if (pMesh->HasPositions()) {
+            Hull hull(pMesh->mVertices, pMesh->mNumVertices);
+            meshData.hull = hull;
+        }
+
         // Process Indices next
         for (unsigned int j = 0, ind = 0; j < pMesh->mNumFaces; ++j)
         {
@@ -153,7 +161,7 @@ bool MeshFactory::LoadMesh(const wchar_t* fileName, UploadBuffer& stagingBuffer,
     boundingBox.min = data.min;
     boundingBox.max = data.max;
 
-    bool success = outMesh.Create(fileName, (UINT)data.vertexData.size(), (UINT)data.vertexData.size() / data.vertexCount, (UINT)data.vertexCount, (UINT)data.indices.size() * sizeof(uint32_t), (UINT)data.indices.size(), DXGI_FORMAT_R32_UINT, boundingBox);
+    bool success = outMesh.Create(fileName, (UINT)data.vertexData.size(), (UINT)data.vertexData.size() / data.vertexCount, (UINT)data.vertexCount, (UINT)data.indices.size() * sizeof(uint32_t), (UINT)data.indices.size(), DXGI_FORMAT_R32_UINT, boundingBox, data.hull);
     if (!success)
     {
         Muon::Printf(L"Error: Failed to create mesh: %s\n", fileName);

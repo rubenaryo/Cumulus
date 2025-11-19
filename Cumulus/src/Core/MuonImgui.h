@@ -7,14 +7,21 @@ Description : Helpers for initializing/using ImGui
 #define MUONIMGUI_H
 
 #include <Core/WinApp.h>
+#include "Camera.h"
 
 namespace Muon
 {
+	struct SceneSettings {
+		bool isSunDynamic = false;
+		int timeOfDay = 800; // stored as military time for now
+		DirectX::XMFLOAT3 sunDir;
+	};
+
 	bool ImguiInit();
 	bool ImguiInitWin32(HWND hwnd);
 	void ImguiShutdown();
 
-	void ImguiNewFrame();
+	void ImguiNewFrame(float gameTime, const Camera& cam, SceneSettings &settings);
 	void ImguiRender();
 }
 

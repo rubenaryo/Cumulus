@@ -30,7 +30,8 @@ namespace Input {
         RollLeft,
         RollRight,
         MouseRotation,
-        MouseMovement
+        MouseMovement,
+        ToggleSprint
     };
 
     // Enum to emphasize the different states of a key

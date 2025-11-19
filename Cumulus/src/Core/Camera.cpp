@@ -6,6 +6,7 @@ Description : Implementation of Camera Class
 #include "Camera.h"
 #include <DirectXMath.h>
 #include <Utils/Utils.h>
+#include <algorithm>
 
 namespace Muon 
 {
@@ -25,6 +26,8 @@ Camera::Camera() :
     mViewProjection = XMFLOAT4X4();
     mPosition = XMVectorZero();
     mTarget = XMVectorZero();
+    mZenith = 1.57079632679f;   // camera starts with 0 height
+    mAzimuth = 1.57079632679f;   // camera starts looking East -> positive X -> 90deg away from positive Z/North
 }
 
 Camera::~Camera()
@@ -39,7 +42,7 @@ void Camera::Init(DirectX::XMFLOAT3& pos, float aspectRatio, float nearPlane, fl
     mPosition = XMLoadFloat3(&pos);
     mTarget = XMVectorSet(0.0f, 200.0f, 0.0f, 0.0f);
 
-    const float CAMERA_DIST = 1.0f;
+    const float CAMERA_DIST = 1.0f; // TODO: Not sure where it's used
 
     mForward = XMVector3Normalize(XMVectorSubtract(mTarget, mPosition));
 
@@ -47,6 +50,8 @@ void Camera::Init(DirectX::XMFLOAT3& pos, float aspectRatio, float nearPlane, fl
 
     mRight = XMVector3Normalize(XMVector3Cross(worldUp, mForward));
     mUp = XMVector3Cross(mForward, mRight);
+
+    UpdateAzimuthZenith();
 
     mConstantBuffer.Create(L"CameraConstantBuffer", Muon::GetConstantBufferSize(sizeof(cbCamera)));
 
@@ -118,6 +123,28 @@ XMVECTOR Camera::GetPosition() const
     return mPosition;
 }
 
+XMVECTOR Camera::GetTarget() const
+{
+    return mTarget;
+}
+
+
+float Camera::GetAzimuth() const
+{
+    return mAzimuth;
+}
+float Camera::GetZenith() const
+{
+    return mZenith;
+}
+
+void Camera::GetAxes(DirectX::XMVECTOR& forward, DirectX::XMVECTOR& right, DirectX::XMVECTOR& up) const
+{
+    forward = mForward;
+    right = mRight;
+    up = mUp;
+}
+
 void Camera::SetTarget(DirectX::XMVECTOR target)
 {
     mTarget = target;
@@ -141,14 +168,64 @@ void Camera::MoveUp(float dist)
 void Camera::MoveAlongAxis(float dist, XMVECTOR axis)
 {
     mPosition = XMVectorAdd(mPosition, XMVectorScale(axis, dist));
+    mTarget = XMVectorAdd(mTarget, XMVectorScale(axis, dist));
+    UpdateAzimuthZenith();
 }
 
 void Camera::Rotate(XMVECTOR quatRotation)
 {
+
     // Calculate Forward vector
     mForward    = XMVector3Rotate(mForward, quatRotation);
     mUp         = XMVector3Rotate(mUp, quatRotation);
     mRight      = XMVector3Rotate(mRight, quatRotation);
+
+    // Recalculate target, zenith, and azimuth
+    float dist = XMVectorGetX(XMVector3Length(XMVectorSubtract(mPosition, mTarget)));
+    mTarget = XMVectorAdd(XMVectorScale(mForward, dist), mPosition);
+    UpdateAzimuthZenith();
+}
+
+void Camera::UpdateAzimuthZenith()
+{
+    // Sets zenith and azimuth based on current camera view
+    // Directions can get flipped around the north and south pole
+    // Fix would require editing the base rotation
+
+    XMVECTOR worldUp = XMVectorSet(0.0f, 1.0f, 0.0f, 0.0f);
+    XMVECTOR worldNorth = XMVectorSet(0.0f, 0.0f, 1.0f, 0.0f);
+
+    float dotZenith = XMVectorGetX(XMVector3Dot(XMVectorNegate(mForward), worldUp));
+    dotZenith = std::clamp(dotZenith, -1.0f, 1.0f); // Prevent NaN
+    float newZenith = acosf(dotZenith);
+
+    XMVECTOR flatProjectFwd = XMVectorSet(XMVectorGetX(mForward), 0.0f, XMVectorGetZ(mForward), 0.0f);
+
+    float flatLength = XMVectorGetX(XMVector3Length(flatProjectFwd));
+
+    float newAzimuth = mAzimuth;
+    if (flatLength > 0.001f) {
+        flatProjectFwd = XMVector3Normalize(flatProjectFwd);
+        float x = XMVectorGetX(flatProjectFwd);
+        float z = XMVectorGetZ(flatProjectFwd);
+        newAzimuth = atan2f(z, x);
+        if (newAzimuth < 0.0f) newAzimuth += XM_2PI;
+    }
+
+    // Detect and correct large azimuth jumps (wrapping)
+    float azimuthDiff = newAzimuth - mAzimuth;
+
+    // Handle the 2pi boundary wrap-around
+    if (azimuthDiff > XM_PI) {
+        newAzimuth -= XM_2PI;
+    }
+    else if (azimuthDiff < -XM_PI) {
+        newAzimuth += XM_2PI;
+    }
+
+    // Update both values
+    mZenith = newZenith;
+    mAzimuth = newAzimuth;
 }
 
 void Camera::UpdateConstantBuffer()

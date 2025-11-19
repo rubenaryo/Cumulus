@@ -68,14 +68,68 @@ void ImguiShutdown()
     ImGui::DestroyContext();
 }
 
-void ImguiNewFrame()
+void ImguiNewFrame(float gameTime, const Camera& cam, SceneSettings& settings)
 {
     // (Your code process and dispatch Win32 messages)
     // Start the Dear ImGui frame
     ImGui_ImplDX12_NewFrame();
     ImGui_ImplWin32_NewFrame();
     ImGui::NewFrame();
-    ImGui::ShowDemoWindow(); // Show demo window! :)
+    //ImGui::ShowDemoWindow(); // Show demo window! :)
+
+    ImGui::Begin("CUMULUS");
+    ImGui::Text("Game Time(s): %f", gameTime);
+    ImGui::Text("Add some more standard analytics here");
+
+    ImGuiTabBarFlags tabFlags = ImGuiTabBarFlags_None;
+    if (ImGui::BeginTabBar("Tabs", tabFlags))
+    {   
+        if (ImGui::BeginTabItem("Cam Info"))
+        {
+            using namespace DirectX;
+            XMFLOAT3 cam_pos, cam_target, cam_fwd, cam_up, cam_r;
+            XMVECTOR cam_fwd_v, cam_up_v, cam_r_v;
+            cam.GetAxes(cam_fwd_v, cam_r_v, cam_up_v);
+            XMStoreFloat3(&cam_pos, cam.GetPosition());
+            XMStoreFloat3(&cam_fwd, cam_fwd_v);
+            XMStoreFloat3(&cam_up, cam_up_v);
+            XMStoreFloat3(&cam_r, cam_r_v);
+            XMStoreFloat3(&cam_target, cam.GetTarget());
+            ImGui::Text("Eye: %f, %f, %f", cam_pos.x, cam_pos.y, cam_pos.z);
+            ImGui::Text("Forward: %f, %f, %f", cam_fwd.x, cam_fwd.y, cam_fwd.z);
+            ImGui::Text("Right: %f, %f, %f", cam_r.x, cam_r.y, cam_r.z);
+            ImGui::Text("Up: %f, %f, %f", cam_up.x, cam_up.y, cam_up.z);
+            ImGui::Text("Target: %f, %f, %f", cam_target.x, cam_target.y, cam_target.z);
+            ImGui::Text("Azimuth: %f, Zenith: %f", cam.GetAzimuth(), cam.GetZenith());
+
+            ImGui::EndTabItem();
+        }
+        if (ImGui::BeginTabItem("Atmosphere"))
+        {
+            ImGui::Text("Sun Direction: %f, %f, %f", settings.sunDir.x, settings.sunDir.y, settings.sunDir.z);
+            ImGui::Checkbox("Toggle Dynamic Sun", &settings.isSunDynamic);
+            if (!settings.isSunDynamic)
+            {
+                ImGui::SliderInt("Time Of Day", &settings.timeOfDay, 0, 2400);
+            }
+            else
+            {
+                // NOTE: this is the same code as in AtmosphereUtils, so if that changes then this gets out of sync
+                float mapped_time = fmodf(gameTime * 60.f, 2400.f);
+                ImGui::Text("Current Time: %.0f", mapped_time);
+            }
+
+            ImGui::EndTabItem();
+        }
+        if (ImGui::BeginTabItem("Interactables"))
+        {
+            ImGui::Checkbox("Visualize Convex Hull", &settings.isSunDynamic);
+            ImGui::EndTabItem();
+        }
+
+        ImGui::EndTabBar();
+    }
+    ImGui::End();
 }
 
 void ImguiRender()
