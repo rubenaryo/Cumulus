@@ -184,7 +184,7 @@ void UpdateAtmosphere(cbAtmosphere& constants,
     XMMATRIX model_from_view = CreateModelFromViewMatrix(
         view_zenith_angle_radians,
         view_azimuth_angle_radians,
-        dist * 1000
+        dist * 100
     );
 
     // Store matrices (DirectX math uses row-major in memory, but these will actually still be like OpenGL column-major)
