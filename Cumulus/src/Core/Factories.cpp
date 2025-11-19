@@ -590,7 +590,7 @@ bool TextureFactory::LoadTexturesForNVDF(std::filesystem::path directoryPath, ID
     return true;
 }
 
-static bool LoadTGASlices(const std::vector<std::filesystem::path>& sliceFiles, size_t width, size_t height, std::vector<float>& outData)
+static bool LoadTGASlices(const std::vector<std::filesystem::path>& sliceFiles, size_t channelCount, size_t width, size_t height, std::vector<float>& outData)
 {
     using namespace DirectX;
     for (size_t i = 0; i < sliceFiles.size(); ++i)
@@ -604,86 +604,157 @@ static bool LoadTGASlices(const std::vector<std::filesystem::path>& sliceFiles, 
 
         const uint8_t* pixels = img->pixels;
         size_t bytesPerPixel = BitsPerPixel(img->format) / 8;
-        size_t sliceOffset = i * width * height * 4;
+        size_t sliceOffset = i * width * height * channelCount;
+
+        // How many channels are actually present in the source pixel
+        const size_t srcChannels = bytesPerPixel;
 
         for (size_t j = 0; j < width * height; ++j)
         {
             size_t x = j % width, y = j / width;
             size_t pixelOffset = y * img->rowPitch + x * bytesPerPixel;
-            size_t baseIndex = sliceOffset + j * 4;
+            size_t baseIndex = sliceOffset + j * channelCount;
 
-            outData[baseIndex + 0] = pixels[pixelOffset + 0] / 255.0f;
-            outData[baseIndex + 1] = pixels[pixelOffset + 1] / 255.0f;
-            outData[baseIndex + 2] = pixels[pixelOffset + 2] / 255.0f;
-            outData[baseIndex + 3] = (bytesPerPixel >= 4) ? pixels[pixelOffset + 3] / 255.0f : 1.0f;
+            // Copy as many channels as both the file and the destination support
+            const size_t channelsToCopy = std::min<size_t>(channelCount, srcChannels);
+        
+            for (size_t c = 0; c < channelsToCopy; ++c)
+            {
+                outData[baseIndex + c] = pixels[pixelOffset + c] / 255.0f;
+            }
+
+            // Fill any remaining channels with sensible defaults
+            for (size_t c = channelsToCopy; c < channelCount; ++c)
+            {
+                // Alpha defaults to 1, others to 0
+                if (c == 3) // alpha
+                    outData[baseIndex + c] = 1.0f;
+                else
+                    outData[baseIndex + c] = 0.0f;
+            }
         }
     }
     return true;
 }
 
-static bool LoadHDRSlices(const std::vector<std::filesystem::path>& sliceFiles, size_t width, size_t height, std::vector<float>& outData)
+static bool LoadHDRSlices(
+    const std::vector<std::filesystem::path>& sliceFiles,
+    size_t channelCount,
+    size_t width,
+    size_t height,
+    std::vector<float>& outData)
 {
     using namespace DirectX;
-    for (size_t i = 0; i < sliceFiles.size(); ++i)
+    namespace fs = std::filesystem;
+
+    const size_t depth = sliceFiles.size();
+
+    for (size_t z = 0; z < depth; ++z)
     {
         ScratchImage sliceImg;
-        if (FAILED(LoadFromHDRFile(sliceFiles[i].c_str(), nullptr, sliceImg)))
+        if (FAILED(LoadFromHDRFile(sliceFiles[z].c_str(), nullptr, sliceImg)))
             return false;
 
         const Image* img = sliceImg.GetImage(0, 0, 0);
-        if (!img) return false;
+        if (!img)
+            return false;
 
         const float* pixels = reinterpret_cast<const float*>(img->pixels);
-        size_t channelsPerPixel = BitsPerPixel(img->format) / 32;
-        size_t sliceOffset = i * width * height * 4;
+
+        // Each channel is 32 bits (float), so:
+        const size_t srcChannels = BitsPerPixel(img->format) / 32;
+        const size_t floatsPerRow = img->rowPitch / sizeof(float);
+        const size_t sliceOffset = z * width * height * channelCount;
 
         for (size_t j = 0; j < width * height; ++j)
         {
-            size_t x = j % width, y = j / width;
-            size_t pixelOffset = (y * img->rowPitch / 4) + x * channelsPerPixel;
-            size_t baseIndex = sliceOffset + j * 4;
+            size_t x = j % width;
+            size_t y = j / width;
 
-            outData[baseIndex + 0] = pixels[pixelOffset + 0];
-            outData[baseIndex + 1] = pixels[pixelOffset + 1];
-            outData[baseIndex + 2] = pixels[pixelOffset + 2];
-            outData[baseIndex + 3] = (channelsPerPixel >= 4) ? pixels[pixelOffset + 3] : 1.0f;
+            size_t pixelOffset = y * floatsPerRow + x * srcChannels;
+            size_t baseIndex = sliceOffset + j * channelCount;
+
+            const size_t channelsToCopy = std::min<size_t>(channelCount, srcChannels);
+
+            // Copy whatever exists in the source
+            for (size_t c = 0; c < channelsToCopy; ++c)
+            {
+                outData[baseIndex + c] = pixels[pixelOffset + c];
+            }
+
+            // Fill remaining channels with defaults (RGB=0, A=1)
+            for (size_t c = channelsToCopy; c < channelCount; ++c)
+            {
+                if (c == 3) // alpha
+                    outData[baseIndex + c] = 1.0f;
+                else
+                    outData[baseIndex + c] = 0.0f;
+            }
         }
     }
+
     return true;
 }
 
-static bool LoadWICSlices(const std::vector<std::filesystem::path>& sliceFiles, size_t width, size_t height, std::vector<float>& outData)
+static bool LoadWICSlices(
+    const std::vector<std::filesystem::path>& sliceFiles,
+    size_t channelCount,
+    size_t width,
+    size_t height,
+    std::vector<float>& outData)
 {
     using namespace DirectX;
-    for (size_t i = 0; i < sliceFiles.size(); ++i)
+    namespace fs = std::filesystem;
+
+    const size_t depth = sliceFiles.size();
+
+    for (size_t z = 0; z < depth; ++z)
     {
         ScratchImage sliceImg;
-        if (FAILED(LoadFromWICFile(sliceFiles[i].c_str(), WIC_FLAGS_NONE, nullptr, sliceImg)))
+        if (FAILED(LoadFromWICFile(sliceFiles[z].c_str(), WIC_FLAGS_NONE, nullptr, sliceImg)))
             return false;
 
         const Image* img = sliceImg.GetImage(0, 0, 0);
-        if (!img) return false;
+        if (!img)
+            return false;
 
         const uint8_t* pixels = img->pixels;
-        size_t bytesPerPixel = BitsPerPixel(img->format) / 8;
-        size_t sliceOffset = i * width * height * 4;
+        const size_t   bytesPerPixel = BitsPerPixel(img->format) / 8;
+        const size_t   srcChannels = bytesPerPixel; // 8 bits per channel
+        const size_t   sliceOffset = z * width * height * channelCount;
 
         for (size_t j = 0; j < width * height; ++j)
         {
-            size_t x = j % width, y = j / width;
-            size_t pixelOffset = y * img->rowPitch + x * bytesPerPixel;
-            size_t baseIndex = sliceOffset + j * 4;
+            size_t x = j % width;
+            size_t y = j / width;
 
-            outData[baseIndex + 0] = pixels[pixelOffset + 0] / 255.0f;
-            outData[baseIndex + 1] = pixels[pixelOffset + 1] / 255.0f;
-            outData[baseIndex + 2] = pixels[pixelOffset + 2] / 255.0f;
-            outData[baseIndex + 3] = (bytesPerPixel >= 4) ? pixels[pixelOffset + 3] / 255.0f : 1.0f;
+            size_t pixelOffset = y * img->rowPitch + x * bytesPerPixel;
+            size_t baseIndex = sliceOffset + j * channelCount;
+
+            const size_t channelsToCopy = std::min<size_t>(channelCount, srcChannels);
+
+            // Copy existing channels from the file
+            for (size_t c = 0; c < channelsToCopy; ++c)
+            {
+                outData[baseIndex + c] = pixels[pixelOffset + c] / 255.0f;
+            }
+
+            // Fill remaining channels with defaults (RGB=0, A=1)
+            for (size_t c = channelsToCopy; c < channelCount; ++c)
+            {
+                if (c == 3) // alpha
+                    outData[baseIndex + c] = 1.0f;
+                else
+                    outData[baseIndex + c] = 0.0f;
+            }
         }
     }
+
     return true;
 }
 
-bool TextureFactory::Load3DTextureFromSlices(std::filesystem::path directoryPath, ID3D12Device* pDevice, ID3D12GraphicsCommandList* pCommandList, ResourceCodex& codex)
+
+bool TextureFactory::Load3DTextureFromSlices(std::filesystem::path directoryPath, size_t channelCount, ID3D12Device* pDevice, ID3D12GraphicsCommandList* pCommandList, ResourceCodex& codex)
 {
     using namespace DirectX;
     namespace fs = std::filesystem;
@@ -779,24 +850,66 @@ bool TextureFactory::Load3DTextureFromSlices(std::filesystem::path directoryPath
         height = pImage->height;
     }
 
+    // Sanity check channelCount
+    if (channelCount == 0 || channelCount > 4)
+    {
+        Muon::Printf(L"Error: Unsupported channelCount (%u) for 3D texture in directory: %s\n",
+            channelCount, dirPathStr.c_str());
+        return false;
+    }
+
     // Load all slices
-    const size_t CHANNELS_PER_VOXEL = 4;
+    const size_t depth = sliceFiles.size();
+    const size_t CHANNELS_PER_VOXEL = channelCount;
     std::vector<float> outData(width * height * sliceFiles.size() * CHANNELS_PER_VOXEL);
 
     bool success = false;
     if (requiredExt == L".tga")
-        success = LoadTGASlices(sliceFiles, width, height, outData);
+        success = LoadTGASlices(sliceFiles, channelCount, width, height, outData);
     else if (requiredExt == L".hdr")
-        success = LoadHDRSlices(sliceFiles, width, height, outData);
+        success = LoadHDRSlices(sliceFiles, channelCount, width, height, outData);
     else if (requiredExt == L".png")
-        success = LoadWICSlices(sliceFiles, width, height, outData);
+        success = LoadWICSlices(sliceFiles, channelCount, width, height, outData);
 
     if (!success)
         return false;
 
+    // Choose DXGI format based on channelCount
+    DXGI_FORMAT format = DXGI_FORMAT_UNKNOWN;
+    switch (channelCount)
+    {
+    case 1:
+        format = DXGI_FORMAT_R32_FLOAT;
+        break;
+    case 2:
+        format = DXGI_FORMAT_R32G32_FLOAT;
+        break;
+    case 3:
+        format = DXGI_FORMAT_R32G32B32_FLOAT;
+        break;
+    case 4:
+        format = DXGI_FORMAT_R32G32B32A32_FLOAT;
+        break;
+    default:
+        // Should have been caught by the earlier check, but just in case
+        Muon::Printf(L"Error: Unsupported channel count (%u) when selecting DXGI format.\n",
+            channelCount);
+        return false;
+    }
+
+
     std::wstring lookupName = directoryPath.filename().wstring() + L"_3D";
-    success = Upload3DTextureFromData(lookupName.c_str(), outData.data(), width, height, sliceFiles.size(),
-        DXGI_FORMAT_R32G32B32A32_FLOAT, pDevice, pCommandList, codex);
+
+    success = Upload3DTextureFromData(
+        lookupName.c_str(), 
+        outData.data(), 
+        static_cast<uint32_t>(width),
+        static_cast<uint32_t>(height),
+        static_cast<uint16_t>(depth),
+        format, 
+        pDevice, 
+        pCommandList, 
+        codex);
 
     return success;
 }
@@ -882,23 +995,31 @@ void TextureFactory::LoadAllNVDF(ID3D12Device* pDevice, ID3D12GraphicsCommandLis
 
 void TextureFactory::LoadAll3DTextures(ID3D12Device* pDevice, ID3D12GraphicsCommandList* pCommandList, ResourceCodex& codex)
 {
+    using namespace std::filesystem;
+
+    Load3DTexturesInPath(path(TEX3D_SCALAR_PATHW), 1, pDevice, pCommandList, codex);
+    Load3DTexturesInPath(path(TEX3D_RGBA_PATHW), 4, pDevice, pCommandList, codex);
+}
+
+
+void TextureFactory::Load3DTexturesInPath(const std::filesystem::path& basePath, size_t channelCount, ID3D12Device* pDevice, ID3D12GraphicsCommandList* pCommandList, ResourceCodex& codex)
+{
     namespace fs = std::filesystem;
-    std::wstring tex3dPath = TEX3DPATHW;
 
 #if defined(MN_DEBUG)
-    if (!fs::exists(tex3dPath))
+    if (!fs::exists(basePath))
         throw std::exception("3D textures folder doesn't exist!");
 #endif
 
-    
-    for (const auto& entry : fs::directory_iterator(tex3dPath))
+
+    for (const auto& entry : fs::directory_iterator(basePath))
     {
         Muon::ResetCommandList(nullptr);
         std::wstring path = entry.path().wstring();
-        
+
         if (entry.is_directory())
         {
-            if (!Load3DTextureFromSlices(entry.path(), pDevice, pCommandList, codex))
+            if (!Load3DTextureFromSlices(entry.path(), channelCount, pDevice, pCommandList, codex))
             {
                 Muon::CloseCommandList();
                 Muon::Printf(L"Warning: Failed to load 3D Texture from directory: %s\n", path.c_str());
