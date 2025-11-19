@@ -46,10 +46,9 @@ DirectX::XMMATRIX CreateViewFromClipMatrix(float fovY_radians, float aspect_rati
 
 // Function to create the model_from_view matrix (inverse view matrix)
 DirectX::XMMATRIX CreateModelFromViewMatrix(
-    float view_distance_meters,
     float view_zenith_angle_radians,
     float view_azimuth_angle_radians,
-    DirectX::XMVECTOR at = DirectX::XMVectorSet(0.0f, 0.0f, 0.0f, 1.0f))    // looking at earth center
+    float view_distance_meters  = 9000)
 {
     using namespace DirectX;
 
@@ -59,28 +58,19 @@ DirectX::XMMATRIX CreateModelFromViewMatrix(
     // y = r * sin(zenith) * sin(azimuth)  
     // z = r * cos(zenith)
 
-    float sin_zenith = sinf(view_zenith_angle_radians);
-    float cos_zenith = cosf(view_zenith_angle_radians);
-    float sin_azimuth = sinf(view_azimuth_angle_radians);
-    float cos_azimuth = cosf(view_azimuth_angle_radians);
+    float s_z = sinf(view_zenith_angle_radians);
+    float c_z = cosf(view_zenith_angle_radians);
+    float s_a = sinf(view_azimuth_angle_radians);
+    float c_a = cosf(view_azimuth_angle_radians);
+    float l = view_distance_meters / kLengthUnitInMeters;
 
-    // camera position in world space (relative to earth center)
-    XMVECTOR camera_pos = XMVectorSet(
-        view_distance_meters * sin_zenith * cos_azimuth / kLengthUnitInMeters,
-        view_distance_meters * sin_zenith * sin_azimuth / kLengthUnitInMeters,
-        view_distance_meters * cos_zenith / kLengthUnitInMeters,
-        1.0f
-    );
-
-    // create view matrix first, then invert it
-    XMVECTOR eye = camera_pos;
-    XMVECTOR up = XMVectorSet(0.0f, 0.0f, 1.0f, 0.0f); // z-up coordinate system
-
-    // Important that this is RH like OpenGL instead of LH
-    XMMATRIX view_matrix = XMMatrixLookAtRH(eye, at, up);
-
-    // invert to get model_from_view (world from camera)
-    XMMATRIX model_from_view = XMMatrixInverse(nullptr, view_matrix);
+    // This follows the method from Bruneton's code,
+    // for a generic one, please look at older commits
+    XMMATRIX model_from_view = XMMatrixSet(
+        -s_a, c_a, 0.0, 0.0,
+        -c_z * c_a, -c_z * s_a, s_z, 0.0,
+        s_z * c_a, s_z * s_a, c_z, 0.0,
+        s_z * c_a * l, s_z * s_a * l, c_z * l, 1.0);
 
     return model_from_view;
 }
@@ -105,14 +95,20 @@ void InitializeAtmosphereConstants(
     // Create matrices
     XMMATRIX view_from_clip = CreateViewFromClipMatrix(kFovY, aspect_ratio);
     XMMATRIX model_from_view = CreateModelFromViewMatrix(
-        view_distance_meters,
         view_zenith_angle_radians,
-        view_azimuth_angle_radians
+        view_azimuth_angle_radians,
+        view_distance_meters
     );
 
     // Store matrices (DirectX math uses row-major in memory, but these will actually still be like OpenGL column-major)
     XMStoreFloat4x4(&constants.view_from_clip,  (view_from_clip));
     XMStoreFloat4x4(&constants.model_from_view, (model_from_view));
+
+    //Muon::Printf("Model From View: \n");
+    //Muon::Printf("%f, %f, %f, %f\n", constants.model_from_view._11, constants.model_from_view._12, constants.model_from_view._13, constants.model_from_view._14);
+    //Muon::Printf("%f, %f, %f, %f\n", constants.model_from_view._21, constants.model_from_view._22, constants.model_from_view._23, constants.model_from_view._24);
+    //Muon::Printf("%f, %f, %f, %f\n", constants.model_from_view._31, constants.model_from_view._32, constants.model_from_view._33, constants.model_from_view._34);
+    //Muon::Printf("%f, %f, %f, %f\n", constants.model_from_view._41, constants.model_from_view._42, constants.model_from_view._43, constants.model_from_view._44);
 
     // camera pos is grabbed from the calculation we already did for model matrix
     constants.camera_position = XMFLOAT3(constants.model_from_view._41, constants.model_from_view._42, constants.model_from_view._43);
@@ -165,7 +161,6 @@ void UpdateAtmosphere(cbAtmosphere& constants,
     float gameTime,
     float viewport_width = 1280,
     float viewport_height = 800,
-    float view_distance_meters = 9000.0f,
     float view_zenith_angle_radians = 1.47f,
     float view_azimuth_angle_radians = -0.1f)
 {
@@ -177,20 +172,19 @@ void UpdateAtmosphere(cbAtmosphere& constants,
     // FOV setup (50 degrees as in original)
     const float kFovY = 50.0f / 180.0f * static_cast<float>(kPi);
 
-
     view_zenith_angle_radians = camera.GetZenith();
     view_azimuth_angle_radians = camera.GetAzimuth();
     // set at to be Y up coordinate system
-    XMVECTOR target = camera.GetTarget();
-    XMVECTOR at = XMVectorSet(XMVectorGetX(target), XMVectorGetZ(target), XMVectorGetY(target), 0.0f);
+    //XMVECTOR target = camera.GetTarget();
+    //XMVECTOR at = XMVectorSet(XMVectorGetX(target), XMVectorGetZ(target), XMVectorGetY(target), 0.0f);
+    float dist = XMVectorGetY(camera.GetPosition());// XMVectorGetX(XMVector3Length(at));
     // Create matrices
     // NOTE: Ideally we woudln't want to recalculate view from clip every time
     XMMATRIX view_from_clip = CreateViewFromClipMatrix(kFovY, aspect_ratio);
     XMMATRIX model_from_view = CreateModelFromViewMatrix(
-        view_distance_meters,
         view_zenith_angle_radians,
         view_azimuth_angle_radians,
-        at
+        dist * 1000
     );
 
     // Store matrices (DirectX math uses row-major in memory, but these will actually still be like OpenGL column-major)
@@ -201,10 +195,12 @@ void UpdateAtmosphere(cbAtmosphere& constants,
     constants.camera_position = XMFLOAT3(constants.model_from_view._41, constants.model_from_view._42, constants.model_from_view._43);
 
     // Earth center (at origin in world space, but offset down in "length units")
-    constants.earth_center = XMFLOAT3(0.0f, 0.0f, -6360.0f); // Earth radius in km
+    constants.earth_center = view_zenith_angle_radians > XM_PIDIV2 ?
+        XMFLOAT3(1.0f, 0.0f, -6360.0f) :    // Earth is always in the same spot, so we will store camera is looking up here...
+        XMFLOAT3(0.0f, 0.0f, -6360.0f); // Earth radius in km
     // -0.989970, -0.141117, 0.006796 -> preset 2
     // -0.935575f, 0.230531f, 0.267499f -> preset 1
-    // -0.03931, 0.25845, -0.36024 is the resulting axis
+    // -0.03931, 0.25845, -0.36024 is the resulting axis, but it sucks aaaaahhhhh why doesn't the sun rise??
     //constants.sun_direction = XMFLOAT3(-0.935575f, 0.230531f, 0.267499f);
     if (isSunDynamic)
     {
@@ -216,7 +212,6 @@ void UpdateAtmosphere(cbAtmosphere& constants,
     {
         constants.sun_direction = GetSunDirection(timeOfDay);
     }
-    Muon::Printf("Sun Direction: %f, %f, %f \n", constants.sun_direction.x, constants.sun_direction.y, constants.sun_direction.z);
     // Normalize sun direction
     XMVECTOR sun_dir = XMLoadFloat3(&constants.sun_direction);
     sun_dir = XMVector3Normalize(sun_dir);

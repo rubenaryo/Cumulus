@@ -188,30 +188,44 @@ void Camera::Rotate(XMVECTOR quatRotation)
 
 void Camera::UpdateAzimuthZenith()
 {
+    // Sets zenith and azimuth based on current camera view
+    // Directions can get flipped around the north and south pole
+    // Fix would require editing the base rotation
+
     XMVECTOR worldUp = XMVectorSet(0.0f, 1.0f, 0.0f, 0.0f);
     XMVECTOR worldNorth = XMVectorSet(0.0f, 0.0f, 1.0f, 0.0f);
 
     float dotZenith = XMVectorGetX(XMVector3Dot(XMVectorNegate(mForward), worldUp));
     dotZenith = std::clamp(dotZenith, -1.0f, 1.0f); // Prevent NaN
-    mZenith = acosf(dotZenith);
+    float newZenith = acosf(dotZenith);
 
     XMVECTOR flatProjectFwd = XMVectorSet(XMVectorGetX(mForward), 0.0f, XMVectorGetZ(mForward), 0.0f);
-    // Check if we're looking straight up/down (degenerate case) -> keep prev value
+
     float flatLength = XMVectorGetX(XMVector3Length(flatProjectFwd));
-    if (flatLength < 0.0001f) {
-        return;
+
+    float newAzimuth = mAzimuth;
+    if (flatLength > 0.001f) {
+        flatProjectFwd = XMVector3Normalize(flatProjectFwd);
+        float x = XMVectorGetX(flatProjectFwd);
+        float z = XMVectorGetZ(flatProjectFwd);
+        newAzimuth = atan2f(z, x);
+        if (newAzimuth < 0.0f) newAzimuth += XM_2PI;
     }
-    flatProjectFwd = XMVector3Normalize(flatProjectFwd);
-    float dotAzimuth = XMVectorGetX(XMVector3Dot(flatProjectFwd, worldNorth));
-    dotAzimuth = std::clamp(dotAzimuth, -1.0f, 1.0f); // Prevent NaN
-    // Use cross product to determine quadrant
-    XMVECTOR cross = XMVector3Cross(worldNorth, flatProjectFwd);
-    float crossY = XMVectorGetY(cross);
-    mAzimuth = acosf(dotAzimuth);
-    // Adjust azimuth based on cross product to get full [0, 2PI] range
-    if (crossY < 0.0f) {
-        mAzimuth = XM_2PI - mAzimuth;
+
+    // Detect and correct large azimuth jumps (wrapping)
+    float azimuthDiff = newAzimuth - mAzimuth;
+
+    // Handle the 2pi boundary wrap-around
+    if (azimuthDiff > XM_PI) {
+        newAzimuth -= XM_2PI;
     }
+    else if (azimuthDiff < -XM_PI) {
+        newAzimuth += XM_2PI;
+    }
+
+    // Update both values
+    mZenith = newZenith;
+    mAzimuth = newAzimuth;
 }
 
 void Camera::UpdateConstantBuffer()
