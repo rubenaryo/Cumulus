@@ -1,6 +1,7 @@
 #include "Hull.h"
 #include <assimp/vector3.h>
 #include <unordered_map>
+#include <unordered_set>
 using namespace DirectX;
 
 namespace Muon
@@ -13,12 +14,141 @@ namespace Muon
         BuildHull(points, pointsCount);
     }
 
-    bool FaceVisibleFromPoint(const HullFace& face, XMVECTOR P)
+    static bool FaceVisibleFromPoint(const HullFace& face, XMVECTOR P)
     {
         XMVECTOR N = XMLoadFloat3(&face.normal);
         float side = XMVectorGetX(XMVector3Dot(N, P)) + face.distance;
         return side > 1e-6f;
     }
+
+    //returns (-1,-1) if no face point pairs exist
+    //returns face to point
+    static std::pair<int, int> FindFurthestFacePointPair(const std::unordered_map<int, std::vector<int>>& faceToPoints, const std::unordered_map<int, double>& pointToFaceDistance) {
+        int bestFace = -1;
+        int bestPoint = -1;
+        double maxDist = -std::numeric_limits<double>::infinity();
+
+        for (const auto& [faceIdx, points] : faceToPoints)
+        {
+            for (int p : points)
+            {
+                auto it = pointToFaceDistance.find(p);
+                if (it == pointToFaceDistance.end()) continue; // no distance for this point
+
+                double d = it->second;
+                if (d > maxDist)
+                {
+                    maxDist = d;
+                    bestFace = faceIdx;
+                    bestPoint = p;
+                }
+            }
+        }
+
+        return { bestFace, bestPoint };
+    }
+
+    static bool FaceHasDirectedEdge(const HullFace& f, int a, int b)
+    {
+        return (f.indices[0] == a && f.indices[1] == b) ||
+            (f.indices[1] == a && f.indices[2] == b) ||
+            (f.indices[2] == a && f.indices[0] == b);
+    }
+
+    static void BuildHorizon(
+        const std::vector<HullFace>& faces,
+        const std::vector<int>& visibleFaces,
+        std::vector<Edge>& outHorizon)
+    {
+        std::unordered_set<int> visibleSet(visibleFaces.begin(), visibleFaces.end());
+
+        std::unordered_set<Edge, EdgeHash> horizonSet;
+
+        auto AddOrRemoveEdge = [&](int a, int b)
+            {
+                Edge e{ a, b };
+
+                // If the opposite directed edge already exists, remove it.
+                // That means edge belongs to INTERNAL region between two visible faces.
+                Edge opposite{ b, a };
+                if (horizonSet.count(opposite))
+                {
+                    horizonSet.erase(opposite);
+                }
+                else
+                {
+                    horizonSet.insert(e);
+                }
+            };
+
+        for (int fIdx : visibleFaces)
+        {
+            const HullFace& f = faces[fIdx];
+
+            int v0 = f.indices[0];
+            int v1 = f.indices[1];
+            int v2 = f.indices[2];
+
+            // Each face has 3 directed edges
+            AddOrRemoveEdge(v0, v1);
+            AddOrRemoveEdge(v1, v2);
+            AddOrRemoveEdge(v2, v0);
+        }
+
+        // Remaining edges form the boundary between visible and non-visible
+        outHorizon.assign(horizonSet.begin(), horizonSet.end());
+    }
+
+    void Hull::ReassignOutsidePoints(
+        const std::vector<int>& removedFaces,
+        std::unordered_map<int, std::vector<int>>& faceToFurthestPoints,
+        std::unordered_map<int, double>& pointToFaceDistance,
+        const std::vector<Muon::HullFace>& faces,
+        const std::vector<bool>& faceDeleted
+    )
+    {
+        std::vector<int> toReassign;
+
+        // Collect points from removed faces
+        for (int f : removedFaces)
+        {
+            auto& pts = faceToFurthestPoints[f];
+            toReassign.insert(toReassign.end(), pts.begin(), pts.end());
+            pts.clear();
+        }
+
+        // Now reassign them to new or existing faces
+        for (auto& op : toReassign)
+        {
+            int idx = op;
+            XMVECTOR P = XMLoadFloat3((XMFLOAT3*)&hullPoints[idx]);
+
+            float maxDist = 0;
+            int bestFace = -1;
+
+            for (int f = 0; f < faces.size(); ++f)
+            {
+                if (faceDeleted[f]) continue;
+
+                XMVECTOR N = XMLoadFloat3(&faces[f].normal);
+                float dist = XMVectorGetX(XMVector3Dot(N, P)) + faces[f].distance;
+
+                if (dist > maxDist)
+                {
+                    maxDist = dist;
+                    bestFace = f;
+                }
+            }
+
+            if (bestFace != -1) {
+                faceToFurthestPoints[bestFace].push_back(idx);
+                pointToFaceDistance[idx] = maxDist;
+            }
+        }
+    }
+
+
+
 
 
     void Hull::BuildHull(const aiVector3D* points, int pointsCount)
@@ -200,7 +330,7 @@ namespace Muon
             }
         }
 
-        std::unordered_map<int, std::vector<int>> faceToClosestPoints;
+        std::unordered_map<int, std::vector<int>> faceToFurthestPoints;
         std::unordered_map<int, double> pointToFaceDistance;
 
         //Step 6: find points outside faces
@@ -229,10 +359,46 @@ namespace Muon
 
 
             if (bestFace != -1) {
-                faceToClosestPoints[bestFace].push_back(i);
+                faceToFurthestPoints[bestFace].push_back(i);
                 pointToFaceDistance[i] = maxDist;
             }
         }
 
+        //Step 7: Expand Hull
+
+        while (true)
+        {
+            int faceWithFurthest = 0;
+            std::pair<int, int> furthestPoint = FindFurthestFacePointPair(faceToFurthestPoints, pointToFaceDistance);
+            
+            //done!
+            if (furthestPoint.first == -1) break;
+
+            XMVECTOR P = XMLoadFloat3((XMFLOAT3*)&points[furthestPoint.second]);
+
+            std::vector<int> visibleFaces;
+            for (int f = 0; f < faces.size(); ++f) {
+                if (FaceVisibleFromPoint(faces[f], P)) {
+                    visibleFaces.push_back(f);
+                }
+            }
+
+            std::vector<Edge> horizon;
+            BuildHorizon(faces, visibleFaces, horizon);
+
+            std::vector<bool> faceDeleted(faces.size(), false);
+            std::vector<int> removedFaces;
+
+            for (int idx : visibleFaces) {
+                faceDeleted[idx] = true;
+                removedFaces.push_back(idx);
+            }
+
+            for (auto& e : horizon) {
+                AddFace(e.v0, e.v1, furthestPoint.second);
+            }
+
+            ReassignOutsidePoints(removedFaces, faceToFurthestPoints, pointToFaceDistance, faces, faceDeleted);
+        }
     }
 }
