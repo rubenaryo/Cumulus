@@ -25,7 +25,7 @@ or "Introduction to 3D Game Programming with DirectX 12" by Frank Luna
 do {                                \
     if (!s)                         \
     {                               \
-        Muon::Print(msg);           \
+        Print(msg);           \
         return false;               \
     }                               \
 } while (0)                         \
@@ -56,6 +56,7 @@ namespace Muon
     Microsoft::WRL::ComPtr<IDXGISwapChain3> gSwapChain;
     Microsoft::WRL::ComPtr<ID3D12Resource> gSwapChainBuffers[SWAP_CHAIN_BUFFER_COUNT];
     Microsoft::WRL::ComPtr<ID3D12Resource> gDepthStencilBuffer;
+    TextureView gDepthStencilSRV;
 
     Texture* gOffscreenTarget = nullptr;
 
@@ -85,6 +86,8 @@ namespace Muon
     int GetSwapChainBufferCount() { return SWAP_CHAIN_BUFFER_COUNT; }
     D3D12_CPU_DESCRIPTOR_HANDLE GetCurrentBackBufferView() { return CD3DX12_CPU_DESCRIPTOR_HANDLE(gRTVHeap->GetCPUDescriptorHandleForHeapStart(), CurrentBackBuffer, gRTVSize); }
     D3D12_CPU_DESCRIPTOR_HANDLE GetDepthStencilView() { return gDSVHeap->GetCPUDescriptorHandleForHeapStart(); }
+    const TextureView& GetDepthStencilSRV() { return gDepthStencilSRV; }
+    ID3D12Resource* GetDepthStencilResource() { return gDepthStencilBuffer.Get(); }
     D3D12_CLEAR_VALUE& GetGlobalClearValue() { return gClearValue; }
     HWND GetHwnd() { return gHwnd; }
 
@@ -158,7 +161,7 @@ namespace Muon
         }
         else
         {
-            Muon::Print("WARNING:  Unable to enable D3D12 debug validation layer\n");
+            Print("WARNING:  Unable to enable D3D12 debug validation layer\n");
             return false;
         }
 
@@ -204,13 +207,13 @@ namespace Muon
             Microsoft::WRL::ComPtr<ID3D12Device> testDevice;
             if (FAILED(D3D12CreateDevice(pAdapter.Get(), D3D_FEATURE_LEVEL_12_0, IID_PPV_ARGS(testDevice.GetAddressOf()))))
             {
-                Muon::Print("Error: Failed to create device!\n");
+                Print("Error: Failed to create device!\n");
                 continue;
             }
 
             if (!IsDirectXRaytracingSupported(testDevice.Get()))
             {
-                Muon::Print("Warning: Found device does NOT support DXR raytracing.\n");
+                Print("Warning: Found device does NOT support DXR raytracing.\n");
             }
 
             // By default, search for the adapter with the most memory because that's usually the dGPU.
@@ -219,7 +222,7 @@ namespace Muon
 
             MaxSize = desc.DedicatedVideoMemory;
             pTempDevice = testDevice;
-            Muon::Printf(L"Selected GPU:  %s (%u MB)\n", desc.Description, desc.DedicatedVideoMemory >> 20);
+            Printf(L"Selected GPU:  %s (%u MB)\n", desc.Description, desc.DedicatedVideoMemory >> 20);
         }
 
         if (pTempDevice.Get() != nullptr)
@@ -251,7 +254,7 @@ namespace Muon
     {
         if (!pDevice)
         {
-            Muon::Print("Failed to create fence because of null device!\n");
+            Print("Failed to create fence because of null device!\n");
             return false;
         }
 
@@ -269,7 +272,7 @@ namespace Muon
     {
         if (!pDevice)
         {
-            Muon::Print("Failed to get descriptor sizes because of null device!\n");
+            Print("Failed to get descriptor sizes because of null device!\n");
             return false;
         }
 
@@ -355,7 +358,7 @@ namespace Muon
         hr = swapChain.As(&out_swapchain);
         CurrentBackBuffer = out_swapchain->GetCurrentBackBufferIndex();
 
-        return SUCCEEDED(hr);
+return SUCCEEDED(hr);
     }
 
     bool CreateDescriptorHeaps(ID3D12Device* pDevice,
@@ -407,7 +410,7 @@ namespace Muon
     {
         if (!pDevice || !pCommandList)
         {
-            Muon::Print("Error: Failed to create depth stencil buffer! Null device or command list\n");
+            Print("Error: Failed to create depth stencil buffer! Null device or command list\n");
             return false;
         }
 
@@ -422,7 +425,7 @@ namespace Muon
         depthStencilDesc.SampleDesc.Quality = GetMSAAQualityLevel();
         depthStencilDesc.Layout = D3D12_TEXTURE_LAYOUT_UNKNOWN;
         depthStencilDesc.Flags = D3D12_RESOURCE_FLAG_ALLOW_DEPTH_STENCIL;
-        depthStencilDesc.Format = DepthStencilFormat;
+        depthStencilDesc.Format = DXGI_FORMAT_R24G8_TYPELESS;
 
         D3D12_CLEAR_VALUE optClear;
         optClear.Format = DepthStencilFormat;
@@ -445,6 +448,22 @@ namespace Muon
         dsvDesc.Texture2D.MipSlice = 0;
         pDevice->CreateDepthStencilView(out_depthStencilBuffer.Get(), &dsvDesc, GetDepthStencilView());
 
+        // Create an SRV for the depth buffer so we can bind it and use it in other parts of the pipeline
+        D3D12_SHADER_RESOURCE_VIEW_DESC srvDesc = {};
+        srvDesc.Shader4ComponentMapping = D3D12_DEFAULT_SHADER_4_COMPONENT_MAPPING;
+        srvDesc.Format = DXGI_FORMAT_R24_UNORM_X8_TYPELESS;
+        srvDesc.ViewDimension = D3D12_SRV_DIMENSION_TEXTURE2D;
+        srvDesc.Texture2D.MipLevels = 1;
+        srvDesc.Texture2D.MostDetailedMip = 0;
+
+        if (!gSRVHeap->Allocate(gDepthStencilSRV.HandleCPU, gDepthStencilSRV.HandleGPU))
+        {
+            Muon::Print("Error: Failed to allocate CPU/GPU handles for Depth Stencil SRV!\n");
+            return false;
+        }
+
+        pDevice->CreateShaderResourceView(out_depthStencilBuffer.Get(), &srvDesc, gDepthStencilSRV.HandleCPU);
+
         // Transition from initial -> depth buffer use
         pCommandList->Reset(GetCommandAllocator(), nullptr);
 
@@ -458,7 +477,7 @@ namespace Muon
     {
         if (!pCommandList)
         {
-            Muon::Print("Error: Failed to set viewport due to null command list!\n");
+            Print("Error: Failed to set viewport due to null command list!\n");
             return false;
         }
 
@@ -517,7 +536,7 @@ namespace Muon
     {
         if (!gOffscreenTarget)
         {
-            Muon::Printf("Fatal Error: Offscreen target pointer not set in DXCore!\n");
+            Printf("Fatal Error: Offscreen target pointer not set in DXCore!\n");
             return false;
         }
 
@@ -530,12 +549,13 @@ namespace Muon
         pCommandList->ResourceBarrier(1, &CD3DX12_RESOURCE_BARRIER::Transition(gOffscreenTarget->GetResource(), 
             D3D12_RESOURCE_STATE_GENERIC_READ, D3D12_RESOURCE_STATE_RENDER_TARGET));
         
-        pCommandList->OMSetRenderTargets(1, &gOffscreenTarget->GetRTVHandleCPU(), FALSE, nullptr);
+        pCommandList->OMSetRenderTargets(1, &gOffscreenTarget->GetRTVHandleCPU(), FALSE, &GetDepthStencilView());
 
         // Clear the back buffer
         pCommandList->ClearRenderTargetView(gOffscreenTarget->GetRTVHandleCPU(), gClearValue.Color, 0, nullptr);
         
-        // TODO: Clear depth stencil once we need that
+        // Clear the depth buffer
+        pCommandList->ClearDepthStencilView(GetDepthStencilView(), D3D12_CLEAR_FLAG_DEPTH, 1.0f, 0, 0, nullptr);
 
         return true;
     }
@@ -706,7 +726,7 @@ namespace Muon
         success &= CreateDepthStencilBuffer(GetDevice(), GetCommandList(), GetCommandQueue(), width, height, gDepthStencilBuffer);
         CHECK_SUCCESS(success, "Error: Failed to create depth stencil buffer!\n");
 
-        success &= SetViewport(GetCommandList(), 0, 0, width, height, 0.001f, 1000.0f);
+        success &= SetViewport(GetCommandList(), 0, 0, width, height, 0.0f, 1.0f);
         CHECK_SUCCESS(success, "Error: Failed to set viewport!\n");
 
         success &= SetScissorRects(GetCommandList(), 0, 0, width, height);
@@ -729,21 +749,21 @@ namespace Muon
         Microsoft::WRL::ComPtr<IDXGIDebug1> dxgiDebug;
         if (SUCCEEDED(DXGIGetDebugInterface1(0, IID_PPV_ARGS(&dxgiDebug))))
         {
-            Muon::Print("\n========================================\n");
-            Muon::Print("D3D12 & DXGI Live Objects Report\n");
-            Muon::Print("========================================\n");
+            Print("\n========================================\n");
+            Print("D3D12 & DXGI Live Objects Report\n");
+            Print("========================================\n");
             DXGI_DEBUG_RLO_FLAGS flags = (DXGI_DEBUG_RLO_FLAGS)(DXGI_DEBUG_RLO_DETAIL | DXGI_DEBUG_RLO_IGNORE_INTERNAL);
             HRESULT hr = dxgiDebug->ReportLiveObjects(DXGI_DEBUG_ALL, flags);
 
             if (SUCCEEDED(hr))
             {
-                Muon::Print("If you see no DXGI/D3D12 warnings above, cleanup was successful\n");
+                Print("If you see no DXGI/D3D12 warnings above, cleanup was successful\n");
             }
             else
             {
-                Muon::Printf("Failed to generate report. HRESULT: 0x%08X\n", hr);
+                Printf("Failed to generate report. HRESULT: 0x%08X\n", hr);
             }
-            Muon::Print("========================================\n\n");
+            Print("========================================\n\n");
         }
     }
 #endif

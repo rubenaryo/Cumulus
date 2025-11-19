@@ -11,16 +11,22 @@ Description : Implementation of Game.h
 #include <Core/Camera.h>
 #include <Core/COMException.h>
 #include <Core/Factories.h>
+#include <Core/MuonImgui.h>
 #include <Core/ResourceCodex.h>
 #include <Core/Shader.h>
 #include <Core/Texture.h>
 #include <Utils/Utils.h>
-#include "SBufferStructs.h"
+#include <Utils/AtmosphereUtils.h>
+
+#include <imgui.h>
+#include <imgui_impl_win32.h>
+#include <imgui_impl_dx12.h>
 
 Game::Game() :
     mInput(),
     mCamera(),
     mOpaquePass(L"OpaquePass"),
+    mAtmospherePass(L"AtmospherePass"),
     mSobelPass(L"SobelPass"),
     mRaymarchPass(L"RaymarchPass"),
     mPostProcessPass(L"PostProcessPass")
@@ -34,6 +40,13 @@ bool Game::Init(HWND window, int width, int height)
 
     bool success = Muon::InitDX12(window, width, height);
 
+    success &= Muon::ImguiInit();
+    if (!success)
+    {
+        Print(L"Error: ImguiInit() failed!\n");
+        return false;
+    }
+
     ResourceCodex::Init();
 
     Muon::ResetCommandList(nullptr);
@@ -42,15 +55,26 @@ bool Game::Init(HWND window, int width, int height)
 
     ResourceCodex& codex = ResourceCodex::GetSingleton();
 
-    mCamera.Init(DirectX::XMFLOAT3(3.0, 3.0, 3.0), width / (float)height, 0.1f, 1000.0f);
+    mCamera.Init(DirectX::XMFLOAT3(500.0, 300.0, 100.0), width / (float)height, 0.1f, 1000.0f);
 
     // Assemble opaque render pass
     {
         mOpaquePass.SetVertexShader(codex.GetVertexShader(GetResourceID(L"Phong.vs")));
         mOpaquePass.SetPixelShader(codex.GetPixelShader(GetResourceID(L"Phong_NormalMap.ps")));
+        mOpaquePass.SetEnableDepth(true);
 
         if (!mOpaquePass.Generate())
             Printf(L"Warning: %s failed to generate!\n", mOpaquePass.GetName());
+    }
+
+    // Assemble atmosphere render pass
+    {
+        mAtmospherePass.SetVertexShader(codex.GetVertexShader(GetResourceID(L"atmosphere.vs")));
+        mAtmospherePass.SetPixelShader(codex.GetPixelShader(GetResourceID(L"atmosphere.ps")));
+        mAtmospherePass.SetEnableDepth(false);
+
+        if (!mAtmospherePass.Generate())
+            Printf(L"Warning: %s failed to generate!\n", mAtmospherePass.GetName());
     }
 
     // Assemble compute filter pass
@@ -73,6 +97,7 @@ bool Game::Init(HWND window, int width, int height)
     {
         mPostProcessPass.SetVertexShader(codex.GetVertexShader(GetResourceID(L"Passthrough.vs")));
         mPostProcessPass.SetPixelShader(codex.GetPixelShader(GetResourceID(L"Passthrough.ps")));
+        mPostProcessPass.SetEnableDepth(false);
 
         if (!mPostProcessPass.Generate())
             Printf(L"Warning: %s failed to generate!\n", mPostProcessPass.GetName());
@@ -89,16 +114,27 @@ bool Game::Init(HWND window, int width, int height)
 
         const float PI = 3.14159f;
         XMMATRIX entityWorld = DirectX::XMMatrixIdentity();
-        //entityWorld = XMMatrixMultiply(entityWorld, DirectX::XMMatrixRotationRollPitchYaw(0, 0, PI/2.0f));
-        //entityWorld = XMMatrixMultiply(entityWorld, DirectX::XMMatrixRotationRollPitchYaw(-PI/2.0f, 0,0));
-        //entityWorld = XMMatrixMultiply(entityWorld, DirectX::XMMatrixScaling(0.12f, 0.12f, 0.12f));
-        //entityWorld = XMMatrixMultiply(entityWorld, DirectX::XMMatrixTranslation(0, 1, 0));
+        entityWorld = XMMatrixMultiply(entityWorld, DirectX::XMMatrixRotationRollPitchYaw(0, 0, PI/2.0f));
+        entityWorld = XMMatrixMultiply(entityWorld, DirectX::XMMatrixRotationRollPitchYaw(-PI/2.0f, 0,0));
+        entityWorld = XMMatrixMultiply(entityWorld, DirectX::XMMatrixScaling(0.12f, 0.12f, 0.12f));
+        entityWorld = XMMatrixMultiply(entityWorld, DirectX::XMMatrixTranslation(0, 1, 0));
         XMStoreFloat4x4(&entity.world, entityWorld);
         XMStoreFloat4x4(&entity.invWorld, DirectX::XMMatrixInverse(nullptr, entityWorld));
         memcpy(mapped, &entity, sizeof(entity));
     }
 
     mLightBuffer.Create(L"Light Buffer", sizeof(cbLights));
+    mTimeBuffer.Create(L"Time", sizeof(cbTime));
+    mAtmosphereBuffer.Create(L"Atmosphere CB", sizeof(cbAtmosphere));
+
+    cbAtmosphere atmosphereParams;
+    InitializeAtmosphereConstants(atmosphereParams, width, height);
+
+    mapped = mAtmosphereBuffer.GetMappedPtr();
+    if (mapped)
+    {
+        memcpy(mapped, &atmosphereParams, sizeof(cbAtmosphere));
+    }
 
     mAABBBuffer.Create(L"AABB Buffer", sizeof(cbIntersections));
 
@@ -223,6 +259,18 @@ void Game::Update(Muon::StepTimer const& timer)
     UINT8* timeBuf = mTimeBuffer.GetMappedPtr();
     if (timeBuf)
         memcpy(timeBuf, &time, sizeof(Muon::cbTime));
+
+    // Updating Atmosphere
+    Muon::cbAtmosphere atmosphereParams;
+    Muon::UpdateAtmosphere(atmosphereParams, mCamera, mIsSunDynamic, mTimeOfDay, time.totalTime);
+    //Muon::InitializeAtmosphereConstants(atmosphereParams, 1280, 800);
+    mSunDir = atmosphereParams.sun_direction;
+
+    mapped = mAtmosphereBuffer.GetMappedPtr();
+    if (mapped)
+    {
+        memcpy(mapped, &atmosphereParams, sizeof(Muon::cbAtmosphere));
+    }
 }
 
 void Game::Render()
@@ -238,6 +286,8 @@ void Game::Render()
     ResetCommandList(nullptr);
     PrepareForRender();
 
+    ImguiNewFrame(mTimer.GetTotalSeconds(), mCamera, mSunDir, mIsSunDynamic, mTimeOfDay);
+
     // Fetch the desired material from the codex
     ResourceCodex& codex = ResourceCodex::GetSingleton();
     ResourceID phongMatId = GetResourceID(L"Phong");
@@ -245,7 +295,6 @@ void Game::Render()
     
     Texture* pOffscreenTarget = codex.GetTexture(GetResourceID(L"OffscreenTarget"));
     Texture* pComputeOutput = codex.GetTexture(GetResourceID(L"SobelOutput"));
-    Texture* pSdfNVDF = codex.GetTexture(GetResourceID(L"StormbirdCloud_NVDF"));
     if (!pOffscreenTarget || !pComputeOutput)
     {
         Muon::Printf("Error: Game::Render Failed to fetch the offscreen target and compute output textures.\n");
@@ -254,6 +303,50 @@ void Game::Render()
 
     ID3D12GraphicsCommandList* pCommandList = GetCommandList();
     pCommandList->SetDescriptorHeaps(1, GetSRVHeap()->GetHeapAddr());
+
+    if (mAtmospherePass.Bind(pCommandList))
+    {
+        const Texture* pTransmittanceTex = codex.GetTexture(GetResourceID(L"transmittance_high.hdr"));
+        const Texture* pIrradianceTex = codex.GetTexture(GetResourceID(L"irradiance_high.hdr"));
+        const Texture* pScatteringTex = codex.GetTexture(GetResourceID(L"TestHDR_3D"));// L"scatter_tex_full.dds"));    // .dds seems to work the same
+
+        int32_t cameraRootIdx = mAtmospherePass.GetResourceRootIndex("VSCamera");
+        if (cameraRootIdx != ROOTIDX_INVALID)
+        {
+            mCamera.Bind(cameraRootIdx, pCommandList);
+        }
+
+        int32_t atmosphereRootIdx = mAtmospherePass.GetResourceRootIndex("cbAtmosphere");
+        if (atmosphereRootIdx != ROOTIDX_INVALID)
+        {
+            pCommandList->SetGraphicsRootConstantBufferView(atmosphereRootIdx, mAtmosphereBuffer.GetGPUVirtualAddress());
+        }
+
+        int32_t transmittanceIdx = mAtmospherePass.GetResourceRootIndex("transmittance_texture");
+        if (pTransmittanceTex && transmittanceIdx != ROOTIDX_INVALID)
+        {
+            pCommandList->SetGraphicsRootDescriptorTable(transmittanceIdx, pTransmittanceTex->GetSRVHandleGPU());
+        }
+
+        int32_t irradianceIdx = mAtmospherePass.GetResourceRootIndex("irradiance_texture");
+        if (pIrradianceTex && irradianceIdx != ROOTIDX_INVALID)
+        {
+            pCommandList->SetGraphicsRootDescriptorTable(irradianceIdx, pIrradianceTex->GetSRVHandleGPU());
+        }
+
+        int32_t scatterIdx = mAtmospherePass.GetResourceRootIndex("scattering_texture");
+        if (pScatteringTex && scatterIdx != ROOTIDX_INVALID)
+        {
+            pCommandList->SetGraphicsRootDescriptorTable(scatterIdx, pScatteringTex->GetSRVHandleGPU());
+        }
+
+        // Draw fullscreen quad
+        pCommandList->IASetVertexBuffers(0, 1, nullptr);
+        pCommandList->IASetIndexBuffer(nullptr);
+        pCommandList->IASetPrimitiveTopology(D3D_PRIMITIVE_TOPOLOGY_TRIANGLELIST);
+
+        pCommandList->DrawInstanced(6, 1, 0, 0);
+    }
 
     if (mOpaquePass.Bind(pCommandList))
     {
@@ -286,7 +379,7 @@ void Game::Render()
             pCommandList->SetGraphicsRootConstantBufferView(timeRootIdx, mTimeBuffer.GetGPUVirtualAddress());
         }
 
-        const Mesh* pMesh = codex.GetMesh(GetResourceID(L"rock_platform.obj"));
+        const Mesh* pMesh = codex.GetMesh(GetResourceID(L"teapot.obj"));
         if (pMesh)
         {
             pMesh->DrawIndexed(pCommandList);
@@ -295,8 +388,15 @@ void Game::Render()
 
     }
 
+    // After opaque pass, transition depth buffer to be bindable as a regular texture by other passes
+    pCommandList->ResourceBarrier(1, &CD3DX12_RESOURCE_BARRIER::Transition(GetDepthStencilResource(),
+        D3D12_RESOURCE_STATE_DEPTH_WRITE, D3D12_RESOURCE_STATE_NON_PIXEL_SHADER_RESOURCE));
+
     if (mRaymarchPass.Bind(pCommandList))
     {
+        Texture* pSdfNVDF = codex.GetTexture(GetResourceID(L"StormbirdCloud_NVDF"));
+        Texture* pNoise = codex.GetTexture(GetResourceID(L"Noise_3D"));
+
         pCommandList->ResourceBarrier(1, &CD3DX12_RESOURCE_BARRIER::Transition(pOffscreenTarget->GetResource(),
             D3D12_RESOURCE_STATE_RENDER_TARGET, D3D12_RESOURCE_STATE_GENERIC_READ));
 
@@ -344,9 +444,21 @@ void Game::Render()
         }
 
         int32_t sdfNVDFIndex = mRaymarchPass.GetResourceRootIndex("sdfNvdfTex");
-        if (inIdx != ROOTIDX_INVALID)
+        if (sdfNVDFIndex != ROOTIDX_INVALID)
         {
             pCommandList->SetComputeRootDescriptorTable(sdfNVDFIndex, pSdfNVDF->GetSRVHandleGPU());
+        }
+
+        int32_t noiseIndex = mRaymarchPass.GetResourceRootIndex("noiseTex"); 
+        if (noiseIndex != ROOTIDX_INVALID)
+        {
+            pCommandList->SetComputeRootDescriptorTable(noiseIndex, pNoise->GetSRVHandleGPU()); 
+        }
+
+        int32_t depthBufferIdx = mRaymarchPass.GetResourceRootIndex("depthStencilBuffer");
+        if (depthBufferIdx != ROOTIDX_INVALID)
+        {
+            pCommandList->SetComputeRootDescriptorTable(depthBufferIdx, GetDepthStencilSRV().HandleGPU);
         }
 
         pCommandList->ResourceBarrier(1, &CD3DX12_RESOURCE_BARRIER::Transition(pComputeOutput->GetResource(),
@@ -364,8 +476,12 @@ void Game::Render()
             D3D12_RESOURCE_STATE_PRESENT, D3D12_RESOURCE_STATE_RENDER_TARGET));
 
         // Specify the buffers we are going to render to.
-        pCommandList->OMSetRenderTargets(1, &GetCurrentBackBufferView(), true, &GetDepthStencilView());
+        pCommandList->OMSetRenderTargets(1, &GetCurrentBackBufferView(), true, nullptr);
     }
+
+    // Get depth buffer ready to write depth again
+    pCommandList->ResourceBarrier(1, &CD3DX12_RESOURCE_BARRIER::Transition(GetDepthStencilResource(),
+        D3D12_RESOURCE_STATE_NON_PIXEL_SHADER_RESOURCE, D3D12_RESOURCE_STATE_DEPTH_WRITE));
 
     if (mPostProcessPass.Bind(pCommandList))
     {
@@ -383,6 +499,7 @@ void Game::Render()
         pCommandList->DrawInstanced(6, 1, 0, 0);
     }
 
+    ImguiRender();
     FinalizeRender();
     CloseCommandList();
     ExecuteCommandList();
@@ -408,16 +525,19 @@ Game::~Game()
     mLightBuffer.Destroy();
     mTimeBuffer.Destroy();
     mAABBBuffer.Destroy();
+    mAtmosphereBuffer.Destroy();
     mHullBuffer.Destroy();
     mHullFaceBuffer.Destroy();
     mHullPointBuffer.Destroy();
     mCamera.Destroy();
     mInput.Destroy();
     mOpaquePass.Destroy();
+    mAtmospherePass.Destroy();
     mSobelPass.Destroy();
     mRaymarchPass.Destroy();
     mPostProcessPass.Destroy();
 
+    Muon::ImguiShutdown();
     Muon::ResourceCodex::Destroy();
     Muon::DestroyDX12();
 }

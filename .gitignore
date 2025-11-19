@@ -6,6 +6,7 @@
 # User-defined binary and intermediate folders
 _int/
 _bin/
+external/imgui/bin
 
 # Visual Studio solution and project files (We use premake now)
 *.vcxproj
@@ -94,3 +95,4 @@ ipch/
 
 # Local History for Visual Studio
 .localhistory/
+Cumulus/imgui.ini

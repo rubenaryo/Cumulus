@@ -22,7 +22,7 @@ namespace Input {
     {
         using namespace DirectX;
 
-        static const float kSpeed = 5.0f;
+        static const float kSpeed = 30.0f;
 
         // Act on user input:
         // - Iterate through all active keys
@@ -36,28 +36,31 @@ namespace Input {
                 PostQuitMessage(0);
                 break;
             case GameCommands::MoveForward:
-                pCamera->MoveForward(kSpeed * dt);
+                pCamera->MoveForward((kSpeed + mIsSprint * mSprintVal) * dt);
                 break;
             case GameCommands::MoveBackward:
-                pCamera->MoveForward(-kSpeed * dt);
+                pCamera->MoveForward(-(kSpeed + mIsSprint * mSprintVal) * dt);
                 break;
             case GameCommands::MoveLeft:
-                pCamera->MoveRight(-kSpeed * dt);
+                pCamera->MoveRight(-(kSpeed + mIsSprint * mSprintVal) * dt);
                 break;
             case GameCommands::MoveRight:
-                pCamera->MoveRight(kSpeed * dt);
+                pCamera->MoveRight((kSpeed + mIsSprint * mSprintVal) * dt);
                 break;
             case GameCommands::MoveUp:
-                pCamera->MoveUp(kSpeed * dt);
+                pCamera->MoveUp((kSpeed + mIsSprint * mSprintVal) * dt);
                 break;
             case GameCommands::MoveDown:
-                pCamera->MoveUp(-kSpeed * dt);
+                pCamera->MoveUp(-(kSpeed + mIsSprint * mSprintVal) * dt);
                 break;
             case GameCommands::RollLeft:
                 pCamera->Rotate(XMQuaternionRotationAxis(pCamera->mForward, kSpeed*dt));
                 break;
             case GameCommands::RollRight:
                 pCamera->Rotate(XMQuaternionRotationAxis(pCamera->mForward, -kSpeed * dt));
+                break;
+            case GameCommands::ToggleSprint:
+                mIsSprint = !mIsSprint;
                 break;
             case GameCommands::MouseRotation:
             {
@@ -111,6 +114,7 @@ namespace Input {
         mKeyMap[GameCommands::MoveRight]    = new Chord(L"Move Right", 'D', KeyState::StillPressed);
         mKeyMap[GameCommands::MoveUp]       = new Chord(L"Move Up", 'Q', KeyState::StillPressed);
         mKeyMap[GameCommands::MoveDown]     = new Chord(L"Move Down", 'E', KeyState::StillPressed);
+        mKeyMap[GameCommands::ToggleSprint] = new Chord(L"Toggle Sprint", VK_LSHIFT, KeyState::JustPressed);
         //mKeyMap[GameCommands::RollLeft]     = new Chord(L"Roll Left", 'Q', KeyState::StillPressed);
         //mKeyMap[GameCommands::RollRight]    = new Chord(L"Roll Right", 'E', KeyState::StillPressed);
 

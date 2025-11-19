@@ -85,5 +85,28 @@ struct alignas(16) cbHullPoints
     DirectX::XMFLOAT3A points[2048];
 };
 
+struct alignas(16) cbAtmosphere
+{
+    DirectX::XMFLOAT4X4 view_from_clip;      // Inverse projection matrix
+    DirectX::XMFLOAT4X4 model_from_view;     // Inverse view matrix
+    
+    DirectX::XMFLOAT3 camera_position;
+    float pad0;
+    
+    DirectX::XMFLOAT3 earth_center;
+    float pad1;
+    
+    DirectX::XMFLOAT3 sun_direction;
+    float pad2;
+    
+    DirectX::XMFLOAT2 sun_size;
+    float exposure;
+    int32_t isCamUp;
+    
+    DirectX::XMFLOAT3 white_point;
+    float pad3;
+};
+
 }
+
 #endif

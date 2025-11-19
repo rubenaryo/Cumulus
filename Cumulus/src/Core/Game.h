@@ -51,6 +51,7 @@ private:
     Muon::Camera mCamera;
 
     Muon::GraphicsPass mOpaquePass;
+    Muon::GraphicsPass mAtmospherePass;
     Muon::ComputePass mSobelPass;
     Muon::ComputePass mRaymarchPass;
     Muon::GraphicsPass mPostProcessPass;
@@ -62,6 +63,7 @@ private:
     Muon::UploadBuffer mLightBuffer;
     Muon::UploadBuffer mTimeBuffer;
     Muon::UploadBuffer mAABBBuffer;
+    Muon::UploadBuffer mAtmosphereBuffer;
 
     Muon::UploadBuffer mHullBuffer;
     Muon::UploadBuffer mHullFaceBuffer;
@@ -69,5 +71,10 @@ private:
 
     // Timer for the main game loop
     Muon::StepTimer mTimer;
+
+    // Variables for ImGUI
+    bool mIsSunDynamic = false;
+    int mTimeOfDay = 800;         // stored as military time for now
+    DirectX::XMFLOAT3 mSunDir;
 };
 #endif
