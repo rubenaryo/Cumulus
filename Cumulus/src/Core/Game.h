@@ -14,6 +14,7 @@ This class encapsulates all app functionality
 #include <Core/StepTimer.h>
 
 #include <Input/GameInput.h>
+#include "MuonImgui.h"
 
 class Game
 {
@@ -47,6 +48,9 @@ private:
     // Input Management
     Input::GameInput mInput;
 
+    //UI Settings
+    Muon::SceneSettings settings;
+
     // Main Camera
     Muon::Camera mCamera;
 
@@ -71,10 +75,5 @@ private:
 
     // Timer for the main game loop
     Muon::StepTimer mTimer;
-
-    // Variables for ImGUI
-    bool mIsSunDynamic = false;
-    int mTimeOfDay = 800;         // stored as military time for now
-    DirectX::XMFLOAT3 mSunDir;
 };
 #endif
