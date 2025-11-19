@@ -109,6 +109,17 @@ project "Shaders"
 	filter { "files:**.cs.hlsl" }
         shadertype "Compute"
 
+    filter "configurations:Debug"
+        -- DXC flags:
+        --  -Zi           : generate full debug info
+        --  -Qembed_debug : embed it in the DXIL blob (no separate .pdb needed)
+        --  -Od           : disable optimizations (better source mapping)
+        shaderoptions { "-Zi", "-Qembed_debug", "-Od" }
+
+    -- Release shaders
+    filter "configurations:Release"
+        shaderoptions { "-O3" }
+
 project "ImGui"
     location "external/imgui"
     kind "StaticLib"
