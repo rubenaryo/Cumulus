@@ -28,8 +28,9 @@ static const float AUTHORING_TO_WORLD_SCALE = SIDE_LENGTH / NVDF_DOMAIN_SIDE_LEN
 static const float DENSITY_SCALE = .035; // To be tuned / driven by NVDF
 
 Texture2D gInput : register(t0);
-Texture3D sdfNvdfTex : register(t1); // Sdf and model textures combined [sdf.r, model.r, model.g, model.b] 
-Texture3D noiseTex : register(t2); // Low frequency, high frequency noises for wispy and billowy clouds 
+Texture3D sdfTex : register(t1); // Cached sdf for accelerating sdf 
+Texture3D nvdfTex : register(t2); // Model textures combined [sdf.r, model.r, model.g, model.b] 
+Texture3D noiseTex : register(t3); // Low frequency, high frequency noises for wispy and billowy clouds 
 Texture2D depthStencilBuffer : register(t3); // The scene's depth-stencil buffer, bound here post-graphics passes
 SamplerState linearWrap : register(s2);
 SamplerState linearClamp : register(s3); 
@@ -336,7 +337,7 @@ float3 VolumeRaymarchNvdf(float3 eyePos, float3 dir, float3 bgColor, int3 dispat
         float3 samplePos = eyePos + march.distance * dir;
 
         // Sample NVDF volume: .r = encoded SDF, .g = density (dimensional profile)
-        float4 sdfSample = sdfNvdfTex.SampleLevel(linearClamp, WorldToNvdfUV(samplePos), 0.0f);
+        float4 sdfSample = nvdfTex.SampleLevel(linearClamp, WorldToNvdfUV(samplePos), 0.0f);
         float sdfDistance = DecodeSdf(sdfSample.r) * AUTHORING_TO_WORLD_SCALE;
 
 #if USE_ADAPTIVE_STEP

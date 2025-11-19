@@ -319,7 +319,8 @@ void Game::Render()
 
     if (mRaymarchPass.Bind(pCommandList))
     {
-        Texture* pSdfNVDF = codex.GetTexture(GetResourceID(L"StormbirdCloud_NVDF"));
+        Texture* pSdf = codex.GetTexture(GetResourceID(L"StormbirdCloudSdf_3D"));
+        Texture* pNVDF = codex.GetTexture(GetResourceID(L"StormbirdCloud_NVDF"));
         Texture* pNoise = codex.GetTexture(GetResourceID(L"Noise_3D"));
 
         pCommandList->ResourceBarrier(1, &CD3DX12_RESOURCE_BARRIER::Transition(pOffscreenTarget->GetResource(),
@@ -350,10 +351,16 @@ void Game::Render()
             pCommandList->SetComputeRootDescriptorTable(outIdx, pComputeOutput->GetUAVHandleGPU());
         }
 
-        int32_t sdfNVDFIndex = mRaymarchPass.GetResourceRootIndex("sdfNvdfTex");
-        if (sdfNVDFIndex != ROOTIDX_INVALID)
+        int32_t sdfIndex = mRaymarchPass.GetResourceRootIndex("sdfTex");
+        if (sdfIndex != ROOTIDX_INVALID)
         {
-            pCommandList->SetComputeRootDescriptorTable(sdfNVDFIndex, pSdfNVDF->GetSRVHandleGPU());
+            pCommandList->SetComputeRootDescriptorTable(sdfIndex, pSdf->GetSRVHandleGPU());
+        }
+
+        int32_t nvdfIndex = mRaymarchPass.GetResourceRootIndex("nvdfTex");
+        if (nvdfIndex != ROOTIDX_INVALID)
+        {
+            pCommandList->SetComputeRootDescriptorTable(nvdfIndex, pNVDF->GetSRVHandleGPU());
         }
 
         int32_t noiseIndex = mRaymarchPass.GetResourceRootIndex("noiseTex"); 
