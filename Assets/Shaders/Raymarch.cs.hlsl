@@ -170,19 +170,32 @@ float ValueErosion(float baseValue, float erosionValue)
     return saturate(v);
 }
 
-float FoldedNoise(float n, float power)
+float FoldBase(float n)
 {
-    float folded = abs(abs(n * 2.0 - 1.0) * 2.0 - 1.0);
-    return pow(folded, power);
+    // Map n in [0,1] to a "folded" 0–1 pattern
+    return abs(abs(n * 2.0 - 1.0) * 2.0 - 1.0);
+}
+
+float FoldPow2(float n)
+{
+    float f = FoldBase(n);
+    return f * f; // f^2
+}
+
+float FoldPow4(float n)
+{
+    float f = FoldBase(n);
+    float f2 = f * f;
+    return f2 * f2; // f^4
 }
 
 float ComputeHighHighFreqNoise(NoiseSample noiseSample, float detailType)
 {
     // Wispy branch: inverted, sharper (power 4)
-    float wispyFolded = 1.0 - FoldedNoise(noiseSample.highFreqWispy, 4.0);
-    
+    float wispyFolded = 1.0 - FoldPow4(noiseSample.highFreqWispy);
+
     // Billow branch: less sharp (power 2)
-    float billowFolded = FoldedNoise(noiseSample.highFreqBillow, 2.0);
+    float billowFolded = FoldPow2(noiseSample.highFreqBillow);
 
     // Blend between the two based on detailType
     float hhf = lerp(wispyFolded, billowFolded, detailType);
