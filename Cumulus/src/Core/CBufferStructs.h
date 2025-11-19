@@ -66,6 +66,9 @@ struct alignas(16) cbConvexHull
 
     uint32_t faceOffset;
     uint32_t faceCount;
+
+    DirectX::XMFLOAT4X4 world;
+    DirectX::XMFLOAT4X4 invWorld;
 };
 
 struct alignas(16) cbHulls

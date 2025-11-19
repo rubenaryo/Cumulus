@@ -126,6 +126,10 @@ bool RayNearHullPoints(
     ConvexHull hull,
     float threshold)
 {
+
+    float3 localOrigin = mul(hull.invWorld, float4(origin, 1.0)).xyz;
+    float3 localDir    = mul(hull.invWorld, float4(dir, 0.0)).xyz;
+
     float thresholdSq = threshold * threshold;
 
     uint start = hull.pointOffset;
@@ -139,15 +143,14 @@ bool RayNearHullPoints(
             return false;
         }
 
-
-        float3 v = P - origin;
-        float t  = dot(v, dir);
+        float3 v = P - localOrigin;
+        float t  = dot(v, localDir);
 
         // If t < 0, closest point is behind ray origin
         if (t < 0.0f)
             continue;
 
-        float3 closestPoint = origin + t * dir;
+        float3 closestPoint = localOrigin + t * localDir;
         float distSq = dot(closestPoint - P, closestPoint - P);
 
         if (distSq <= thresholdSq)
@@ -172,14 +175,18 @@ bool RayConvexHullIntersect(
     uint faceStart = hull.faceOffset;
     uint faceEnd   = hull.faceOffset + hull.faceCount;
 
+    float3 localOrigin = mul(hull.invWorld, float4(origin, 1.0)).xyz;
+    float3 localDir    = mul(hull.invWorld, float4(dir, 0.0)).xyz;
+
+
     for (uint fi = faceStart; fi < faceEnd; ++fi)
     {
         float4 face = hullFaces[fi];
         float distance = face.w;
         float4 normal = float4(face.xyz, 0.0);
 
-        float dist0 = dot(normal, origin) + distance;
-        float denom = dot(normal, dir);
+        float dist0 = dot(normal, localOrigin) + distance;
+        float denom = dot(normal, localDir);
 
         if (abs(denom) < 1e-8)
         {

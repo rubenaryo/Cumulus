@@ -107,19 +107,21 @@ bool Game::Init(HWND window, int width, int height)
     mWorldMatrixBuffer.Create(L"world matrix buffer", sizeof(cbPerEntity));
     UINT8* mapped = mWorldMatrixBuffer.GetMappedPtr();
     assert(mapped);
+
+
+    const float PI = 3.14159f;
+    DirectX::XMMATRIX debugEntityWorld = DirectX::XMMatrixIdentity();
+    debugEntityWorld = XMMatrixMultiply(debugEntityWorld, DirectX::XMMatrixRotationRollPitchYaw(0, 0, PI / 2.0f));
+    debugEntityWorld = XMMatrixMultiply(debugEntityWorld, DirectX::XMMatrixRotationRollPitchYaw(-PI / 2.0f, 0, 0));
+    debugEntityWorld = XMMatrixMultiply(debugEntityWorld, DirectX::XMMatrixScaling(0.12f, 0.12f, 0.12f));
+    debugEntityWorld = XMMatrixMultiply(debugEntityWorld, DirectX::XMMatrixTranslation(0, 1, 0));
+
     if (mapped)
     {
         using namespace DirectX;
         cbPerEntity entity;
-
-        const float PI = 3.14159f;
-        XMMATRIX entityWorld = DirectX::XMMatrixIdentity();
-        entityWorld = XMMatrixMultiply(entityWorld, DirectX::XMMatrixRotationRollPitchYaw(0, 0, PI/2.0f));
-        entityWorld = XMMatrixMultiply(entityWorld, DirectX::XMMatrixRotationRollPitchYaw(-PI/2.0f, 0,0));
-        entityWorld = XMMatrixMultiply(entityWorld, DirectX::XMMatrixScaling(0.12f, 0.12f, 0.12f));
-        entityWorld = XMMatrixMultiply(entityWorld, DirectX::XMMatrixTranslation(0, 1, 0));
-        XMStoreFloat4x4(&entity.world, entityWorld);
-        XMStoreFloat4x4(&entity.invWorld, DirectX::XMMatrixInverse(nullptr, entityWorld));
+        XMStoreFloat4x4(&entity.world, debugEntityWorld);
+        XMStoreFloat4x4(&entity.invWorld, DirectX::XMMatrixInverse(nullptr, debugEntityWorld));
         memcpy(mapped, &entity, sizeof(entity));
     }
 
@@ -164,9 +166,11 @@ bool Game::Init(HWND window, int width, int height)
         cHull.pointCount = (uint32_t)h.hullPoints.size();
         cHull.pointOffset = 0;
 
+        XMStoreFloat4x4(&cHull.world, debugEntityWorld);
+        XMStoreFloat4x4(&cHull.invWorld, DirectX::XMMatrixInverse(nullptr, debugEntityWorld));
+
         hulls.hulls[0] = cHull;
         hulls.hullCount = 1;
-
         memcpy(mHullBuffer.GetMappedPtr(), &hulls, sizeof(hulls));
     }
 

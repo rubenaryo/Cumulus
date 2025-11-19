@@ -26,8 +26,8 @@ struct ConvexHull
     uint faceOffset;    // offset into HullFaces
     uint faceCount;
 
-    // float3 aabbMin;
-    // float3 aabbMax;
+    float4x4 world;
+	float4x4 invWorld;
 };
 
 cbuffer HullsBuffer : register(b4)
