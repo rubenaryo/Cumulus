@@ -55,7 +55,7 @@ bool Game::Init(HWND window, int width, int height)
 
     ResourceCodex& codex = ResourceCodex::GetSingleton();
 
-    mCamera.Init(DirectX::XMFLOAT3(3.0, 3.0, 3.0), width / (float)height, 0.1f, 1000.0f);
+    mCamera.Init(DirectX::XMFLOAT3(500.0, 300.0, 100.0), width / (float)height, 0.1f, 1000.0f);
 
     // Assemble opaque render pass
     {
@@ -222,7 +222,6 @@ void Game::Render()
     
     Texture* pOffscreenTarget = codex.GetTexture(GetResourceID(L"OffscreenTarget"));
     Texture* pComputeOutput = codex.GetTexture(GetResourceID(L"SobelOutput"));
-    Texture* pSdfNVDF = codex.GetTexture(GetResourceID(L"StormbirdCloud_NVDF"));
     if (!pOffscreenTarget || !pComputeOutput)
     {
         Muon::Printf("Error: Game::Render Failed to fetch the offscreen target and compute output textures.\n");
@@ -320,6 +319,9 @@ void Game::Render()
 
     if (mRaymarchPass.Bind(pCommandList))
     {
+        Texture* pSdfNVDF = codex.GetTexture(GetResourceID(L"StormbirdCloud_NVDF"));
+        Texture* pNoise = codex.GetTexture(GetResourceID(L"Noise_3D"));
+
         pCommandList->ResourceBarrier(1, &CD3DX12_RESOURCE_BARRIER::Transition(pOffscreenTarget->GetResource(),
             D3D12_RESOURCE_STATE_RENDER_TARGET, D3D12_RESOURCE_STATE_GENERIC_READ));
 
@@ -349,9 +351,15 @@ void Game::Render()
         }
 
         int32_t sdfNVDFIndex = mRaymarchPass.GetResourceRootIndex("sdfNvdfTex");
-        if (inIdx != ROOTIDX_INVALID)
+        if (sdfNVDFIndex != ROOTIDX_INVALID)
         {
             pCommandList->SetComputeRootDescriptorTable(sdfNVDFIndex, pSdfNVDF->GetSRVHandleGPU());
+        }
+
+        int32_t noiseIndex = mRaymarchPass.GetResourceRootIndex("noiseTex"); 
+        if (noiseIndex != ROOTIDX_INVALID)
+        {
+            pCommandList->SetComputeRootDescriptorTable(noiseIndex, pNoise->GetSRVHandleGPU()); 
         }
 
         int32_t depthBufferIdx = mRaymarchPass.GetResourceRootIndex("depthStencilBuffer");

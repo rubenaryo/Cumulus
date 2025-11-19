@@ -22,7 +22,7 @@ namespace Input {
     {
         using namespace DirectX;
 
-        static const float kSpeed = 5.0f;
+        static const float kSpeed = 30.0f;
 
         // Act on user input:
         // - Iterate through all active keys
