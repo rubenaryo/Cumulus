@@ -201,7 +201,6 @@ bool Game::Init(HWND window, int width, int height)
 
         UINT8* pointsPtr = mHullPointBuffer.GetMappedPtr();
         if (pointsPtr) {
-            //is this really necessary oh m  y god
             std::vector<DirectX::XMFLOAT3A> float3s;
             float3s.reserve(h.hullPoints.size());
 
@@ -388,8 +387,6 @@ void Game::Render()
         {
             pMesh->DrawIndexed(pCommandList);
         }
-
-
     }
 
     // After opaque pass, transition depth buffer to be bindable as a regular texture by other passes
