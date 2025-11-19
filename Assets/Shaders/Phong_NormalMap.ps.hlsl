@@ -1,6 +1,5 @@
 #include "PhongCommon.hlsli"
 #include "TimeBuffer.hlsli"
-#include "Raymarch_Common.hlsli"
 
 struct VertexOut
 {
@@ -86,11 +85,6 @@ float4 main(VertexOut input) : SV_TARGET
     totalLight *= surfaceColor;
 
     totalLight = saturate(totalLight);
-
-    if(hullCount > 0)
-    {
-        return float4(1, 0, 0, 1);
-    }
 
     return float4(totalLight, 1);
 }
