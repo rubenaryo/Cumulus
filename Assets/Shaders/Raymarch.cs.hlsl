@@ -337,7 +337,7 @@ float3 VolumeRaymarchNvdf(float3 eyePos, float3 dir, float3 bgColor, int3 dispat
         float3 samplePos = eyePos + march.distance * dir;
 
         // Sample NVDF volume: .r = encoded SDF, .g = density (dimensional profile)
-        float4 sdfSample = nvdfTex.SampleLevel(linearClamp, WorldToNvdfUV(samplePos), 0.0f);
+        float4 sdfSample = sdfTex.SampleLevel(linearClamp, WorldToNvdfUV(samplePos), 0.0f);
         float sdfDistance = DecodeSdf(sdfSample.r) * AUTHORING_TO_WORLD_SCALE;
 
 #if USE_ADAPTIVE_STEP
@@ -346,18 +346,17 @@ float3 VolumeRaymarchNvdf(float3 eyePos, float3 dir, float3 bgColor, int3 dispat
 #else
         march.stepSize = max(sdfDistance, AUTHORING_TO_WORLD_SCALE);
 #endif
-
-#if USE_JITTERED_STEP
-        float jitter = StaticStepJitter(dispatchThreadID.xy, march.stepIndex); // [-0.5, 0.5]
-        float jitterDistance = jitter * march.stepSize;
-        samplePos += dir * jitterDistance;
-#endif
-        
         if (sdfDistance < 0.0)
         {
-            float dimensionalProfile = sdfSample.g;
-            float detailType = sdfSample.b;
-            float densityScale = sdfSample.a;
+#if USE_JITTERED_STEP
+            float jitter = StaticStepJitter(dispatchThreadID.xy, march.stepIndex); // [-0.5, 0.5]
+            float jitterDistance = jitter * march.stepSize;
+            samplePos += dir * jitterDistance;
+#endif
+            float4 nvdfSample = nvdfTex.SampleLevel(linearClamp, WorldToNvdfUV(samplePos), 0.0f);
+            float dimensionalProfile = nvdfSample.g;
+            float detailType = nvdfSample.b;
+            float densityScale = nvdfSample.a;
             
             float density = GetUprezzedVoxelCloudDensity(
                 march,
