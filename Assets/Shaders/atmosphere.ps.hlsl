@@ -847,16 +847,13 @@ float4 main(PSInput input) : SV_TARGET
 
     float3 view_direction = normalize(input.view_ray);
     
-    bool isCamUp = earth_center.x > 0.1f;
-    float3 earth_cent = float3(0.0, earth_center.y, earth_center.z);
-    
 #if RENDERSPHERE
     float fragment_angular_size =
         length(abs(ddx(input.view_ray)) + abs(ddy(input.view_ray))) / length(input.view_ray);
     float shadow_in = 0.0f;
     float shadow_out = 0.0f;
     float lightshaft_fadein_hack = smoothstep(
-        0.02, 0.04, dot(normalize(camera - earth_cent), sun_direction));
+        0.02, 0.04, dot(normalize(camera - earth_center), sun_direction));
     
     GetSphereShadowInOut(view_direction, sun_direction, shadow_in, shadow_out);
 
@@ -883,7 +880,7 @@ float4 main(PSInput input) : SV_TARGET
             float3 norm = normalize(point_pos - kSphereCenter);
             float3 sky_irradiance;
             float3 sun_irradiance = GetSunAndSkyIlluminance(
-                point_pos - earth_cent, norm, sun_direction, sky_irradiance);
+                point_pos - earth_center, norm, sun_direction, sky_irradiance);
             sphere_radiance =
                 kSphereAlbedo * (1.0 / PI) * (sun_irradiance + sky_irradiance);
             float shadow_length =
@@ -891,12 +888,12 @@ float4 main(PSInput input) : SV_TARGET
                 lightshaft_fadein_hack;
             
             float3 transmittance;
-            float3 in_scatter = GetSkyLuminanceToPoint(camera - earth_cent,
-                point_pos - earth_cent, shadow_length, sun_direction, transmittance);
+            float3 in_scatter = GetSkyLuminanceToPoint(camera - earth_center,
+                point_pos - earth_center, shadow_length, sun_direction, transmittance);
             sphere_radiance = sphere_radiance * transmittance + in_scatter;
         }
     }
-    p = camera - earth_cent;
+    p = camera - earth_center;
     p_dot_v = dot(p, view_direction);
     p_dot_p = dot(p, p);
     float ray_earth_center_squared_distance = p_dot_p - p_dot_v * p_dot_v;
@@ -906,14 +903,12 @@ float4 main(PSInput input) : SV_TARGET
 #else
     
     // Test planet sphere P intersection
-    float3 p = camera - earth_cent;
+    float3 p = camera - earth_center;
     float p_dot_v = dot(p, view_direction);
     float p_dot_p = dot(p, p);
     float ray_earth_center_squared_distance = p_dot_p - p_dot_v * p_dot_v;
     float discriminant =
-        earth_cent.z * earth_cent.z - ray_earth_center_squared_distance;
-    if (p_dot_v < 0.0 && isCamUp)
-        return float4(kGroundAlbedo.xyz, 1.0);
+        earth_center.z * earth_center.z - ray_earth_center_squared_distance;
 #endif
     float ground_alpha = 0.0;
     float3 ground_radiance = float3(0.0, 0.0, 0.0);
@@ -922,10 +917,10 @@ float4 main(PSInput input) : SV_TARGET
         float distance_to_intersection = -p_dot_v - sqrt(discriminant);
         if (distance_to_intersection > 0.0) {
             float3 point_pos = camera + view_direction * distance_to_intersection;
-            float3 norm = normalize(point_pos - earth_cent);
+            float3 norm = normalize(point_pos - earth_center);
             float3 sky_irradiance;
             float3 sun_irradiance = GetSunAndSkyIlluminance(
-                point_pos - earth_cent, norm, sun_direction, sky_irradiance);
+                point_pos - earth_center, norm, sun_direction, sky_irradiance);
 #if RENDERSPHERE
             ground_radiance = kGroundAlbedo * (1.0 / PI) * (
                 sun_irradiance * GetSunVisibility(point_pos, sun_direction) +
@@ -938,8 +933,8 @@ float4 main(PSInput input) : SV_TARGET
             float shadow_length = 0.0f;
 #endif
             float3 transmittance;
-            float3 in_scatter = GetSkyLuminanceToPoint(camera - earth_cent,
-                point_pos - earth_cent, shadow_length, sun_direction, transmittance);
+            float3 in_scatter = GetSkyLuminanceToPoint(camera - earth_center,
+                point_pos - earth_center, shadow_length, sun_direction, transmittance);
             ground_radiance = ground_radiance * transmittance + in_scatter;
             ground_alpha = 1.0;
         }
@@ -952,10 +947,10 @@ float4 main(PSInput input) : SV_TARGET
         float distance_to_intersection = -p_dot_v - sqrt(discriminant);
         if (distance_to_intersection > 0.0) {
             float3 point_pos = camera + view_direction * distance_to_intersection;
-            float3 norm = normalize(point_pos - earth_cent);
+            float3 norm = normalize(point_pos - earth_center);
             float3 sky_irradiance;
             float3 sun_irradiance = GetSunAndSkyIlluminance(
-                point_pos - earth_cent, norm, -sun_direction, sky_irradiance);
+                point_pos - earth_center, norm, -sun_direction, sky_irradiance);
 #if RENDERSPHERE
             night_ground_radiance = kGroundAlbedo * (1.0 / PI) * (
                 sun_irradiance * GetSunVisibility(point_pos, -sun_direction) +
@@ -968,8 +963,8 @@ float4 main(PSInput input) : SV_TARGET
             float shadow_length = 0.0f;
 #endif
             float3 transmittance;
-            float3 in_scatter = GetSkyLuminanceToPoint(camera - earth_cent,
-                point_pos - earth_cent, shadow_length, -sun_direction, transmittance);
+            float3 in_scatter = GetSkyLuminanceToPoint(camera - earth_center,
+                point_pos - earth_center, shadow_length, -sun_direction, transmittance);
             night_ground_radiance = night_ground_radiance * transmittance + in_scatter;
             night_ground_alpha = 1.0;
         }
@@ -984,19 +979,19 @@ float4 main(PSInput input) : SV_TARGET
 #endif
     
     // Day Night Logic
-    float3 camera_up = normalize(camera - earth_cent);
+    float3 camera_up = normalize(camera - earth_center);
     float sun_height = dot(sun_direction, camera_up);
     float moon_visibility = smoothstep(0.20, -0.10, sun_height);    // this should give a longer sunset than sunrise
     // Day Radiance
     float3 transmittance;
     float3 radiance = GetSkyLuminance(
-        camera - earth_cent, view_direction, shadow_length, sun_direction,
+        camera - earth_center, view_direction, shadow_length, sun_direction,
         transmittance);
     // Night Radiance
     float3 night_transmittance;
     float3 night_radiance = GetSkyLuminance(
-        camera - earth_cent, view_direction, 0.0, -sun_direction,
-        night_transmittance) * 0.005;
+        camera - earth_center, view_direction, 0.0, -sun_direction,
+        night_transmittance) * 0.05;
     // Sun and Moon disc
     if (dot(view_direction, sun_direction) > sun_size.y)
     {
@@ -1008,8 +1003,14 @@ float4 main(PSInput input) : SV_TARGET
     }
     // Blending sky to properly add day and night together
     radiance = lerp(radiance, night_radiance, moon_visibility);
-    transmittance = lerp(transmittance, night_transmittance * 0.005, moon_visibility);
-    ground_radiance = lerp(ground_radiance, night_ground_radiance * 0.005, moon_visibility);
+    transmittance = lerp(transmittance, night_transmittance * 0.05, moon_visibility);
+    ground_radiance = lerp(ground_radiance, night_ground_radiance * 0.05, moon_visibility);
+    if (p_dot_v < 0.0 && isCamUp > 0.1)
+    {
+        float3 ground_blu = float3(0.05, 0.05, 0.2);
+        float3 ground_col = lerp(ground_blu, ground_blu * 0.1f, moon_visibility);
+        return float4(ground_col.xyz, 1.0);
+    }
     
     radiance = lerp(radiance, ground_radiance, ground_alpha);
 #if RENDERSPHERE

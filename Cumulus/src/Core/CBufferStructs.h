@@ -75,10 +75,10 @@ struct alignas(16) cbAtmosphere
     
     DirectX::XMFLOAT2 sun_size;
     float exposure;
-    float pad3;
+    int32_t isCamUp;
     
     DirectX::XMFLOAT3 white_point;
-    float pad4;
+    float pad3;
 };
 
 }

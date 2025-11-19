@@ -112,6 +112,12 @@ void ImguiNewFrame(float gameTime, const Camera& cam, DirectX::XMFLOAT3 sunDir, 
             {
                 ImGui::SliderInt("Time Of Day", &timeOfDay, 0, 2400);
             }
+            else
+            {
+                // NOTE: this is the same code as in AtmosphereUtils, so if that changes then this gets out of sync
+                float mapped_time = fmodf(gameTime * 60.f, 2400.f);
+                ImGui::Text("Current Time: %.0f", mapped_time);
+            }
 
             ImGui::EndTabItem();
         }

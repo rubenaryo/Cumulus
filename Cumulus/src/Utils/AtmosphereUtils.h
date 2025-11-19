@@ -112,7 +112,7 @@ void InitializeAtmosphereConstants(
 
     // camera pos is grabbed from the calculation we already did for model matrix
     constants.camera_position = XMFLOAT3(constants.model_from_view._41, constants.model_from_view._42, constants.model_from_view._43);
-
+    constants.isCamUp = view_zenith_angle_radians > XM_PIDIV2 ? 1 : 0;
     // Earth center (at origin in world space, but offset down in "length units")
     constants.earth_center = XMFLOAT3(0.0f, 0.0f, -6360.0f); // Earth radius in km
     // -0.989970, -0.141117, 0.006796 -> preset 2
@@ -174,10 +174,10 @@ void UpdateAtmosphere(cbAtmosphere& constants,
 
     view_zenith_angle_radians = camera.GetZenith();
     view_azimuth_angle_radians = camera.GetAzimuth();
-    // set at to be Y up coordinate system
+    // Distance calculation is either based on simply height or distance from target
     //XMVECTOR target = camera.GetTarget();
     //XMVECTOR at = XMVectorSet(XMVectorGetX(target), XMVectorGetZ(target), XMVectorGetY(target), 0.0f);
-    float dist = XMVectorGetY(camera.GetPosition());// XMVectorGetX(XMVector3Length(at));
+    float dist = max(XMVectorGetY(camera.GetPosition()), 0.f);// XMVectorGetX(XMVector3Length(at));
     // Create matrices
     // NOTE: Ideally we woudln't want to recalculate view from clip every time
     XMMATRIX view_from_clip = CreateViewFromClipMatrix(kFovY, aspect_ratio);
@@ -193,11 +193,9 @@ void UpdateAtmosphere(cbAtmosphere& constants,
 
     // camera pos is grabbed from the calculation we already did for model matrix
     constants.camera_position = XMFLOAT3(constants.model_from_view._41, constants.model_from_view._42, constants.model_from_view._43);
-
+    constants.isCamUp = view_zenith_angle_radians > XM_PIDIV2 ? 1 : 0;
     // Earth center (at origin in world space, but offset down in "length units")
-    constants.earth_center = view_zenith_angle_radians > XM_PIDIV2 ?
-        XMFLOAT3(1.0f, 0.0f, -6360.0f) :    // Earth is always in the same spot, so we will store camera is looking up here...
-        XMFLOAT3(0.0f, 0.0f, -6360.0f); // Earth radius in km
+    constants.earth_center = XMFLOAT3(0.0f, 0.0f, -6360.0f); // Earth radius in km
     // -0.989970, -0.141117, 0.006796 -> preset 2
     // -0.935575f, 0.230531f, 0.267499f -> preset 1
     // -0.03931, 0.25845, -0.36024 is the resulting axis, but it sucks aaaaahhhhh why doesn't the sun rise??
