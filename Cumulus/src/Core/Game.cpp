@@ -138,7 +138,7 @@ bool Game::Init(HWND window, int width, int height)
 
     mAABBBuffer.Create(L"AABB Buffer", sizeof(cbIntersections));
 
-    const Mesh* m = codex.GetMesh(Muon::GetResourceID(L"rock_platform.obj"));
+    const Mesh* m = codex.GetMesh(Muon::GetResourceID(L"teapot.obj"));
 
     cbIntersections intersections = {};
     intersections.aabbCount = 1;
