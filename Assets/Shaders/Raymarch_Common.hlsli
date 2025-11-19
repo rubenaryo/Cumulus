@@ -20,8 +20,8 @@ cbuffer AABBBuffer : register(b3)
 
 struct ConvexHull
 {
-    uint pointOffset;   // offset into HullPoints
-    uint pointCount;
+    uint buffer1;   // offset into HullPoints
+    uint buffer2;
 
     uint faceOffset;    // offset into HullFaces
     uint faceCount;
@@ -36,12 +36,7 @@ cbuffer HullsBuffer : register(b4)
 	ConvexHull hulls[1];
 };
 
-cbuffer HullPointsBuffer : register(b5)
-{
-	float4 hullPoints[2048];
-};	
-
-cbuffer HullFacesBuffer : register(b6)
+cbuffer HullFacesBuffer : register(b5)
 {
 	float4 hullFaces[1024];
 };

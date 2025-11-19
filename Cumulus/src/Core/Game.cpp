@@ -163,8 +163,7 @@ bool Game::Init(HWND window, int width, int height)
         cbConvexHull cHull = {};
         cHull.faceCount = (uint32_t)h.faces.size();
         cHull.faceOffset = 0;
-        cHull.pointCount = (uint32_t)h.hullPoints.size();
-        cHull.pointOffset = 0;
+
 
         XMStoreFloat4x4(&cHull.world, debugEntityWorld);
         XMStoreFloat4x4(&cHull.invWorld, DirectX::XMMatrixInverse(nullptr, debugEntityWorld));
@@ -191,27 +190,6 @@ bool Game::Init(HWND window, int width, int height)
 
         if (facePtr) {
             memcpy(facePtr, &faces, sizeof(faces));
-        }
-    }
-
-    mHullPointBuffer.Create(L"Hull Points Buffer", sizeof(cbHullPoints));
-
-    if (m && h.hullPoints.size() > 0) {
-        cbHullPoints points = {};
-
-        UINT8* pointsPtr = mHullPointBuffer.GetMappedPtr();
-        if (pointsPtr) {
-            std::vector<DirectX::XMFLOAT3A> float3s;
-            float3s.reserve(h.hullPoints.size());
-
-            for (const auto& v : h.hullPoints)
-            {
-                DirectX::XMFLOAT3A f3;
-                DirectX::XMStoreFloat3A(&f3, v);
-                float3s.push_back(f3);
-            }
-            copy(float3s.begin(), float3s.end(), points.points);
-            memcpy(pointsPtr, &points, sizeof(points));
         }
     }
 
@@ -426,12 +404,6 @@ void Game::Render()
             pCommandList->SetComputeRootConstantBufferView(hullFaceIdx, mHullFaceBuffer.GetGPUVirtualAddress());
         }
 
-        int32_t hullPtsIdx = mRaymarchPass.GetResourceRootIndex("HullPointsBuffer");
-        if (hullPtsIdx != ROOTIDX_INVALID)
-        {
-            pCommandList->SetComputeRootConstantBufferView(hullPtsIdx, mHullPointBuffer.GetGPUVirtualAddress());
-        }
-
         int32_t inIdx = mRaymarchPass.GetResourceRootIndex("gInput");
         if (inIdx != ROOTIDX_INVALID)
         {
@@ -529,7 +501,6 @@ Game::~Game()
     mAtmosphereBuffer.Destroy();
     mHullBuffer.Destroy();
     mHullFaceBuffer.Destroy();
-    mHullPointBuffer.Destroy();
     mCamera.Destroy();
     mInput.Destroy();
     mOpaquePass.Destroy();

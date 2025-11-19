@@ -124,8 +124,6 @@ bool Mesh::DrawIndexed(ID3D12GraphicsCommandList* pCommandList) const
         D3D12_MESSAGE* message = reinterpret_cast<D3D12_MESSAGE*>(bytes.data());
 
         infoQueue->GetMessage(i, message, &messageLength);
-
-        printf("DX12: %s\n", message->pDescription);
     }
     infoQueue->ClearStoredMessages();
 

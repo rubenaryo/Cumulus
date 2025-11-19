@@ -260,13 +260,8 @@ namespace Muon
 
 
         // Step 4: Build tetrahedron faces
-        hullPoints.clear();
         faces.clear();
 
-        //hullPoints.push_back(A); // 0
-        //hullPoints.push_back(B); // 1
-        //hullPoints.push_back(C); // 2
-        //hullPoints.push_back(D); // 3
         std::vector<bool> faceDeleted(faces.size(), false);
         std::vector<int> removedFaces;
 

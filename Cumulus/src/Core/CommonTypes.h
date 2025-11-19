@@ -28,8 +28,8 @@ namespace Muon
     struct HullFace
     {
         int indices[3];
-        DirectX::XMFLOAT3A normal;
         float distance;
+        DirectX::XMFLOAT3A normal;
     };
 
     struct Edge {

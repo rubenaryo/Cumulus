@@ -119,48 +119,6 @@ bool RayBoxIntersect(
     return tExit > max(tEnter, 0.0);
 }
 
-
-bool RayNearHullPoints(
-    float3 origin,
-    float3 dir,
-    ConvexHull hull,
-    float threshold)
-{
-
-    float3 localOrigin = mul(hull.invWorld, float4(origin, 1.0)).xyz;
-    float3 localDir    = mul(hull.invWorld, float4(dir, 0.0)).xyz;
-
-    float thresholdSq = threshold * threshold;
-
-    uint start = hull.pointOffset;
-    uint end   = start + hull.pointCount;
-
-    for (uint i = start; i < end; ++i)
-    {
-        float3 P = hullPoints[i].xyz;
-
-        if(length(P) < 0.001){
-            return false;
-        }
-
-        float3 v = P - localOrigin;
-        float t  = dot(v, localDir);
-
-        // If t < 0, closest point is behind ray origin
-        if (t < 0.0f)
-            continue;
-
-        float3 closestPoint = localOrigin + t * localDir;
-        float distSq = dot(closestPoint - P, closestPoint - P);
-
-        if (distSq <= thresholdSq)
-            return true;
-    }
-
-    return false;
-}
-
-
 bool RayConvexHullIntersect(
     float3 origin,
     float3 dir,

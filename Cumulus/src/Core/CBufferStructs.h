@@ -61,8 +61,8 @@ struct alignas(256) cbIntersections
 
 struct alignas(16) cbConvexHull
 {
-    uint32_t pointOffset;
-    uint32_t pointCount;
+    uint32_t buffer1;
+    uint32_t buffer2;
 
     uint32_t faceOffset;
     uint32_t faceCount;
