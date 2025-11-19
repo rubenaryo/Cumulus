@@ -53,8 +53,13 @@ public:
     
     void GetPosition3A(DirectX::XMFLOAT3A* out_pos) const;
     DirectX::XMVECTOR   GetPosition() const;
+    DirectX::XMVECTOR   GetTarget() const;
+    float               GetAzimuth() const;
+    float               GetZenith() const;
+    void GetAxes(DirectX::XMVECTOR& forward, DirectX::XMVECTOR& right, DirectX::XMVECTOR& up) const;
 
     void SetTarget(DirectX::XMVECTOR target);
+    void UpdateAzimuthZenith();
 
 private:
     // View and Projection Matrices
@@ -68,6 +73,9 @@ private:
     DirectX::XMVECTOR   mUp;
     DirectX::XMVECTOR   mPosition;
     DirectX::XMVECTOR   mTarget;
+    // Camera's polar locations
+    float   mZenith;
+    float   mAzimuth;
 
     // Position of near and far planes along forward axis
     float mNear;

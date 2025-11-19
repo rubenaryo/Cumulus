@@ -297,7 +297,8 @@ float3 VolumeRaymarchNvdf(float3 eyePos, float3 dir, float3 bgColor, int3 dispat
     if (!RayBoxIntersect(eyePos, dir, VOLUME_MIN_WS, VOLUME_MAX_WS, tEnter, tExit))
     {
         // Ray misses the volume entirely
-        return float3(1, 1, 1);
+        //return float3(1, 1, 1);
+        return bgColor;
     }
 
     float minBoxEnter = tEnter;

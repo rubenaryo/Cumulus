@@ -67,5 +67,10 @@ private:
 
     // Timer for the main game loop
     Muon::StepTimer mTimer;
+
+    // Variables for ImGUI
+    bool mIsSunDynamic = false;
+    int mTimeOfDay = 800;         // stored as military time for now
+    DirectX::XMFLOAT3 mSunDir;
 };
 #endif

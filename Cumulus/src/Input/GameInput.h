@@ -24,6 +24,9 @@ namespace Input {
     protected:
         // Override implementation for setting default key mappings
         virtual void SetDefaultKeyMap() override;
+        // multiplier for motions
+        bool mIsSprint = false;
+        float mSprintVal = 30.f;
     };
 }
 #endif

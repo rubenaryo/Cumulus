@@ -15,8 +15,8 @@ cbuffer cbAtmosphere : register(b0)
     
     float2 sun_size; // x = angular radius, y = cos(angular radius)
     float exposure; // Tone mapping exposure
-    float pad3;
+    int isCamUp;
     
     float3 white_point; // Tone mapping white point
-    float pad4;
+    float pad3;
 };
