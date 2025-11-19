@@ -100,11 +100,12 @@ namespace Muon
     }
 
     void Hull::ReassignOutsidePoints(
-        const std::vector<int>& removedFaces,
         std::unordered_map<int, std::vector<int>>& faceToFurthestPoints,
         std::unordered_map<int, double>& pointToFaceDistance,
+        const aiVector3D* points,
         const std::vector<Muon::HullFace>& faces,
-        const std::vector<bool>& faceDeleted
+        const std::vector<bool>& faceDeleted,
+        const std::vector<int>& removedFaces
     )
     {
         std::vector<int> toReassign;
@@ -121,14 +122,13 @@ namespace Muon
         for (auto& op : toReassign)
         {
             int idx = op;
-            XMVECTOR P = XMLoadFloat3((XMFLOAT3*)&hullPoints[idx]);
-
+            XMVECTOR P = XMLoadFloat3(reinterpret_cast<const XMFLOAT3*>(&points[idx]));
             float maxDist = 0;
             int bestFace = -1;
 
             for (int f = 0; f < faces.size(); ++f)
             {
-                if (faceDeleted[f]) continue;
+                if (f < faceDeleted.size() && faceDeleted[f]) continue;
 
                 XMVECTOR N = XMLoadFloat3(&faces[f].normal);
                 float dist = XMVectorGetX(XMVector3Dot(N, P)) + faces[f].distance;
@@ -162,8 +162,8 @@ namespace Muon
         float maxX = -FLT_MAX;
         float minX = FLT_MAX;
 
-        int minXIndex = -1;
-        int maxXIndex = -1;
+        int aIndex = -1;
+        int bIndex = -1;
 
         // Step 1: find extreme X points
         for (int i = 0; i < pointsCount; ++i)
@@ -172,58 +172,58 @@ namespace Muon
             if (x < minX)
             {
                 minX = x;
-                minXIndex = i;
+                aIndex = i;
             }
 
             if (x > maxX)
             {
                 maxX = x;
-                maxXIndex = i;
+                bIndex = i;
             }
         }
 
-        if (minXIndex == maxXIndex)
+        if (aIndex == bIndex)
         {
             perror("ERROR: all points are identical in Hull");
             return;
         }
 
-        XMVECTOR A = XMLoadFloat3(reinterpret_cast<const XMFLOAT3*>(&points[minXIndex]));
-        XMVECTOR B = XMLoadFloat3(reinterpret_cast<const XMFLOAT3*>(&points[maxXIndex]));
+        XMVECTOR A = XMLoadFloat3(reinterpret_cast<const XMFLOAT3*>(&points[aIndex]));
+        XMVECTOR B = XMLoadFloat3(reinterpret_cast<const XMFLOAT3*>(&points[bIndex]));
 
 
         // Step 2: find point C farthest from AB line
         XMVECTOR AB = XMVectorSubtract(B, A);
         XMVECTOR ABn = XMVector3Normalize(AB);
 
-        int topIndex = -1;
+        int cIndex = -1;
         float maxDistFromLine = 0.0f;
 
         for (int i = 0; i < pointsCount; ++i)
         {
-            if (i == minXIndex || i == maxXIndex)
+            if (i == aIndex || i == bIndex)
                 continue;
 
             XMVECTOR P = XMLoadFloat3(reinterpret_cast<const XMFLOAT3*>(&points[i]));
             XMVECTOR AP = XMVectorSubtract(P, A);
-            // perpendicular distance to line AB = |AP × ABn|
+            // perpendicular distance to line AB = |AP Ã— ABn|
             XMVECTOR crossProd = XMVector3Cross(AP, ABn);
             float dist = XMVectorGetX(XMVector3Length(crossProd));
 
             if (dist > maxDistFromLine)
             {
                 maxDistFromLine = dist;
-                topIndex = i;
+                cIndex = i;
             }
         }
 
-        if (topIndex == -1 || maxDistFromLine < 1e-5f)
+        if (cIndex == -1 || maxDistFromLine < 1e-5f)
         {
             perror("ERROR: Points are collinear in Hull");
             return;
         }
 
-        XMVECTOR C = XMLoadFloat3(reinterpret_cast<const XMFLOAT3*>(&points[topIndex]));
+        XMVECTOR C = XMLoadFloat3(reinterpret_cast<const XMFLOAT3*>(&points[cIndex]));
 
         // Step 3: find point D farthest from plane ABC
         XMVECTOR ABv = XMVectorSubtract(B, A);
@@ -233,11 +233,11 @@ namespace Muon
         float maxPlaneDist = 0.0f;
         int dIndex = -1;
 
-        float planeD = XMVectorGetX(XMVector3Dot(n, A)); // plane eq: n·x = d
+        float planeD = XMVectorGetX(XMVector3Dot(n, A)); // plane eq: nÂ·x = d
 
         for (int i = 0; i < pointsCount; ++i)
         {
-            if (i == minXIndex || i == maxXIndex || i == topIndex)
+            if (i == aIndex || i == bIndex || i == cIndex)
                 continue;
 
             XMVECTOR P = XMLoadFloat3(reinterpret_cast<const XMFLOAT3*>(&points[i]));
@@ -263,10 +263,12 @@ namespace Muon
         hullPoints.clear();
         faces.clear();
 
-        hullPoints.push_back(A); // 0
-        hullPoints.push_back(B); // 1
-        hullPoints.push_back(C); // 2
-        hullPoints.push_back(D); // 3
+        //hullPoints.push_back(A); // 0
+        //hullPoints.push_back(B); // 1
+        //hullPoints.push_back(C); // 2
+        //hullPoints.push_back(D); // 3
+        std::vector<bool> faceDeleted(faces.size(), false);
+        std::vector<int> removedFaces;
 
         auto AddFace = [&](int i0, int i1, int i2)
             {
@@ -275,9 +277,9 @@ namespace Muon
                 face.indices[1] = i1;
                 face.indices[2] = i2;
 
-                XMVECTOR p0 = hullPoints[i0];
-                XMVECTOR p1 = hullPoints[i1];
-                XMVECTOR p2 = hullPoints[i2];
+                XMVECTOR p0 = XMLoadFloat3(reinterpret_cast<const XMFLOAT3*>(&points[i0]));
+                XMVECTOR p1 = XMLoadFloat3(reinterpret_cast<const XMFLOAT3*>(&points[i1]));
+                XMVECTOR p2 = XMLoadFloat3(reinterpret_cast<const XMFLOAT3*>(&points[i2]));
                 XMVECTOR n = XMVector3Normalize(XMVector3Cross(XMVectorSubtract(p1, p0), XMVectorSubtract(p2, p0)));
                 float d = -XMVectorGetX(XMVector3Dot(n, p0));
 
@@ -287,13 +289,15 @@ namespace Muon
                 face.distance = d;
 
                 faces.push_back(face);
+                //consistent sizing for hull context:
+                faceDeleted.push_back(false);
             };
 
         // Create 4 tetrahedron faces
-        AddFace(0, 1, 2);
-        AddFace(0, 2, 3);
-        AddFace(0, 3, 1);
-        AddFace(1, 3, 2);
+        AddFace(aIndex, bIndex, cIndex);
+        AddFace(aIndex, cIndex, dIndex);
+        AddFace(aIndex, dIndex, bIndex);
+        AddFace(bIndex, dIndex, cIndex);
 
         // Step 5: Ensure outward normals
         for (int fi = 0; fi < (int)faces.size(); ++fi)
@@ -312,15 +316,14 @@ namespace Muon
             if (opp == -1) continue;
 
             XMVECTOR N = XMLoadFloat3(reinterpret_cast<const XMFLOAT3*>(&face.normal));
-
-            float side = XMVectorGetX(XMVector3Dot(N, hullPoints[opp])) - face.distance;
+            float side = XMVectorGetX(XMVector3Dot(N, XMLoadFloat3(reinterpret_cast<const XMFLOAT3*>(&points[opp])))) - face.distance;
             if (side > 0)
             {
-                // inward normal — flip winding
+                // inward normal â€” flip winding
                 std::swap(face.indices[1], face.indices[2]);
-                XMVECTOR p0 = hullPoints[face.indices[0]];
-                XMVECTOR p1 = hullPoints[face.indices[1]];
-                XMVECTOR p2 = hullPoints[face.indices[2]];
+                XMVECTOR p0 = XMLoadFloat3(reinterpret_cast<const XMFLOAT3*>(&points[face.indices[0]]));
+                XMVECTOR p1 = XMLoadFloat3(reinterpret_cast<const XMFLOAT3*>(&points[face.indices[1]]));
+                XMVECTOR p2 = XMLoadFloat3(reinterpret_cast<const XMFLOAT3*>(&points[face.indices[2]]));
 
                 XMFLOAT3A outNorm;
                 auto & norm = XMVector3Normalize(XMVector3Cross(XMVectorSubtract(p1, p0), XMVectorSubtract(p2, p0)));
@@ -337,7 +340,7 @@ namespace Muon
         for (int i = 0; i < pointsCount; ++i)
         {
             //tetra verts
-            if (i == minXIndex || i == maxXIndex || i == topIndex || i == dIndex)
+            if (i == aIndex || i == bIndex || i == cIndex || i == dIndex)
                 continue;
 
             XMVECTOR P = XMLoadFloat3(reinterpret_cast<const XMFLOAT3*>(&points[i]));
@@ -365,9 +368,10 @@ namespace Muon
         }
 
         //Step 7: Expand Hull
-
-        while (true)
+        int run = 0;
+        while (true && run < MAX_HULL_LOOPS)
         {
+            run++;
             int faceWithFurthest = 0;
             std::pair<int, int> furthestPoint = FindFurthestFacePointPair(faceToFurthestPoints, pointToFaceDistance);
             
@@ -378,7 +382,7 @@ namespace Muon
 
             std::vector<int> visibleFaces;
             for (int f = 0; f < faces.size(); ++f) {
-                if (FaceVisibleFromPoint(faces[f], P)) {
+                if (!faceDeleted[f] && FaceVisibleFromPoint(faces[f], P)) {
                     visibleFaces.push_back(f);
                 }
             }
@@ -386,19 +390,26 @@ namespace Muon
             std::vector<Edge> horizon;
             BuildHorizon(faces, visibleFaces, horizon);
 
-            std::vector<bool> faceDeleted(faces.size(), false);
-            std::vector<int> removedFaces;
-
             for (int idx : visibleFaces) {
                 faceDeleted[idx] = true;
                 removedFaces.push_back(idx);
             }
 
+
             for (auto& e : horizon) {
                 AddFace(e.v0, e.v1, furthestPoint.second);
             }
 
-            ReassignOutsidePoints(removedFaces, faceToFurthestPoints, pointToFaceDistance, faces, faceDeleted);
+            ReassignOutsidePoints(faceToFurthestPoints, pointToFaceDistance, points, faces, faceDeleted, removedFaces);
         }
+
+        std::vector<HullFace> finalFaces;
+        for (int i = 0; i < faceDeleted.size(); ++i) {
+            if (!faceDeleted[i]) {
+                finalFaces.push_back(faces[i]);
+            }
+        }
+
+        faces = finalFaces;
     }
 }
