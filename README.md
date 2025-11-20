@@ -18,6 +18,21 @@ At its core, Cumulus is a realtime DirectX 12 cloud renderer with collisions, GP
 We utilize the cloud rendering framework from the Horizon game series, as outlined in the [Nubis 3](https://www.guerrilla-games.com/read/nubis-cubed) presentation from Advancements in Real-Time Rendering 2023. We then advance this method by incorporating interaction, allowing users to feel as though the clouds are truly part of the environment. Since the Nubis method uses offline modeled clouds, to enable interaction, we generate cloud data procedurally on the GPU to support our framework. This enables us to create more dynamic scenes, where we can smoothly transition between different weather conditions, resulting in true, realistic, and real-time cloudscapes.
 
 ## Current Features
+### Clouds
+<p align="center">
+  <img width="80%" alt="image" src="images/beauty.png" />
+  <br>
+  <em>A nice cloud in our engine</em>
+</p>
+
+#### Rendering
+ - World-space NVDF placement — volumes positioned consistently in world coordinates
+ - Ray-marched rendering — integrates density with Beer–Lambert absorption/compositing
+ - SDF-guided stepping — signed-distance field cached in 3D textures to skip empty space
+ - Adaptive step sizing — step length scales with camera distance for quality/perf balance
+ - Jittered sampling — per-pixel/step jitter to decorrelate samples and reduce voxel-grid artifacts
+#### Generation
+ - SDF based GPU cloud generation is currently in progress
 ### Engine
 #### Core
  - Atmosphere rendering pass
@@ -34,29 +49,12 @@ We utilize the cloud rendering framework from the Horizon game series, as outlin
  - Automatic lifetime reporting for catching memory leaks in Debug mode
  - Diligent error detection and logging
  - ImGUI integration
-
-### Clouds
-<p align="center">
-  <img width="80%" alt="image" src="images/beauty.png" />
-  <br>
-  <em>A nice cloud in our engine</em>
-</p>
-
-#### Rendering
- - World-space NVDF placement — volumes positioned consistently in world coordinates
- - Ray-marched rendering — integrates density with Beer–Lambert absorption/compositing
- - SDF-guided stepping — signed-distance field cached in 3D textures to skip empty space
- - Adaptive step sizing — step length scales with camera distance for quality/perf balance
- - Jittered sampling — per-pixel/step jitter to decorrelate samples and reduce voxel-grid artifacts
-#### Generation
- - SDF based GPU cloud generation is currently in progress
 ### Collision
-<figure style="text-align: center;">
-  <video controls style="max-width: 80%;">
-    <source src="images/ConvexHull.mp4" type="video/mp4">
-  </video>
-  <figcaption><em>A teapot showing its Convex Hulls</em></figcaption>
-</figure>
+<p align="center">
+  <img width="80%" alt="image" src="images/ConvexHull.gif" />
+  <br>
+  <em>Dynamic Convex Hull of a teapot</em>
+</p>
 
  - Convex Hull object bounds
  - Managed via several structured buffers on GPU – built to be dynamic as meshes update position / animation
