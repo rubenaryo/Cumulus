@@ -78,10 +78,23 @@ bool Texture::InitUAV(ID3D12Device* pDevice, DescriptorHeap* pSRVHeap)
     if (!pSRVHeap || !pSRVHeap->Allocate(mViewUAV.HandleCPU, mViewUAV.HandleGPU))
         return false;
 
+    bool is3D = mDepth > 1;
+
     D3D12_UNORDERED_ACCESS_VIEW_DESC uavDesc = {};
     uavDesc.Format = mFormat;
-    uavDesc.ViewDimension = D3D12_UAV_DIMENSION_TEXTURE2D;
-    uavDesc.Texture2D.MipSlice = 0;
+    
+    if (is3D)
+    {
+        uavDesc.ViewDimension = D3D12_UAV_DIMENSION_TEXTURE3D;
+        uavDesc.Texture3D.MipSlice = 0;
+        uavDesc.Texture3D.FirstWSlice = 0;
+        uavDesc.Texture3D.WSize = -1;
+    }
+    else
+    {
+        uavDesc.ViewDimension = D3D12_UAV_DIMENSION_TEXTURE2D;
+        uavDesc.Texture2D.MipSlice = 0;
+    }
 
     pDevice->CreateUnorderedAccessView(mpResource.Get(), nullptr, &uavDesc, mViewUAV.HandleCPU);
     return true;
