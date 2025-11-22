@@ -12,6 +12,7 @@ This class encapsulates all app functionality
 #include <Core/PipelineState.h>
 #include <Core/Pass.h>
 #include <Core/StepTimer.h>
+#include <Core/FrameResources.h>
 
 #include <Input/GameInput.h>
 #include "MuonImgui.h"
@@ -23,6 +24,7 @@ public:
     ~Game();
 
     bool Init(HWND window, int width, int height);
+    bool InitFrameResources(UINT width, UINT height);
 
     // Main Game Loop
     void Frame();
@@ -63,11 +65,8 @@ private:
     // TEMP: For testing
     Muon::Mesh mCube;
 
-    Muon::UploadBuffer mWorldMatrixBuffer;
-    Muon::UploadBuffer mLightBuffer;
-    Muon::UploadBuffer mTimeBuffer;
-    Muon::UploadBuffer mAABBBuffer;
-    Muon::UploadBuffer mAtmosphereBuffer;
+    static const size_t NUM_FRAMES_IN_FLIGHT = 2;
+    std::array<Muon::FrameResources, NUM_FRAMES_IN_FLIGHT> mFrameResources;
 
     Muon::UploadBuffer mHullBuffer;
     Muon::UploadBuffer mHullFaceBuffer;

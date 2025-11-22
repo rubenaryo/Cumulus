@@ -16,7 +16,6 @@ Description : Implementation of Game.h
 #include <Core/Shader.h>
 #include <Core/Texture.h>
 #include <Utils/Utils.h>
-#include <Utils/AtmosphereUtils.h>
 
 #include <imgui.h>
 #include <imgui_impl_win32.h>
@@ -103,7 +102,10 @@ bool Game::Init(HWND window, int width, int height)
             Printf(L"Warning: %s failed to generate!\n", mPostProcessPass.GetName());
     }
 
+    
 
+
+#if 0
     mWorldMatrixBuffer.Create(L"world matrix buffer", sizeof(cbPerEntity));
     UINT8* mapped = mWorldMatrixBuffer.GetMappedPtr();
     assert(mapped);
@@ -122,6 +124,15 @@ bool Game::Init(HWND window, int width, int height)
         cbPerEntity entity;
         XMStoreFloat4x4(&entity.world, debugEntityWorld);
         XMStoreFloat4x4(&entity.invWorld, DirectX::XMMatrixInverse(nullptr, debugEntityWorld));
+
+        const float PI = 3.14159f;
+        XMMATRIX entityWorld = DirectX::XMMatrixIdentity();
+        entityWorld = XMMatrixMultiply(entityWorld, DirectX::XMMatrixRotationRollPitchYaw(0, 0, PI / 2.0f));
+        entityWorld = XMMatrixMultiply(entityWorld, DirectX::XMMatrixRotationRollPitchYaw(-PI / 2.0f, 0, 0));
+        entityWorld = XMMatrixMultiply(entityWorld, DirectX::XMMatrixScaling(0.12f, 0.12f, 0.12f));
+        entityWorld = XMMatrixMultiply(entityWorld, DirectX::XMMatrixTranslation(0, 1, 0));
+        XMStoreFloat4x4(&entity.world, entityWorld);
+        XMStoreFloat4x4(&entity.invWorld, DirectX::XMMatrixInverse(nullptr, entityWorld));
         memcpy(mapped, &entity, sizeof(entity));
     }
 
@@ -194,10 +205,23 @@ bool Game::Init(HWND window, int width, int height)
     }
 
     mTimeBuffer.Create(L"Time", sizeof(cbTime));
+#endif // 0
+
+    InitFrameResources(width, height);
 
     Muon::CloseCommandList();
     Muon::ExecuteCommandList();
     return success;
+}
+
+bool Game::InitFrameResources(UINT width, UINT height)
+{
+    for (size_t i = 0; i != NUM_FRAMES_IN_FLIGHT; ++i)
+    {
+        mFrameResources.at(i).Create(width, height);
+    }
+
+    return true;
 }
 
 // On Timer tick, run Update() on the game, then Render()
@@ -216,6 +240,7 @@ void Game::Frame()
 void Game::Update(Muon::StepTimer const& timer)
 {
     float elapsedTime = float(timer.GetElapsedSeconds());
+    float totalTime = float(timer.GetTotalSeconds());
     mInput.Frame(elapsedTime, &mCamera);
     mCamera.UpdateView();
 
@@ -252,6 +277,7 @@ void Game::Update(Muon::StepTimer const& timer)
     {
         memcpy(mapped, &atmosphereParams, sizeof(Muon::cbAtmosphere));
     }
+    mFrameResources.at(0).Update(totalTime, elapsedTime);
 }
 
 void Game::Render()
@@ -273,6 +299,8 @@ void Game::Render()
     ResourceCodex& codex = ResourceCodex::GetSingleton();
     ResourceID phongMatId = GetResourceID(L"Phong");
     const Muon::Material* pPhongMaterial = codex.GetMaterialType(phongMatId);
+
+    FrameResources& currFrameResources = mFrameResources.at(0);
     
     Texture* pOffscreenTarget = codex.GetTexture(GetResourceID(L"OffscreenTarget"));
     Texture* pComputeOutput = codex.GetTexture(GetResourceID(L"SobelOutput"));
@@ -300,7 +328,7 @@ void Game::Render()
         int32_t atmosphereRootIdx = mAtmospherePass.GetResourceRootIndex("cbAtmosphere");
         if (atmosphereRootIdx != ROOTIDX_INVALID)
         {
-            pCommandList->SetGraphicsRootConstantBufferView(atmosphereRootIdx, mAtmosphereBuffer.GetGPUVirtualAddress());
+            pCommandList->SetGraphicsRootConstantBufferView(atmosphereRootIdx, currFrameResources.mAtmosphereBuffer.GetGPUVirtualAddress());
         }
 
         int32_t transmittanceIdx = mAtmospherePass.GetResourceRootIndex("transmittance_texture");
@@ -345,19 +373,19 @@ void Game::Render()
         int32_t worldMatrixRootIdx = mOpaquePass.GetResourceRootIndex("VSWorld");
         if (worldMatrixRootIdx != ROOTIDX_INVALID)
         {
-            pCommandList->SetGraphicsRootConstantBufferView(worldMatrixRootIdx, mWorldMatrixBuffer.GetGPUVirtualAddress());
+            pCommandList->SetGraphicsRootConstantBufferView(worldMatrixRootIdx, currFrameResources.mWorldMatrixBuffer.GetGPUVirtualAddress());
         }
      
         int32_t lightsRootIdx = mOpaquePass.GetResourceRootIndex("PSLights");
         if (lightsRootIdx != ROOTIDX_INVALID)
         {
-            pCommandList->SetGraphicsRootConstantBufferView(lightsRootIdx, mLightBuffer.GetGPUVirtualAddress());
+            pCommandList->SetGraphicsRootConstantBufferView(lightsRootIdx, currFrameResources.mLightBuffer.GetGPUVirtualAddress());
         }
 
         int32_t timeRootIdx = mOpaquePass.GetResourceRootIndex("Time");
         if (timeRootIdx != ROOTIDX_INVALID)
         {
-            pCommandList->SetGraphicsRootConstantBufferView(timeRootIdx, mTimeBuffer.GetGPUVirtualAddress());
+            pCommandList->SetGraphicsRootConstantBufferView(timeRootIdx, currFrameResources.mTimeBuffer.GetGPUVirtualAddress());
         }
 
         const Mesh* pMesh = codex.GetMesh(GetResourceID(L"teapot.obj"));
@@ -389,7 +417,7 @@ void Game::Render()
         int32_t aabbIdx = mRaymarchPass.GetResourceRootIndex("AABBBuffer");
         if (aabbIdx != ROOTIDX_INVALID)
         {
-            pCommandList->SetComputeRootConstantBufferView(aabbIdx, mAABBBuffer.GetGPUVirtualAddress());
+            pCommandList->SetComputeRootConstantBufferView(aabbIdx, currFrameResources.mAABBBuffer.GetGPUVirtualAddress());
         }
 
         int32_t hullIdx = mRaymarchPass.GetResourceRootIndex("HullsBuffer");
@@ -493,6 +521,11 @@ void Game::CreateWindowSizeDependentResources(int newWidth, int newHeight)
 
 Game::~Game()
 { 
+    for (size_t i = 0; i != NUM_FRAMES_IN_FLIGHT; ++i)
+    {
+        mFrameResources.at(i).Destroy();
+    }
+
     mCube.Destroy();
     mWorldMatrixBuffer.Destroy();
     mLightBuffer.Destroy();
