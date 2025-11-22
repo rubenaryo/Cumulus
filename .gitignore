@@ -7,6 +7,7 @@
 _int/
 _bin/
 external/imgui/bin
+Cumulus/imgui.ini
 
 # Visual Studio solution and project files (We use premake now)
 *.vcxproj
