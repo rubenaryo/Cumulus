@@ -508,14 +508,22 @@ return SUCCEEDED(hr);
 
     /////////////////////////////////////////////////////////////////////
 
-    bool ResetCommandList(ID3D12PipelineState* pInitialPipelineState)
+    bool ResetCommandList(ID3D12CommandAllocator* pAllocator, ID3D12PipelineState* pInitialPipelineState)
     {
-        ID3D12CommandAllocator* pAllocator = GetCommandAllocator();
+        bool forceFlush = false;
+        if (!pAllocator)
+        {
+            pAllocator = GetCommandAllocator(); // Use the central allocator if one is not provided
+            forceFlush = true;
+        }
+
         ID3D12GraphicsCommandList* pCommandList = GetCommandList();
         if (!pAllocator || !pCommandList)
             return false;
 
-        FlushCommandQueue();
+        // If the central allocator is used, we wait synchronously here, so that it can be safely used again.
+        if (forceFlush)
+            FlushCommandQueue();
 
         HRESULT hr = pAllocator->Reset();
         COM_EXCEPT(hr);
@@ -616,6 +624,13 @@ return SUCCEEDED(hr);
 
         CurrentBackBuffer = GetSwapChain()->GetCurrentBackBufferIndex();
         return true;
+    }
+
+    UINT64 AdvanceFence()
+    {
+        ++gFenceVal;
+        gCommandQueue->Signal(gFence.Get(), gFenceVal);
+        return gFenceVal;
     }
 
     bool CheckFeatureLevel(ID3D12Device* pDevice, D3D_FEATURE_LEVEL& outHighestLevel, const wchar_t** ppFeatureLevelStr)
