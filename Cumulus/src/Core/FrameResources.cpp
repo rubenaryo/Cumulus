@@ -38,22 +38,23 @@ bool FrameResources::Create(UINT width, UINT height)
 		return false;
 	}
 
+    ResourceCodex& codex = ResourceCodex::GetSingleton();
     mWorldMatrixBuffer.Create(L"world matrix buffer", sizeof(cbPerEntity));
     UINT8* mapped = mWorldMatrixBuffer.GetMappedPtr();
     assert(mapped);
     const float PI = 3.14159f;
+    DirectX::XMMATRIX debugEntityWorld = DirectX::XMMatrixIdentity();
+    debugEntityWorld = XMMatrixMultiply(debugEntityWorld, DirectX::XMMatrixRotationRollPitchYaw(0, 0, PI / 2.0f));
+    debugEntityWorld = XMMatrixMultiply(debugEntityWorld, DirectX::XMMatrixRotationRollPitchYaw(-PI / 2.0f, 0, 0));
+    debugEntityWorld = XMMatrixMultiply(debugEntityWorld, DirectX::XMMatrixScaling(0.12f, 0.12f, 0.12f));
+    debugEntityWorld = XMMatrixMultiply(debugEntityWorld, DirectX::XMMatrixTranslation(0, 1, 0));
+
     if (mapped)
     {
         using namespace DirectX;
         cbPerEntity entity;
-
-        XMMATRIX entityWorld = DirectX::XMMatrixIdentity();
-        entityWorld = XMMatrixMultiply(entityWorld, DirectX::XMMatrixRotationRollPitchYaw(0, 0, PI / 2.0f));
-        entityWorld = XMMatrixMultiply(entityWorld, DirectX::XMMatrixRotationRollPitchYaw(-PI / 2.0f, 0, 0));
-        entityWorld = XMMatrixMultiply(entityWorld, DirectX::XMMatrixScaling(0.12f, 0.12f, 0.12f));
-        entityWorld = XMMatrixMultiply(entityWorld, DirectX::XMMatrixTranslation(0, 1, 0));
-        XMStoreFloat4x4(&entity.world, entityWorld);
-        XMStoreFloat4x4(&entity.invWorld, DirectX::XMMatrixInverse(nullptr, entityWorld));
+        XMStoreFloat4x4(&entity.world, debugEntityWorld);
+        XMStoreFloat4x4(&entity.invWorld, DirectX::XMMatrixInverse(nullptr, debugEntityWorld));
         memcpy(mapped, &entity, sizeof(entity));
     }
 
@@ -72,8 +73,7 @@ bool FrameResources::Create(UINT width, UINT height)
 
     mAABBBuffer.Create(L"AABB Buffer", sizeof(cbIntersections));
 
-    ResourceCodex& codex = ResourceCodex::GetSingleton();
-    const Mesh* m = codex.GetMesh(Muon::GetResourceID(L"cube.obj"));
+    const Mesh* m = codex.GetMesh(Muon::GetResourceID(L"teapot.obj"));
 
     cbIntersections intersections = {};
     intersections.aabbCount = 1;
@@ -84,6 +84,7 @@ bool FrameResources::Create(UINT width, UINT height)
             memcpy(aabbPtr, &intersections, sizeof(intersections));
         }
     }
+
     //HULL:
     //todo: concat all hulls
     Hull h = m->GetHull();
@@ -95,12 +96,6 @@ bool FrameResources::Create(UINT width, UINT height)
         cbConvexHull cHull = {};
         cHull.faceCount = (uint32_t)h.faces.size();
         cHull.faceOffset = 0;
-
-        DirectX::XMMATRIX debugEntityWorld = DirectX::XMMatrixIdentity();
-        debugEntityWorld = XMMatrixMultiply(debugEntityWorld, DirectX::XMMatrixRotationRollPitchYaw(0, 0, PI / 2.0f));
-        debugEntityWorld = XMMatrixMultiply(debugEntityWorld, DirectX::XMMatrixRotationRollPitchYaw(-PI / 2.0f, 0, 0));
-        debugEntityWorld = XMMatrixMultiply(debugEntityWorld, DirectX::XMMatrixScaling(0.12f, 0.12f, 0.12f));
-        debugEntityWorld = XMMatrixMultiply(debugEntityWorld, DirectX::XMMatrixTranslation(0, 1, 0));
 
         XMStoreFloat4x4(&cHull.world, debugEntityWorld);
         XMStoreFloat4x4(&cHull.invWorld, DirectX::XMMatrixInverse(nullptr, debugEntityWorld));
