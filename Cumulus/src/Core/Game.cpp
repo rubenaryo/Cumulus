@@ -227,14 +227,39 @@ bool Game::InitFrameResources(UINT width, UINT height)
 // On Timer tick, run Update() on the game, then Render()
 void Game::Frame()
 {
+    WaitForCurrFrameResource();
+
     mTimer.Tick([&]()
     {
         Update(mTimer);
     });
 
     Render();
+    AdvanceFence();
 
+    mCurrFrameResourceIdx = (mCurrFrameResourceIdx + 1) % NUM_FRAMES_IN_FLIGHT;
     Muon::UpdateTitleBar(mTimer.GetFramesPerSecond(), mTimer.GetFrameCount());
+}
+
+void Game::WaitForCurrFrameResource()
+{
+    Muon::FrameResources& currFrameResources = mFrameResources.at(mCurrFrameResourceIdx);
+    ID3D12Fence* pFence = Muon::GetFence();
+    if (currFrameResources.mFence != 0 && pFence->GetCompletedValue() < currFrameResources.mFence)
+    {
+        HANDLE eventHandle = CreateEventEx(nullptr, false, false, EVENT_ALL_ACCESS);
+        HRESULT hr = pFence->SetEventOnCompletion(currFrameResources.mFence, eventHandle);
+        WaitForSingleObject(eventHandle, INFINITE);
+        CloseHandle(eventHandle);
+    }
+}
+
+void Game::AdvanceFence()
+{
+    Muon::FrameResources& currFrameResources = mFrameResources.at(mCurrFrameResourceIdx);
+
+    // Advance the fence value to mark commands up to this fence point.
+    currFrameResources.mFence = Muon::AdvanceFence();
 }
 
 void Game::Update(Muon::StepTimer const& timer)
@@ -278,6 +303,8 @@ void Game::Update(Muon::StepTimer const& timer)
         memcpy(mapped, &atmosphereParams, sizeof(Muon::cbAtmosphere));
     }
     mFrameResources.at(0).Update(totalTime, elapsedTime);
+    Muon::FrameResources& currFrameResources = mFrameResources.at(mCurrFrameResourceIdx);
+    currFrameResources.Update(totalTime, elapsedTime);
 }
 
 void Game::Render()
@@ -290,7 +317,8 @@ void Game::Render()
         return;
     }
 
-    ResetCommandList(nullptr);
+    FrameResources& currFrameResources = mFrameResources.at(mCurrFrameResourceIdx);
+    ResetCommandList(currFrameResources.mCmdAllocator.Get());
     PrepareForRender();
 
     ImguiNewFrame(mTimer.GetTotalSeconds(), mCamera, settings);
@@ -300,7 +328,6 @@ void Game::Render()
     ResourceID phongMatId = GetResourceID(L"Phong");
     const Muon::Material* pPhongMaterial = codex.GetMaterialType(phongMatId);
 
-    FrameResources& currFrameResources = mFrameResources.at(0);
     
     Texture* pOffscreenTarget = codex.GetTexture(GetResourceID(L"OffscreenTarget"));
     Texture* pComputeOutput = codex.GetTexture(GetResourceID(L"SobelOutput"));
@@ -505,7 +532,6 @@ void Game::Render()
     CloseCommandList();
     ExecuteCommandList();
     Present();
-    FlushCommandQueue();
     UpdateBackBufferIndex();
 }
 

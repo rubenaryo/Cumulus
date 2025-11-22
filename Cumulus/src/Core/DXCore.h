@@ -47,7 +47,7 @@ namespace Muon
 	Texture* GetOffscreenTarget();
 	void SetOffscreenTarget(Texture* pOffscreenTarget);
 
-	bool ResetCommandList(ID3D12PipelineState* pInitialPipelineState);
+	bool ResetCommandList(ID3D12CommandAllocator* pAllocator, ID3D12PipelineState* pInitialPipelineState = nullptr);
 	bool CloseCommandList();
 	bool PrepareForRender();
 	bool FinalizeRender();
@@ -55,6 +55,7 @@ namespace Muon
 	bool Present();
 	bool FlushCommandQueue();
 	bool UpdateBackBufferIndex();
+	UINT64 AdvanceFence();
 	bool CheckFeatureLevel(ID3D12Device* pDevice, D3D_FEATURE_LEVEL& outHighestLevel, std::wstring& outHighestLevelStr);
 	bool UpdateTitleBar(uint32_t fps, uint32_t frameCount);
 

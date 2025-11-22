@@ -28,6 +28,8 @@ public:
 
     // Main Game Loop
     void Frame();
+    void WaitForCurrFrameResource();
+    void AdvanceFence();
 
     // Callbacks for windows messages
     void OnActivated();
@@ -67,6 +69,7 @@ private:
 
     static const size_t NUM_FRAMES_IN_FLIGHT = 2;
     std::array<Muon::FrameResources, NUM_FRAMES_IN_FLIGHT> mFrameResources;
+    size_t mCurrFrameResourceIdx = 0;
 
     Muon::UploadBuffer mHullBuffer;
     Muon::UploadBuffer mHullFaceBuffer;
