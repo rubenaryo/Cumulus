@@ -28,6 +28,7 @@ Game::Game() :
     mAtmospherePass(L"AtmospherePass"),
     mSobelPass(L"SobelPass"),
     mRaymarchPass(L"RaymarchPass"),
+    mProcNVDFPass(L"ProcNVDFPass"),
     mPostProcessPass(L"PostProcessPass")
 {
     mTimer.SetFixedTimeStep(false);
@@ -92,6 +93,14 @@ bool Game::Init(HWND window, int width, int height)
             Printf(L"Warning: %s failed to generate!\n", mRaymarchPass.GetName());
     }
 
+    // Assemble procedural nvdf pass
+    {
+        mProcNVDFPass.SetComputeShader(codex.GetComputeShader(GetResourceID(L"UpdateNVDF.cs")));
+
+        if (!mProcNVDFPass.Generate())
+            Printf(L"Warning: %s failed to generate!\n", mProcNVDFPass.GetName());
+    }
+
     // Assemble post-process render pass
     {
         mPostProcessPass.SetVertexShader(codex.GetVertexShader(GetResourceID(L"Passthrough.vs")));
@@ -128,6 +137,11 @@ void Game::Frame()
     {
         Update(mTimer);
     });
+
+    if (mTimer.GetTotalTicks() % 240 == 0)
+    {
+        UpdateProceduralNVDF();
+    }
 
     Render();
     AdvanceFence();
@@ -166,6 +180,50 @@ void Game::Update(Muon::StepTimer const& timer)
 
     Muon::FrameResources& currFrameResources = mFrameResources.at(mCurrFrameResourceIdx);
     currFrameResources.Update(totalTime, elapsedTime, settings, mCamera);
+}
+
+void Game::UpdateProceduralNVDF()
+{
+    using namespace Muon;
+
+    ID3D12GraphicsCommandList* pCommandList = Muon::GetCommandList();
+    ResetCommandList(nullptr);
+    pCommandList->SetDescriptorHeaps(1, GetSRVHeap()->GetHeapAddr());
+
+    if (!mProcNVDFPass.Bind(pCommandList))
+    {
+        Muon::Printf("Failed to bind procedural nvdf pass\n");
+        return;
+    }
+
+    ResourceCodex& codex = ResourceCodex::GetSingleton();
+    Texture* pProcNVDFTex = codex.GetTexture(GetResourceID(L"ProceduralNVDF"));
+    if (!pProcNVDFTex)
+    {
+        Muon::Printf("Error: Failed to get procedural nvdf texture!\n");
+        return;
+    }
+
+    int32_t outputIdx = mProcNVDFPass.GetResourceRootIndex("gOutput");
+    if (outputIdx != ROOTIDX_INVALID)
+    {
+        pCommandList->SetComputeRootDescriptorTable(outputIdx, pProcNVDFTex->GetUAVHandleGPU());
+    }
+
+    pCommandList->ResourceBarrier(1, &CD3DX12_RESOURCE_BARRIER::Transition(pProcNVDFTex->GetResource(),
+        D3D12_RESOURCE_STATE_GENERIC_READ, D3D12_RESOURCE_STATE_UNORDERED_ACCESS));
+
+    UINT numGroupsX = (UINT)ceilf(pProcNVDFTex->GetWidth() / 16.0f);
+    UINT numGroupsY = (UINT)ceilf(pProcNVDFTex->GetHeight() / 16.0f);
+    UINT numGroupsZ = (UINT)ceilf(pProcNVDFTex->GetDepth() / 2.0f);
+    pCommandList->Dispatch(numGroupsX, numGroupsY, numGroupsZ);
+
+    pCommandList->ResourceBarrier(1, &CD3DX12_RESOURCE_BARRIER::Transition(pProcNVDFTex->GetResource(),
+        D3D12_RESOURCE_STATE_UNORDERED_ACCESS, D3D12_RESOURCE_STATE_GENERIC_READ));
+
+    CloseCommandList();
+    ExecuteCommandList();
+    FlushCommandQueue(); // TODO: Give this process its own cmd allocator so we don't stall everything here
 }
 
 void Game::Render()
@@ -420,6 +478,7 @@ Game::~Game()
     mAtmospherePass.Destroy();
     mSobelPass.Destroy();
     mRaymarchPass.Destroy();
+    mProcNVDFPass.Destroy();
     mPostProcessPass.Destroy();
 
     Muon::ImguiShutdown();

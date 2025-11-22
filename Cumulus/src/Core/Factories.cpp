@@ -957,7 +957,7 @@ void TextureFactory::CreateProceduralNVDFTexture(ID3D12Device* pDevice, ID3D12Gr
     bool success = tex.Create(PROC_NVDF_NAME, pDevice, PROC_NVDF_WIDTH, PROC_NVDF_HEIGHT, PROC_NVDF_DEPTH,
         DXGI_FORMAT_R32G32B32A32_FLOAT,
         D3D12_RESOURCE_FLAG_ALLOW_UNORDERED_ACCESS,
-        D3D12_RESOURCE_STATE_COMMON);
+        D3D12_RESOURCE_STATE_GENERIC_READ);
 
     if (!success)
     {
