@@ -266,6 +266,9 @@ void Game::Update(Muon::StepTimer const& timer)
 {
     float elapsedTime = float(timer.GetElapsedSeconds());
     float totalTime = float(timer.GetTotalSeconds());
+    mInput.Frame(elapsedTime, &mCamera);
+    mCamera.UpdateView();    
+
     Muon::FrameResources& currFrameResources = mFrameResources.at(mCurrFrameResourceIdx);
     currFrameResources.Update(totalTime, elapsedTime, settings, mCamera);
 }

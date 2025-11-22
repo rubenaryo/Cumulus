@@ -174,12 +174,14 @@ void FrameResources::Update(float totalTime, float deltaTime, Muon::SceneSetting
 
 void FrameResources::Destroy()
 {
-	mCmdAllocator.Reset();
-	mWorldMatrixBuffer.Destroy();
-	mLightBuffer.Destroy();
-	mTimeBuffer.Destroy();
-	mAABBBuffer.Destroy();
-	mAtmosphereBuffer.Destroy();
+    mCmdAllocator.Reset();
+    mWorldMatrixBuffer.Destroy();
+    mLightBuffer.Destroy();
+    mTimeBuffer.Destroy();
+    mAABBBuffer.Destroy();
+    mAtmosphereBuffer.Destroy();
+    mHullBuffer.Destroy();
+    mHullFaceBuffer.Destroy();
 }
 
 
