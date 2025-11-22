@@ -266,45 +266,8 @@ void Game::Update(Muon::StepTimer const& timer)
 {
     float elapsedTime = float(timer.GetElapsedSeconds());
     float totalTime = float(timer.GetTotalSeconds());
-    mInput.Frame(elapsedTime, &mCamera);
-    mCamera.UpdateView();
-
-    Muon::cbLights lights;
-
-    lights.ambientColor = DirectX::XMFLOAT3A(+1.0f, +0.772f, +0.56f);
-    lights.directionalLight.diffuseColor = DirectX::XMFLOAT3A(1.0, 1.0, 1.0);
-    lights.directionalLight.dir = DirectX::XMFLOAT3A(0,1,0);
-
-    DirectX::XMStoreFloat3(&lights.cameraWorldPos, mCamera.GetPosition());
-
-    UINT8* mapped = mLightBuffer.GetMappedPtr();
-    
-    if (mapped)
-        memcpy(mapped, &lights, sizeof(Muon::cbLights));
-
-
-    Muon::cbTime time;
-    time.totalTime = (float)timer.GetTotalSeconds();
-    time.deltaTime = elapsedTime;
-
-    UINT8* timeBuf = mTimeBuffer.GetMappedPtr();
-    if (timeBuf)
-        memcpy(timeBuf, &time, sizeof(Muon::cbTime));
-
-    // Updating Atmosphere
-    Muon::cbAtmosphere atmosphereParams;
-    Muon::UpdateAtmosphere(atmosphereParams, mCamera, settings.isSunDynamic, settings.timeOfDay, time.totalTime);
-    //Muon::InitializeAtmosphereConstants(atmosphereParams, 1280, 800);
-    settings.sunDir = atmosphereParams.sun_direction;
-
-    mapped = mAtmosphereBuffer.GetMappedPtr();
-    if (mapped)
-    {
-        memcpy(mapped, &atmosphereParams, sizeof(Muon::cbAtmosphere));
-    }
-    mFrameResources.at(0).Update(totalTime, elapsedTime);
     Muon::FrameResources& currFrameResources = mFrameResources.at(mCurrFrameResourceIdx);
-    currFrameResources.Update(totalTime, elapsedTime);
+    currFrameResources.Update(totalTime, elapsedTime, settings, mCamera);
 }
 
 void Game::Render()
@@ -450,13 +413,13 @@ void Game::Render()
         int32_t hullIdx = mRaymarchPass.GetResourceRootIndex("HullsBuffer");
         if (hullIdx != ROOTIDX_INVALID)
         {
-            pCommandList->SetComputeRootConstantBufferView(hullIdx, mHullBuffer.GetGPUVirtualAddress());
+            pCommandList->SetComputeRootConstantBufferView(hullIdx, currFrameResources.mHullBuffer.GetGPUVirtualAddress());
         }
 
         int32_t hullFaceIdx = mRaymarchPass.GetResourceRootIndex("HullFacesBuffer");
         if (hullFaceIdx != ROOTIDX_INVALID)
         {
-            pCommandList->SetComputeRootConstantBufferView(hullFaceIdx, mHullFaceBuffer.GetGPUVirtualAddress());
+            pCommandList->SetComputeRootConstantBufferView(hullFaceIdx, currFrameResources.mHullFaceBuffer.GetGPUVirtualAddress());
         }
 
         int32_t inIdx = mRaymarchPass.GetResourceRootIndex("gInput");
@@ -553,13 +516,6 @@ Game::~Game()
     }
 
     mCube.Destroy();
-    mWorldMatrixBuffer.Destroy();
-    mLightBuffer.Destroy();
-    mTimeBuffer.Destroy();
-    mAABBBuffer.Destroy();
-    mAtmosphereBuffer.Destroy();
-    mHullBuffer.Destroy();
-    mHullFaceBuffer.Destroy();
     mCamera.Destroy();
     mInput.Destroy();
     mOpaquePass.Destroy();

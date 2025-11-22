@@ -71,9 +71,6 @@ private:
     std::array<Muon::FrameResources, NUM_FRAMES_IN_FLIGHT> mFrameResources;
     size_t mCurrFrameResourceIdx = 0;
 
-    Muon::UploadBuffer mHullBuffer;
-    Muon::UploadBuffer mHullFaceBuffer;
-
     // Timer for the main game loop
     Muon::StepTimer mTimer;
 };

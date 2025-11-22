@@ -11,13 +11,19 @@ Description : Resources needed for a single frame
 
 namespace Muon
 {
+    struct SceneSettings;
+    class Camera;
+}
+
+namespace Muon
+{
 
 struct FrameResources
 {
     FrameResources();
     
     bool Create(UINT width, UINT height);
-    void Update(float totalTime, float deltaTime);
+    void Update(float totalTime, float deltaTime, Muon::SceneSettings& settings, Muon::Camera& camera);
     void Destroy();
 
     Microsoft::WRL::ComPtr<ID3D12CommandAllocator> mCmdAllocator;
@@ -27,6 +33,8 @@ struct FrameResources
     UploadBuffer mTimeBuffer;
     UploadBuffer mAABBBuffer;
     UploadBuffer mAtmosphereBuffer;
+    Muon::UploadBuffer mHullBuffer;
+    Muon::UploadBuffer mHullFaceBuffer;
 
     UINT64 mFence = 0;
 };
