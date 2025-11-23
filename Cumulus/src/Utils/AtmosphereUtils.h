@@ -175,9 +175,10 @@ void UpdateAtmosphere(cbAtmosphere& constants,
     view_zenith_angle_radians = camera.GetZenith();
     view_azimuth_angle_radians = camera.GetAzimuth();
     // Distance calculation is either based on simply height or distance from target
-    //XMVECTOR target = camera.GetTarget();
-    //XMVECTOR at = XMVectorSet(XMVectorGetX(target), XMVectorGetZ(target), XMVectorGetY(target), 0.0f);
-    float dist = max(XMVectorGetY(camera.GetPosition()), 0.f);// XMVectorGetX(XMVector3Length(at));
+    XMVECTOR target = camera.GetTarget();
+    XMVECTOR at = XMVectorSet(XMVectorGetX(target), XMVectorGetZ(target), XMVectorGetY(target), 0.0f);
+    //float dist = max(XMVectorGetY(camera.GetPosition()), 0.f);
+    float dist = XMVectorGetX(XMVector3Length(at));
     // Create matrices
     // NOTE: Ideally we woudln't want to recalculate view from clip every time
     XMMATRIX view_from_clip = CreateViewFromClipMatrix(kFovY, aspect_ratio);

@@ -158,6 +158,7 @@ void Camera::MoveForward(float dist)
 void Camera::MoveRight(float dist)
 {
     MoveAlongAxis(dist, mRight);
+    mTarget = XMVectorAdd(mTarget, XMVectorScale(mRight, dist));
 }
 
 void Camera::MoveUp(float dist)
@@ -168,7 +169,6 @@ void Camera::MoveUp(float dist)
 void Camera::MoveAlongAxis(float dist, XMVECTOR axis)
 {
     mPosition = XMVectorAdd(mPosition, XMVectorScale(axis, dist));
-    mTarget = XMVectorAdd(mTarget, XMVectorScale(axis, dist));
     UpdateAzimuthZenith();
 }
 
