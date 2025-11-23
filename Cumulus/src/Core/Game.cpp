@@ -373,7 +373,7 @@ void Game::Render()
 
     if (mRaymarchPass.Bind(pCommandList))
     {
-        Texture* pSdf = codex.GetTexture(GetResourceID(L"StormbirdCloudSdf_3D"));
+        Texture* pSdf = codex.GetTexture(GetResourceID(L"StormbirdCloudSDF_3D"));
         Texture* pNVDF = codex.GetTexture(GetResourceID(L"StormbirdCloud_NVDF"));
         Texture* pNoise = codex.GetTexture(GetResourceID(L"Noise_3D"));
 
