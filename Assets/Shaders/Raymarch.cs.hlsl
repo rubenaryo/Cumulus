@@ -6,9 +6,10 @@
 #define USE_JITTERED_STEP 1
 #define USE_HIGH_HIGH_FREQUENCY 1
 #define DEBUG_AABB_INTERSECT 0
+#define DEBUG_STEP_COUNT 0   // 1 = show step-count debug gradient, 0 = normal shading
 
 // Raymarch settings
-static const int MAX_STEPS = 1024; // Max steps per ray
+static const int MAX_STEPS = 256; // Max steps per ray
 static const float MIN_DIST = 0.001; // Global near distance
 static const float MAX_DIST = 1000.0; // Global far distance
 static const float EPSILON = 0.001; // Small epsilon for safety
@@ -25,7 +26,7 @@ static const float NOISE_DOMAIN_SIDE_LENGTH = 100.0; // Noise domain: 3D noise p
 static const float AUTHORING_TO_WORLD_SCALE = SIDE_LENGTH / NVDF_DOMAIN_SIDE_LENGTH;
 
 // Density -> extinction scaling
-static const float DENSITY_SCALE = .035; // To be tuned / driven by NVDF
+static const float DENSITY_SCALE = 1; // To be tuned / driven by NVDF
 
 Texture2D gInput : register(t0);
 Texture3D sdfTex : register(t1); // Cached sdf for accelerating sdf 
@@ -452,9 +453,22 @@ float3 VolumeRaymarchNvdf(float3 eyePos, float3 dir, float3 bgColor, int3 dispat
 
         march.distance += march.stepSize;
     }
+    
+#if DEBUG_STEP_COUNT
+    // Number of steps actually taken (body executions)
+    float stepsTaken = (march.stepIndex + 1);
 
+    // Normalize to [0,1] using MAX_STEPS as the "max step count"
+    float t = stepsTaken / (float) MAX_STEPS;
+    t = saturate(t);
+
+    // Simple black→white gradient
+    float3 debugColor = lerp(float3(0.0, 0.0, 0.0), float3(1.0, 1.0, 1.0), t);
+    return debugColor;
+#else
     float3 finalColor = march.accumColor + bgColor * march.transmittance;
     return finalColor;
+#endif
 }
 
 
