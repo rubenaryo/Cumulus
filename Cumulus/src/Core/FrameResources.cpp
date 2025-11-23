@@ -12,6 +12,7 @@ Description : Resources needed for a single frame
 #include <Utils/AtmosphereUtils.h>
 #include <Utils/Utils.h>
 #include <assert.h>
+#include <cmath>
 
 namespace Muon
 {
@@ -46,8 +47,11 @@ bool FrameResources::Create(UINT width, UINT height)
     DirectX::XMMATRIX debugEntityWorld = DirectX::XMMatrixIdentity();
     debugEntityWorld = XMMatrixMultiply(debugEntityWorld, DirectX::XMMatrixRotationRollPitchYaw(0, 0, PI / 2.0f));
     debugEntityWorld = XMMatrixMultiply(debugEntityWorld, DirectX::XMMatrixRotationRollPitchYaw(-PI / 2.0f, 0, 0));
-    debugEntityWorld = XMMatrixMultiply(debugEntityWorld, DirectX::XMMatrixScaling(0.12f, 0.12f, 0.12f));
+    debugEntityWorld = XMMatrixMultiply(debugEntityWorld, DirectX::XMMatrixScaling(10.12f, 10.12f, 10.12f));
     debugEntityWorld = XMMatrixMultiply(debugEntityWorld, DirectX::XMMatrixTranslation(0, 1, 0));
+
+    EntityData entityData{};
+
 
     if (mapped)
     {
@@ -55,6 +59,7 @@ bool FrameResources::Create(UINT width, UINT height)
         cbPerEntity entity;
         XMStoreFloat4x4(&entity.world, debugEntityWorld);
         XMStoreFloat4x4(&entity.invWorld, DirectX::XMMatrixInverse(nullptr, debugEntityWorld));
+        entityData.entityMatrices = entity;
         memcpy(mapped, &entity, sizeof(entity));
     }
 
@@ -103,6 +108,7 @@ bool FrameResources::Create(UINT width, UINT height)
         hulls.hulls[0] = cHull;
         hulls.hullCount = 1;
         memcpy(mHullBuffer.GetMappedPtr(), &hulls, sizeof(hulls));
+        entityData.hull = cHull;
     }
 
     mHullFaceBuffer.Create(L"Hull Faces Buffer", sizeof(cbHullFaces));
@@ -127,6 +133,7 @@ bool FrameResources::Create(UINT width, UINT height)
 
     mTimeBuffer.Create(L"Time", sizeof(cbTime));
 
+    this->entityCbData[0] = entityData;
 	return true;
 }
 
@@ -165,6 +172,44 @@ void FrameResources::Update(float totalTime, float deltaTime, Muon::SceneSetting
         memcpy(mapped, &atmosphereParams, sizeof(Muon::cbAtmosphere));
     }
 
+    const float PI = 3.14159f;
+    DirectX::XMMATRIX debugEntityWorld = DirectX::XMMatrixIdentity();
+    debugEntityWorld = XMMatrixMultiply(debugEntityWorld, DirectX::XMMatrixRotationRollPitchYaw(0, 0, PI / 2.0f));
+    debugEntityWorld = XMMatrixMultiply(debugEntityWorld, DirectX::XMMatrixRotationRollPitchYaw(-PI / 2.0f, 0, 0));
+    debugEntityWorld = XMMatrixMultiply(debugEntityWorld,  DirectX::XMMatrixScaling(10.f, 10.f, 10.f));
+    float yPos = 1000*(sin(time.totalTime * .5f));
+    debugEntityWorld = XMMatrixMultiply(debugEntityWorld, DirectX::XMMatrixTranslation(0, yPos, 0));
+
+    UINT8* worldMatrix = mWorldMatrixBuffer.GetMappedPtr();
+    assert(worldMatrix);
+
+    if (worldMatrix)
+    {
+        using namespace DirectX;
+        cbPerEntity entity;
+        XMStoreFloat4x4(&entity.world, debugEntityWorld);
+        XMStoreFloat4x4(&entity.invWorld, DirectX::XMMatrixInverse(nullptr, debugEntityWorld));
+        memcpy(worldMatrix, &entity, sizeof(entity));
+    }
+
+    cbConvexHull cHull = this->entityCbData[0].hull;
+    mHullBuffer.Create(L"Hull Buffer", sizeof(cbHulls));
+
+    if (mHullBuffer.GetMappedPtr())
+    {
+        cbHulls hulls = {};
+
+        XMStoreFloat4x4(&cHull.world, debugEntityWorld);
+        XMStoreFloat4x4(&cHull.invWorld, DirectX::XMMatrixInverse(nullptr, debugEntityWorld));
+
+        hulls.hulls[0] = cHull;
+        hulls.hullCount = 1;
+        memcpy(mHullBuffer.GetMappedPtr(), &hulls, sizeof(hulls));
+    }
+}
+
+void FrameResources::UpdateEntity(int32_t entityId, EntityData newData)
+{
 }
 
 void FrameResources::Destroy()

@@ -110,6 +110,11 @@ struct alignas(16) cbAtmosphere
     float pad3;
 };
 
+struct EntityData {
+    cbPerEntity entityMatrices;
+    cbConvexHull hull;
+};
+
 }
 
 #endif

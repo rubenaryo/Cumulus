@@ -138,7 +138,7 @@ void Game::Frame()
         Update(mTimer);
     });
 
-    if (mTimer.GetTotalTicks() % 240 == 0)
+    if (mTimer.GetTotalTicks() % 2 == 0)
     {
         UpdateProceduralNVDF();
     }
@@ -187,6 +187,8 @@ void Game::UpdateProceduralNVDF()
     using namespace Muon;
 
     ID3D12GraphicsCommandList* pCommandList = Muon::GetCommandList();
+    FrameResources& currFrameResources = mFrameResources.at(mCurrFrameResourceIdx);
+
     ResetCommandList(nullptr);
     pCommandList->SetDescriptorHeaps(1, GetSRVHeap()->GetHeapAddr());
 
@@ -209,6 +211,19 @@ void Game::UpdateProceduralNVDF()
     {
         pCommandList->SetComputeRootDescriptorTable(outputIdx, pProcNVDFTex->GetUAVHandleGPU());
     }
+
+    int32_t hullIdx = mProcNVDFPass.GetResourceRootIndex("HullsBuffer");
+    if (hullIdx != ROOTIDX_INVALID)
+    {
+        pCommandList->SetComputeRootConstantBufferView(hullIdx, currFrameResources.mHullBuffer.GetGPUVirtualAddress());
+    }
+
+    int32_t hullFaceIdx = mProcNVDFPass.GetResourceRootIndex("HullFacesBuffer");
+    if (hullFaceIdx != ROOTIDX_INVALID)
+    {
+        pCommandList->SetComputeRootConstantBufferView(hullFaceIdx, currFrameResources.mHullFaceBuffer.GetGPUVirtualAddress());
+    }
+
 
     pCommandList->ResourceBarrier(1, &CD3DX12_RESOURCE_BARRIER::Transition(pProcNVDFTex->GetResource(),
         D3D12_RESOURCE_STATE_GENERIC_READ, D3D12_RESOURCE_STATE_UNORDERED_ACCESS));
@@ -335,7 +350,7 @@ void Game::Render()
         }
 
         const Mesh* pMesh = codex.GetMesh(GetResourceID(L"teapot.obj"));
-        if (pMesh)
+        if (pMesh && settings.drawObjects)
         {
             pMesh->DrawIndexed(pCommandList);
         }
@@ -348,6 +363,7 @@ void Game::Render()
     if (mRaymarchPass.Bind(pCommandList))
     {
         Texture* pSdfNVDF = codex.GetTexture(GetResourceID(L"StormbirdCloud_NVDF"));
+        Texture* collisionTexture = codex.GetTexture(GetResourceID(L"ProceduralNVDF"));
         Texture* pNoise = codex.GetTexture(GetResourceID(L"Noise_3D"));
 
         pCommandList->ResourceBarrier(1, &CD3DX12_RESOURCE_BARRIER::Transition(pOffscreenTarget->GetResource(),
@@ -406,6 +422,12 @@ void Game::Render()
         if (depthBufferIdx != ROOTIDX_INVALID)
         {
             pCommandList->SetComputeRootDescriptorTable(depthBufferIdx, GetDepthStencilSRV().HandleGPU);
+        }
+
+        int32_t collisionIndex = mRaymarchPass.GetResourceRootIndex("collisionTex");
+        if (collisionIndex != ROOTIDX_INVALID)
+        {
+            pCommandList->SetComputeRootDescriptorTable(collisionIndex, collisionTexture->GetSRVHandleGPU());
         }
 
         pCommandList->ResourceBarrier(1, &CD3DX12_RESOURCE_BARRIER::Transition(pComputeOutput->GetResource(),

@@ -5,32 +5,14 @@
 #define USE_ADAPTIVE_STEP 1 // Shows some artifact ATM. Will debug again after uprez. 
 #define USE_JITTERED_STEP 1
 #define USE_HIGH_HIGH_FREQUENCY 1
-#define DEBUG_AABB_INTERSECT 1
-
-// Raymarch settings
-static const int MAX_STEPS = 1024; // Max steps per ray
-static const float MIN_DIST = 0.001; // Global near distance
-static const float MAX_DIST = 1000.0; // Global far distance
-static const float EPSILON = 0.001; // Small epsilon for safety
-static const float MIN_TRANSMITTANCE = 0.01; // Early-out when mostly opaque
-
-// Volume bounds in world space
-static const float SIDE_LENGTH = 4000.0; 
-static const float3 VOLUME_MIN_WS = float3(-SIDE_LENGTH / 2, 0.0, -SIDE_LENGTH / 2);
-static const float3 VOLUME_MAX_WS = float3(SIDE_LENGTH / 2, SIDE_LENGTH / 8, SIDE_LENGTH / 2);
-
-// Mapping from NVDF authoring space to world 
-static const float NVDF_DOMAIN_SIDE_LENGTH = 4000.0; // NVDF authoring domain: 4km x 4km x 0.5km (matches the world volume).
-static const float NOISE_DOMAIN_SIDE_LENGTH = 100.0; // Noise domain: 3D noise pattern repeats every 100m in X/Y/Z.
-static const float AUTHORING_TO_WORLD_SCALE = SIDE_LENGTH / NVDF_DOMAIN_SIDE_LENGTH;
-
-// Density -> extinction scaling
-static const float DENSITY_SCALE = .035; // To be tuned / driven by NVDF
+#define DEBUG_AABB_INTERSECT 0
 
 Texture2D gInput : register(t0);
 Texture3D sdfNvdfTex : register(t1); // Sdf and model textures combined [sdf.r, model.r, model.g, model.b] 
 Texture3D noiseTex : register(t2); // Low frequency, high frequency noises for wispy and billowy clouds 
 Texture2D depthStencilBuffer : register(t3); // The scene's depth-stencil buffer, bound here post-graphics passes
+Texture3D gpuCloudTex : register(t4); // Sdf and model textures combined [sdf.r, model.r, model.g, model.b] 
+
 SamplerState linearWrap : register(s2);
 SamplerState linearClamp : register(s3); 
 RWTexture2D<float4> gOutput : register(u0);
@@ -82,20 +64,6 @@ void InitRayMarchInfo(out RayMarchInfo info, float tEnter, float tExit)
     info.stepIndex = 0;
 }
 
-
-float3 WorldToNvdfUV(float3 worldPos)
-{
-    float3 local = (worldPos - VOLUME_MIN_WS) / (VOLUME_MAX_WS - VOLUME_MIN_WS);
-
-    // local: (X, Y, Z) normalized into [0,1]
-
-    float u = local.x; // world X -> texture X
-    float v = local.z; // world Z -> texture Y (so each slice is an XZ plane)
-    float w = local.y; // world Y -> texture Z (stacking along Y)
-
-    return float3(u, v, w);
-}
-
 bool RayBoxIntersect(
     float3 origin,
     float3 dir,
@@ -118,64 +86,6 @@ bool RayBoxIntersect(
     // Need a positive interval where enter < exit
     return tExit > max(tEnter, 0.0);
 }
-
-bool RayConvexHullIntersect(
-    float3 origin,
-    float3 dir,
-    ConvexHull hull,
-    out float tEnter,
-    out float tExit)
-{
-    // Initial interval: (-∞, +∞)
-    tEnter = -1e20;
-    tExit  =  1e20;
-
-    uint faceStart = hull.faceOffset;
-    uint faceEnd   = hull.faceOffset + hull.faceCount;
-
-    float3 localOrigin = mul(hull.invWorld, float4(origin, 1.0)).xyz;
-    float3 localDir    = mul(hull.invWorld, float4(dir, 0.0)).xyz;
-
-
-    for (uint fi = faceStart; fi < faceEnd; ++fi)
-    {
-        float4 face = hullFaces[fi];
-        float distance = face.w;
-        float4 normal = float4(face.xyz, 0.0);
-
-        float dist0 = dot(normal, localOrigin) + distance;
-        float denom = dot(normal, localDir);
-
-        if (abs(denom) < 1e-8)
-        {
-            // Ray is parallel to plane
-            if (dist0 > 0.0)
-                return false;   // outside → cannot intersect
-            else
-                continue;       // inside → this plane imposes no limit
-        }
-
-        float tHit = -dist0 / denom;
-
-        if (denom < 0.0)
-        {
-            // entering half-space
-            tEnter = max(tEnter, tHit);
-        }
-        else
-        {
-            // exiting half-space
-            tExit = min(tExit, tHit);
-        }
-
-        if (tEnter > tExit)
-            return false;
-    }
-
-    // Need exit to be after enter, and at least one must be in front
-    return tExit > max(tEnter, 0.0);
-}
-
 // Encoded value in [0, 1]  ->  real SDF in [-256, 4096]
 float DecodeSdf(float encodedSdf)
 {
@@ -358,22 +268,7 @@ float3 VolumeRaymarchNvdf(float3 eyePos, float3 dir, float3 bgColor, int3 dispat
         return bgColor;
     }
 
-    float minBoxEnter = tEnter;
-    float maxBoxExit = tExit;
-    for (uint i = 0; i < aabbCount; ++i)
-    {
-        float aabbEnter, aabbExit;
-        if (RayBoxIntersect(eyePos, dir, aabbs[i].minBounds, aabbs[i].maxBounds, aabbEnter, aabbExit))
-        {
-            minBoxEnter = min(minBoxEnter, aabbEnter);
-            maxBoxExit = max(maxBoxExit, aabbExit);
 #if DEBUG_AABB_INTERSECT
-           // return float3(1, 0, 0) * bgColor; // Visualize AABB intersection
-#endif
-        }
-    }
-
-
     for(uint i = 0; i < hullCount; ++i)
     {
         float hullEnter, hullExit;
@@ -383,11 +278,10 @@ float3 VolumeRaymarchNvdf(float3 eyePos, float3 dir, float3 bgColor, int3 dispat
         {
             // minBoxEnter = min(minBoxEnter, hullEnter);
             // maxBoxExit = max(maxBoxExit, hullExit);
-#if DEBUG_AABB_INTERSECT
             return float3(1, 0, 0) * bgColor; // Visualize hull intersection
-#endif
         }
     }
+#endif
 
     // Clamp to your global near/far
     tEnter = max(tEnter, MIN_DIST);
@@ -411,7 +305,10 @@ float3 VolumeRaymarchNvdf(float3 eyePos, float3 dir, float3 bgColor, int3 dispat
 
         // Sample NVDF volume: .r = encoded SDF, .g = density (dimensional profile)
         float4 sdfSample = sdfNvdfTex.SampleLevel(linearClamp, WorldToNvdfUV(samplePos), 0.0f);
-        float sdfDistance = DecodeSdf(sdfSample.r) * AUTHORING_TO_WORLD_SCALE;
+        float4 collisionSample = gpuCloudTex.SampleLevel(linearClamp, WorldToNvdfUV(samplePos), 0.0f);
+        sdfSample.g *= (1.0 - collisionSample.g);
+
+        float sdfDistance = DecodeSdf(sdfSample.r) * AUTHORING_TO_WORLD_SCALE * (1.0 - collisionSample.g);
 
 #if USE_ADAPTIVE_STEP
         float adaptive = ComputeAdaptiveStepSize(march.distance);
