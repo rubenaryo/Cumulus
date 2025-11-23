@@ -2,6 +2,7 @@
 
 // MeshFactory
 #include "Mesh.h"
+#include <Core/Hull.h>
 #include <assimp/Importer.hpp>
 #include <assimp/postprocess.h>
 #include <assimp/scene.h>
@@ -805,6 +806,21 @@ bool TextureFactory::Load3DTextureFromSlices(std::filesystem::path directoryPath
     std::wstring lookupName = directoryPath.filename().wstring() + L"_3D";
     success = Upload3DTextureFromData(lookupName.c_str(), outData.data(), width, height, sliceFiles.size(),
         DXGI_FORMAT_R32G32B32A32_FLOAT, pDevice, pCommandList, codex);
+
+    Texture* p3DTex = codex.GetTexture(GetResourceID(lookupName.c_str()));
+    if (!p3DTex)
+    {
+        Printf(L"Error: Failed to fetch 3D NVDF texture: %s from codex when transitioning to compute resource\n", lookupName.c_str());
+        return false;
+    }
+
+    // Assumption: 3D textures will be used in the raymarch compute shader (not pixel shader)
+    // In reality, we should track the resource state explicitly by building a new system.
+    pCommandList->ResourceBarrier(1, &CD3DX12_RESOURCE_BARRIER::Transition(
+        p3DTex->GetResource(),
+        D3D12_RESOURCE_STATE_PIXEL_SHADER_RESOURCE,
+        D3D12_RESOURCE_STATE_NON_PIXEL_SHADER_RESOURCE
+    ));
 
     return success;
 }
