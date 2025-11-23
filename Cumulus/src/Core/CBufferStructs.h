@@ -59,6 +59,35 @@ struct alignas(256) cbIntersections
     AABB aabbs[1];
 };
 
+struct alignas(16) cbConvexHull
+{
+    uint32_t buffer1;
+    uint32_t buffer2;
+
+    uint32_t faceOffset;
+    uint32_t faceCount;
+
+    DirectX::XMFLOAT4X4 world;
+    DirectX::XMFLOAT4X4 invWorld;
+};
+
+struct alignas(16) cbHulls
+{
+    uint32_t hullCount;
+    cbConvexHull hulls[1];
+};
+
+
+struct alignas(16) cbHullFaces
+{
+    DirectX::XMFLOAT4 faces[1024];
+};
+
+struct alignas(16) cbHullPoints
+{
+    DirectX::XMFLOAT3A points[2048];
+};
+
 struct alignas(16) cbAtmosphere
 {
     DirectX::XMFLOAT4X4 view_from_clip;      // Inverse projection matrix

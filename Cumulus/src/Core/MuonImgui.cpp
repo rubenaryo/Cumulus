@@ -68,7 +68,7 @@ void ImguiShutdown()
     ImGui::DestroyContext();
 }
 
-void ImguiNewFrame(float gameTime, const Camera& cam, DirectX::XMFLOAT3 sunDir, bool& isSunDynamic, int& timeOfDay)
+void ImguiNewFrame(float gameTime, const Camera& cam, SceneSettings& settings)
 {
     // (Your code process and dispatch Win32 messages)
     // Start the Dear ImGui frame
@@ -106,11 +106,11 @@ void ImguiNewFrame(float gameTime, const Camera& cam, DirectX::XMFLOAT3 sunDir, 
         }
         if (ImGui::BeginTabItem("Atmosphere"))
         {
-            ImGui::Text("Sun Direction: %f, %f, %f", sunDir.x, sunDir.y, sunDir.z);
-            ImGui::Checkbox("Toggle Dynamic Sun", &isSunDynamic);
-            if (!isSunDynamic)
+            ImGui::Text("Sun Direction: %f, %f, %f", settings.sunDir.x, settings.sunDir.y, settings.sunDir.z);
+            ImGui::Checkbox("Toggle Dynamic Sun", &settings.isSunDynamic);
+            if (!settings.isSunDynamic)
             {
-                ImGui::SliderInt("Time Of Day", &timeOfDay, 0, 2400);
+                ImGui::SliderInt("Time Of Day", &settings.timeOfDay, 0, 2400);
             }
             else
             {
@@ -121,6 +121,12 @@ void ImguiNewFrame(float gameTime, const Camera& cam, DirectX::XMFLOAT3 sunDir, 
 
             ImGui::EndTabItem();
         }
+        if (ImGui::BeginTabItem("Interactables"))
+        {
+            ImGui::Checkbox("Visualize Convex Hull", &settings.isSunDynamic);
+            ImGui::EndTabItem();
+        }
+
         ImGui::EndTabBar();
     }
     ImGui::End();

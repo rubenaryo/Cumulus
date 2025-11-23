@@ -10,11 +10,12 @@ Description : Mesh initialization logic, for DX12
 #include <Core/ResourceCodex.h>
 #include <Utils/Utils.h>
 #include <d3dx12.h>
+#include <Core/Hull.h>
 
 namespace Muon
 {
 
-bool Mesh::Create(const wchar_t* name, UINT vtxDataSize, UINT vtxStride, UINT vtxCount, UINT idxDataSize, UINT idxCount, DXGI_FORMAT idxFormat, AABB aabb)
+bool Mesh::Create(const wchar_t* name, UINT vtxDataSize, UINT vtxStride, UINT vtxCount, UINT idxDataSize, UINT idxCount, DXGI_FORMAT idxFormat, AABB aabb, Hull hull)
 {
     if (!Muon::GetDevice() || vtxDataSize == 0)
         return false;
@@ -23,6 +24,7 @@ bool Mesh::Create(const wchar_t* name, UINT vtxDataSize, UINT vtxStride, UINT vt
 
     {
         this->aabb = aabb;
+        this->hull = hull;
 
         // Creates as with default heap type. This is fast to read from the GPU but inaccessible from the CPU. 
         // We need to go through a staging buffer (UploadBuffer) to get the data to it.
@@ -102,10 +104,29 @@ bool Mesh::Draw(ID3D12GraphicsCommandList* pCommandList) const
 
 bool Mesh::DrawIndexed(ID3D12GraphicsCommandList* pCommandList) const
 {
+    Microsoft::WRL::ComPtr<ID3D12InfoQueue> infoQueue;
+    Muon::GetDevice()->QueryInterface(IID_PPV_ARGS(&infoQueue));
+
+
+
     pCommandList->IASetPrimitiveTopology(D3D_PRIMITIVE_TOPOLOGY_TRIANGLELIST);
     pCommandList->IASetVertexBuffers(0, 1, &VertexBufferView);
     pCommandList->IASetIndexBuffer(&IndexBufferView);
     pCommandList->DrawIndexedInstanced(IndexCount, 1, 0, 0, 0);
+
+    UINT64 numMessages = infoQueue->GetNumStoredMessages();
+    for (UINT64 i = 0; i < numMessages; i++)
+    {
+        SIZE_T messageLength = 0;
+        infoQueue->GetMessage(i, nullptr, &messageLength);
+
+        std::vector<char> bytes(messageLength);
+        D3D12_MESSAGE* message = reinterpret_cast<D3D12_MESSAGE*>(bytes.data());
+
+        infoQueue->GetMessage(i, message, &messageLength);
+    }
+    infoQueue->ClearStoredMessages();
+
     return true;
 }
 

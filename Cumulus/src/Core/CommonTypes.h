@@ -24,6 +24,27 @@ namespace Muon
         DirectX::XMFLOAT3A min;
         DirectX::XMFLOAT3A max;
     };
+
+    struct HullFace
+    {
+        int indices[3];
+        float distance;
+        DirectX::XMFLOAT3A normal;
+    };
+
+    struct Edge {
+        int v0, v1;
+
+        bool operator==(Edge const& other) const {
+            return v0 == other.v0 && v1 == other.v1;
+        }
+    };
+
+    struct EdgeHash {
+        size_t operator()(Edge const& e) const noexcept {
+            return (size_t(e.v0) << 32) ^ size_t(e.v1);
+        }
+    };
 }
 
 #endif

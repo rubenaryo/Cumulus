@@ -85,5 +85,6 @@ float4 main(VertexOut input) : SV_TARGET
     totalLight *= surfaceColor;
 
     totalLight = saturate(totalLight);
+
     return float4(totalLight, 1);
 }

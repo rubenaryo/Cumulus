@@ -11,11 +11,17 @@ Description : Helpers for initializing/using ImGui
 
 namespace Muon
 {
+	struct SceneSettings {
+		bool isSunDynamic = false;
+		int timeOfDay = 800; // stored as military time for now
+		DirectX::XMFLOAT3 sunDir;
+	};
+
 	bool ImguiInit();
 	bool ImguiInitWin32(HWND hwnd);
 	void ImguiShutdown();
 
-	void ImguiNewFrame(float gameTime, const Camera& cam, DirectX::XMFLOAT3 sunDir, bool& isSunDynamic, int& timeOfDay);
+	void ImguiNewFrame(float gameTime, const Camera& cam, SceneSettings &settings);
 	void ImguiRender();
 }
 

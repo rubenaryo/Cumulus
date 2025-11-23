@@ -16,7 +16,6 @@ Description : Implementation of Game.h
 #include <Core/Shader.h>
 #include <Core/Texture.h>
 #include <Utils/Utils.h>
-#include <Utils/AtmosphereUtils.h>
 
 #include <imgui.h>
 #include <imgui_impl_win32.h>
@@ -103,113 +102,70 @@ bool Game::Init(HWND window, int width, int height)
             Printf(L"Warning: %s failed to generate!\n", mPostProcessPass.GetName());
     }
 
-
-    mWorldMatrixBuffer.Create(L"world matrix buffer", sizeof(cbPerEntity));
-    UINT8* mapped = mWorldMatrixBuffer.GetMappedPtr();
-    assert(mapped);
-    if (mapped)
-    {
-        using namespace DirectX;
-        cbPerEntity entity;
-
-        const float PI = 3.14159f;
-        XMMATRIX entityWorld = DirectX::XMMatrixIdentity();
-        entityWorld = XMMatrixMultiply(entityWorld, DirectX::XMMatrixRotationRollPitchYaw(0, 0, PI/2.0f));
-        entityWorld = XMMatrixMultiply(entityWorld, DirectX::XMMatrixRotationRollPitchYaw(-PI/2.0f, 0,0));
-        entityWorld = XMMatrixMultiply(entityWorld, DirectX::XMMatrixScaling(0.12f, 0.12f, 0.12f));
-        entityWorld = XMMatrixMultiply(entityWorld, DirectX::XMMatrixTranslation(0, 1, 0));
-        XMStoreFloat4x4(&entity.world, entityWorld);
-        XMStoreFloat4x4(&entity.invWorld, DirectX::XMMatrixInverse(nullptr, entityWorld));
-        memcpy(mapped, &entity, sizeof(entity));
-    }
-
-    mLightBuffer.Create(L"Light Buffer", sizeof(cbLights));
-    mTimeBuffer.Create(L"Time", sizeof(cbTime));
-    mAtmosphereBuffer.Create(L"Atmosphere CB", sizeof(cbAtmosphere));
-
-    cbAtmosphere atmosphereParams;
-    InitializeAtmosphereConstants(atmosphereParams, width, height);
-
-    mapped = mAtmosphereBuffer.GetMappedPtr();
-    if (mapped)
-    {
-        memcpy(mapped, &atmosphereParams, sizeof(cbAtmosphere));
-    }
-
-    mAABBBuffer.Create(L"AABB Buffer", sizeof(cbIntersections));
-
-
-    const Mesh* m = codex.GetMesh(Muon::GetResourceID(L"cube.obj"));
-
-    cbIntersections intersections = {};
-    intersections.aabbCount = 1;
-    intersections.aabbs[0] = m->GetAABB();
-    if (m) {
-        UINT8* aabbPtr = mAABBBuffer.GetMappedPtr();
-        if (aabbPtr) {
-            memcpy(aabbPtr, &intersections, sizeof(intersections));
-        }
-    }
-
-    mTimeBuffer.Create(L"Time", sizeof(cbTime));
+    InitFrameResources(width, height);
 
     Muon::CloseCommandList();
     Muon::ExecuteCommandList();
     return success;
 }
 
+bool Game::InitFrameResources(UINT width, UINT height)
+{
+    for (size_t i = 0; i != NUM_FRAMES_IN_FLIGHT; ++i)
+    {
+        mFrameResources.at(i).Create(width, height);
+    }
+
+    return true;
+}
+
 // On Timer tick, run Update() on the game, then Render()
 void Game::Frame()
 {
+    WaitForCurrFrameResource();
+
     mTimer.Tick([&]()
     {
         Update(mTimer);
     });
 
     Render();
+    AdvanceFence();
 
+    mCurrFrameResourceIdx = (mCurrFrameResourceIdx + 1) % NUM_FRAMES_IN_FLIGHT;
     Muon::UpdateTitleBar(mTimer.GetFramesPerSecond(), mTimer.GetFrameCount());
+}
+
+void Game::WaitForCurrFrameResource()
+{
+    Muon::FrameResources& currFrameResources = mFrameResources.at(mCurrFrameResourceIdx);
+    ID3D12Fence* pFence = Muon::GetFence();
+    if (currFrameResources.mFence != 0 && pFence->GetCompletedValue() < currFrameResources.mFence)
+    {
+        HANDLE eventHandle = CreateEventEx(nullptr, false, false, EVENT_ALL_ACCESS);
+        HRESULT hr = pFence->SetEventOnCompletion(currFrameResources.mFence, eventHandle);
+        WaitForSingleObject(eventHandle, INFINITE);
+        CloseHandle(eventHandle);
+    }
+}
+
+void Game::AdvanceFence()
+{
+    Muon::FrameResources& currFrameResources = mFrameResources.at(mCurrFrameResourceIdx);
+
+    // Advance the fence value to mark commands up to this fence point.
+    currFrameResources.mFence = Muon::AdvanceFence();
 }
 
 void Game::Update(Muon::StepTimer const& timer)
 {
     float elapsedTime = float(timer.GetElapsedSeconds());
+    float totalTime = float(timer.GetTotalSeconds());
     mInput.Frame(elapsedTime, &mCamera);
-    mCamera.UpdateView();
+    mCamera.UpdateView();    
 
-    Muon::cbLights lights;
-
-    lights.ambientColor = DirectX::XMFLOAT3A(+1.0f, +0.772f, +0.56f);
-    lights.directionalLight.diffuseColor = DirectX::XMFLOAT3A(1.0, 1.0, 1.0);
-    lights.directionalLight.dir = DirectX::XMFLOAT3A(0,1,0);
-
-    DirectX::XMStoreFloat3(&lights.cameraWorldPos, mCamera.GetPosition());
-
-    UINT8* mapped = mLightBuffer.GetMappedPtr();
-    
-    if (mapped)
-        memcpy(mapped, &lights, sizeof(Muon::cbLights));
-
-
-    Muon::cbTime time;
-    time.totalTime = (float)timer.GetTotalSeconds();
-    time.deltaTime = elapsedTime;
-
-    UINT8* timeBuf = mTimeBuffer.GetMappedPtr();
-    if (timeBuf)
-        memcpy(timeBuf, &time, sizeof(Muon::cbTime));
-
-    // Updating Atmosphere
-    Muon::cbAtmosphere atmosphereParams;
-    Muon::UpdateAtmosphere(atmosphereParams, mCamera, mIsSunDynamic, mTimeOfDay, time.totalTime);
-    //Muon::InitializeAtmosphereConstants(atmosphereParams, 1280, 800);
-    mSunDir = atmosphereParams.sun_direction;
-
-    mapped = mAtmosphereBuffer.GetMappedPtr();
-    if (mapped)
-    {
-        memcpy(mapped, &atmosphereParams, sizeof(Muon::cbAtmosphere));
-    }
+    Muon::FrameResources& currFrameResources = mFrameResources.at(mCurrFrameResourceIdx);
+    currFrameResources.Update(totalTime, elapsedTime, settings, mCamera);
 }
 
 void Game::Render()
@@ -222,15 +178,17 @@ void Game::Render()
         return;
     }
 
-    ResetCommandList(nullptr);
+    FrameResources& currFrameResources = mFrameResources.at(mCurrFrameResourceIdx);
+    ResetCommandList(currFrameResources.mCmdAllocator.Get());
     PrepareForRender();
 
-    ImguiNewFrame(mTimer.GetTotalSeconds(), mCamera, mSunDir, mIsSunDynamic, mTimeOfDay);
+    ImguiNewFrame(mTimer.GetTotalSeconds(), mCamera, settings);
 
     // Fetch the desired material from the codex
     ResourceCodex& codex = ResourceCodex::GetSingleton();
     ResourceID phongMatId = GetResourceID(L"Phong");
     const Muon::Material* pPhongMaterial = codex.GetMaterialType(phongMatId);
+
     
     Texture* pOffscreenTarget = codex.GetTexture(GetResourceID(L"OffscreenTarget"));
     Texture* pComputeOutput = codex.GetTexture(GetResourceID(L"SobelOutput"));
@@ -258,7 +216,7 @@ void Game::Render()
         int32_t atmosphereRootIdx = mAtmospherePass.GetResourceRootIndex("cbAtmosphere");
         if (atmosphereRootIdx != ROOTIDX_INVALID)
         {
-            pCommandList->SetGraphicsRootConstantBufferView(atmosphereRootIdx, mAtmosphereBuffer.GetGPUVirtualAddress());
+            pCommandList->SetGraphicsRootConstantBufferView(atmosphereRootIdx, currFrameResources.mAtmosphereBuffer.GetGPUVirtualAddress());
         }
 
         int32_t transmittanceIdx = mAtmospherePass.GetResourceRootIndex("transmittance_texture");
@@ -303,19 +261,19 @@ void Game::Render()
         int32_t worldMatrixRootIdx = mOpaquePass.GetResourceRootIndex("VSWorld");
         if (worldMatrixRootIdx != ROOTIDX_INVALID)
         {
-            pCommandList->SetGraphicsRootConstantBufferView(worldMatrixRootIdx, mWorldMatrixBuffer.GetGPUVirtualAddress());
+            pCommandList->SetGraphicsRootConstantBufferView(worldMatrixRootIdx, currFrameResources.mWorldMatrixBuffer.GetGPUVirtualAddress());
         }
      
         int32_t lightsRootIdx = mOpaquePass.GetResourceRootIndex("PSLights");
         if (lightsRootIdx != ROOTIDX_INVALID)
         {
-            pCommandList->SetGraphicsRootConstantBufferView(lightsRootIdx, mLightBuffer.GetGPUVirtualAddress());
+            pCommandList->SetGraphicsRootConstantBufferView(lightsRootIdx, currFrameResources.mLightBuffer.GetGPUVirtualAddress());
         }
 
         int32_t timeRootIdx = mOpaquePass.GetResourceRootIndex("Time");
         if (timeRootIdx != ROOTIDX_INVALID)
         {
-            pCommandList->SetGraphicsRootConstantBufferView(timeRootIdx, mTimeBuffer.GetGPUVirtualAddress());
+            pCommandList->SetGraphicsRootConstantBufferView(timeRootIdx, currFrameResources.mTimeBuffer.GetGPUVirtualAddress());
         }
 
         const Mesh* pMesh = codex.GetMesh(GetResourceID(L"teapot.obj"));
@@ -347,7 +305,19 @@ void Game::Render()
         int32_t aabbIdx = mRaymarchPass.GetResourceRootIndex("AABBBuffer");
         if (aabbIdx != ROOTIDX_INVALID)
         {
-            pCommandList->SetComputeRootConstantBufferView(aabbIdx, mAABBBuffer.GetGPUVirtualAddress());
+            pCommandList->SetComputeRootConstantBufferView(aabbIdx, currFrameResources.mAABBBuffer.GetGPUVirtualAddress());
+        }
+
+        int32_t hullIdx = mRaymarchPass.GetResourceRootIndex("HullsBuffer");
+        if (hullIdx != ROOTIDX_INVALID)
+        {
+            pCommandList->SetComputeRootConstantBufferView(hullIdx, currFrameResources.mHullBuffer.GetGPUVirtualAddress());
+        }
+
+        int32_t hullFaceIdx = mRaymarchPass.GetResourceRootIndex("HullFacesBuffer");
+        if (hullFaceIdx != ROOTIDX_INVALID)
+        {
+            pCommandList->SetComputeRootConstantBufferView(hullFaceIdx, currFrameResources.mHullFaceBuffer.GetGPUVirtualAddress());
         }
 
         int32_t inIdx = mRaymarchPass.GetResourceRootIndex("gInput");
@@ -423,7 +393,6 @@ void Game::Render()
     CloseCommandList();
     ExecuteCommandList();
     Present();
-    FlushCommandQueue();
     UpdateBackBufferIndex();
 }
 
@@ -439,12 +408,12 @@ void Game::CreateWindowSizeDependentResources(int newWidth, int newHeight)
 
 Game::~Game()
 { 
+    for (size_t i = 0; i != NUM_FRAMES_IN_FLIGHT; ++i)
+    {
+        mFrameResources.at(i).Destroy();
+    }
+
     mCube.Destroy();
-    mWorldMatrixBuffer.Destroy();
-    mLightBuffer.Destroy();
-    mTimeBuffer.Destroy();
-    mAABBBuffer.Destroy();
-    mAtmosphereBuffer.Destroy();
     mCamera.Destroy();
     mInput.Destroy();
     mOpaquePass.Destroy();
