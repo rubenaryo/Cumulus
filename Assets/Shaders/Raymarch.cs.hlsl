@@ -5,7 +5,7 @@
 #define USE_ADAPTIVE_STEP 1 // Shows some artifact ATM. Will debug again after uprez. 
 #define USE_JITTERED_STEP 1
 #define USE_HIGH_HIGH_FREQUENCY 1
-#define DEBUG_AABB_INTERSECT 1
+#define DEBUG_AABB_INTERSECT 0
 
 // Raymarch settings
 static const int MAX_STEPS = 1024; // Max steps per ray
@@ -368,7 +368,7 @@ float3 VolumeRaymarchNvdf(float3 eyePos, float3 dir, float3 bgColor, int3 dispat
             minBoxEnter = min(minBoxEnter, aabbEnter);
             maxBoxExit = max(maxBoxExit, aabbExit);
 #if DEBUG_AABB_INTERSECT
-           // return float3(1, 0, 0) * bgColor; // Visualize AABB intersection
+            return float3(1, 0, 0) * bgColor; // Visualize AABB intersection
 #endif
         }
     }
