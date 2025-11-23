@@ -28,8 +28,9 @@ static const float AUTHORING_TO_WORLD_SCALE = SIDE_LENGTH / NVDF_DOMAIN_SIDE_LEN
 static const float DENSITY_SCALE = .035; // To be tuned / driven by NVDF
 
 Texture2D gInput : register(t0);
-Texture3D sdfNvdfTex : register(t1); // Sdf and model textures combined [sdf.r, model.r, model.g, model.b] 
-Texture3D noiseTex : register(t2); // Low frequency, high frequency noises for wispy and billowy clouds 
+Texture3D sdfTex : register(t1); // Cached sdf for accelerating sdf 
+Texture3D nvdfTex : register(t2); // Model textures combined [sdf.r, model.r, model.g, model.b] 
+Texture3D noiseTex : register(t3); // Low frequency, high frequency noises for wispy and billowy clouds 
 Texture2D depthStencilBuffer : register(t3); // The scene's depth-stencil buffer, bound here post-graphics passes
 SamplerState linearWrap : register(s2);
 SamplerState linearClamp : register(s3); 
@@ -229,7 +230,7 @@ float ValueErosion(float baseValue, float erosionValue)
 
 float FoldBase(float n)
 {
-    // Map n in [0,1] to a "folded" 0�1 pattern
+    // Map n in [0,1] to a "folded" pattern
     return abs(abs(n * 2.0 - 1.0) * 2.0 - 1.0);
 }
 
@@ -354,7 +355,6 @@ float3 VolumeRaymarchNvdf(float3 eyePos, float3 dir, float3 bgColor, int3 dispat
     if (!RayBoxIntersect(eyePos, dir, VOLUME_MIN_WS, VOLUME_MAX_WS, tEnter, tExit))
     {
         // Ray misses the volume entirely
-        //return float3(1, 1, 1);
         return bgColor;
     }
 
@@ -410,7 +410,7 @@ float3 VolumeRaymarchNvdf(float3 eyePos, float3 dir, float3 bgColor, int3 dispat
         float3 samplePos = eyePos + march.distance * dir;
 
         // Sample NVDF volume: .r = encoded SDF, .g = density (dimensional profile)
-        float4 sdfSample = sdfNvdfTex.SampleLevel(linearClamp, WorldToNvdfUV(samplePos), 0.0f);
+        float4 sdfSample = sdfTex.SampleLevel(linearClamp, WorldToNvdfUV(samplePos), 0.0f);
         float sdfDistance = DecodeSdf(sdfSample.r) * AUTHORING_TO_WORLD_SCALE;
 
 #if USE_ADAPTIVE_STEP
@@ -419,18 +419,17 @@ float3 VolumeRaymarchNvdf(float3 eyePos, float3 dir, float3 bgColor, int3 dispat
 #else
         march.stepSize = max(sdfDistance, AUTHORING_TO_WORLD_SCALE);
 #endif
-
-#if USE_JITTERED_STEP
-        float jitter = StaticStepJitter(dispatchThreadID.xy, march.stepIndex); // [-0.5, 0.5]
-        float jitterDistance = jitter * march.stepSize;
-        samplePos += dir * jitterDistance;
-#endif
-        
         if (sdfDistance < 0.0)
         {
-            float dimensionalProfile = sdfSample.g;
-            float detailType = sdfSample.b;
-            float densityScale = sdfSample.a;
+#if USE_JITTERED_STEP
+            float jitter = StaticStepJitter(dispatchThreadID.xy, march.stepIndex); // [-0.5, 0.5]
+            float jitterDistance = jitter * march.stepSize;
+            samplePos += dir * jitterDistance;
+#endif
+            float4 nvdfSample = nvdfTex.SampleLevel(linearClamp, WorldToNvdfUV(samplePos), 0.0f);
+            float dimensionalProfile = nvdfSample.g;
+            float detailType = nvdfSample.b;
+            float densityScale = nvdfSample.a;
             
             float density = GetUprezzedVoxelCloudDensity(
                 march,
