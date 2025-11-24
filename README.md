@@ -58,6 +58,14 @@ We utilize the cloud rendering framework from the Horizon game series, as outlin
 
  - Convex Hull object bounds
  - Managed via several structured buffers on GPU – built to be dynamic as meshes update position / animation
+
+
+https://github.com/user-attachments/assets/75663386-7b17-41eb-a8a1-4c755ff82367
+
+
+
+  - Compute Shader: Modify Density Texture when cell collides with convex hull 
+
 ### Atmosphere
 <p align="center">
   <img width="80%" alt="image" src="images/sunrise.png" />
