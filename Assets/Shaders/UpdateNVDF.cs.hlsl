@@ -21,6 +21,15 @@ float dot2(in float3 v)
     return dot(v, v);
 }
 
+float random(int x)
+{
+    x = (x << 13) ^ x;
+    return (1 - (x * (x * x * 15731 + 789221)
+            + 1376312589) & (0x7fffffff))
+            / 10737741824.0;
+
+}
+
 float3 random3(float3 p)
 {
     return frac(sin(float3(dot(p, float3(127.1, 311.7, 191.999)),
@@ -86,6 +95,24 @@ float SDF_Sphere(float3 query, float3 center, float radius)
     return length(query - center) - radius;
 }
 
+// p is query
+// a is left point, b is right
+// I removed thickness (w) to be dependent on length now
+float SDF_VesicaSegment(float3 p,float3 a,float3 b, float w)
+{
+    float3 c = (a + b) * 0.5;
+    float l = length(b - a);
+    float3 v = (b - a) / l;
+    float y = dot(p - c, v);
+    float2 q = float2(length(p - c - y * v), abs(y));
+    
+    float r = 0.5 * l;
+    float d = 0.5 * (r * r - w * w) / w;
+    float3 h = (r * q.x < d * (q.y - r)) ? float3(0.0, r, 0.0) : float3(-d, 0.0, d + w);
+ 
+    return length(q - h.xy) - h.z;
+}
+
 float SDF_RoundCone(float3 p, float3 a, float3 b, float r1, float r2)
 {
     float3 ba = b - a;
@@ -121,8 +148,13 @@ float SDF_Cloud(float3 query, int numSeed, float3 origin, float scale)
     float3 midpoint = (cone_a + cone_b) * 0.5;
     for (int i = 0; i < numSeed; ++i)
     {
-        float3 offset = hash3(float3(i, numSeed, i * numSeed)) * 2.4 - 1.2;
-        float sphere = SDF_Sphere(query, midpoint + offset * scale, (WorleyNoise3D(midpoint + offset, 12) * 0.9 + 0.2) * scale);
+        float3 offset = hash3(float3(i, random(numSeed), i * numSeed)) * 2.4 - 1.2;
+        //float sphere = SDF_Sphere(query, midpoint + offset * scale * 0.8, (WorleyNoise3D(midpoint + offset, 12) * 0.9 + 0.2) * scale);
+        
+        float3 a = midpoint + offset * scale;
+        float3 b = midpoint - offset * scale;
+        float w = scale * 0.5f;
+        float sphere = SDF_VesicaSegment(query, a, b, w);
         d = smooth_min(d, sphere, 0.7);
     }
     return d;
@@ -174,7 +206,11 @@ void main(int3 dispatchThreadID : SV_DispatchThreadID)
     //        //d = SDF_Sphere(worldPos, center, 50.f);
     //    }
     //}
+    // density scale is just a worley noise for now
+    // might need to edit the noise for this to be right
     gOutput[coord].g = clamp(-d, 0.0, 1.0) * WorleyNoise3D(worldPos, 64);
+    // density itself needs to start a bit inside the sdf to look good
+    gOutput[coord].a = d < -5.0 ? hash3(worldPos) : 0.0f;
     const float sdfMin = -256.0;
     const float sdfMax = 4096.0;
     float encodedSdf = (d - sdfMin) / (sdfMax - sdfMin);
@@ -183,10 +219,10 @@ void main(int3 dispatchThreadID : SV_DispatchThreadID)
     // detail type for now fully depends on sdf
     // curently its a quadratic fall off to be more billowy the deeper we are
     // is 0 if we're too far away from the cloud
-    gOutput[coord].b = d < 0.5 ? clamp(abs(d * 0.5f) * abs(d * 0.5), 0.0, 1.0) : 0.0f;
-    // density scale is just a worley noise for now
-    // might need to edit the noise for this to be right
-    gOutput[coord].a = d < 0.0001 ? hash3(worldPos) : 0.0f;
+    float norm_height = (worldPos.z - VOLUME_MIN_WS.z) / (VOLUME_MAX_WS.z - VOLUME_MIN_WS.z);
+    gOutput[coord].b = (random(gOutput[coord].a) + 0.1) * norm_height;
+    //gOutput[coord].b = 1.0;
+    return;
     
     //---------------------------
     // COLLISION CODE
@@ -199,7 +235,7 @@ void main(int3 dispatchThreadID : SV_DispatchThreadID)
     // }
 
     bool collision = false;
-    for(uint i = 0; i < hullCount; ++i)
+    for (uint i = 0; i < hullCount; ++i)
     {
         float hullEnter, hullExit;
         ConvexHull ch = hulls[i];
@@ -212,7 +248,7 @@ void main(int3 dispatchThreadID : SV_DispatchThreadID)
         }
     }
 
-    if(!collision)
+    if (!collision)
     {
         gOutput[coord] = float4(0.0, max(gOutput[coord].g - 0.01, 0.0), 1.0, 1.0);
     }
