@@ -26,6 +26,9 @@ static const float AUTHORING_TO_WORLD_SCALE = SIDE_LENGTH / NVDF_DOMAIN_SIDE_LEN
 // Density -> extinction scaling
 static const float DENSITY_SCALE = .035; // To be tuned / driven by NVDF
 
+// GPU cloud or Nubis
+static const bool USE_GPU_CLOUD = true;
+
 
 struct AABB
 {

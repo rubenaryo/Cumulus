@@ -82,9 +82,12 @@ bool FrameResources::Create(UINT width, UINT height)
     cloudData.numSeeds = numClouds;
     for (int i = 0; i < numClouds; ++i)
     {
-        float x = static_cast<float>(rand()) / (static_cast<float>(RAND_MAX) + 1.0f);
-        float y = static_cast<float>(rand()) / (static_cast<float>(RAND_MAX) + 1.0f);
-        float z = static_cast<float>(rand()) / (static_cast<float>(RAND_MAX) + 1.0f);
+        //float x = static_cast<float>(rand()) / (static_cast<float>(RAND_MAX) + 1.0f);
+        //float y = static_cast<float>(rand()) / (static_cast<float>(RAND_MAX) + 1.0f);
+        //float z = static_cast<float>(rand()) / (static_cast<float>(RAND_MAX) + 1.0f);
+        float x = cos(i * 12723.123);
+        float y = sin(i * 1284.789);
+        float z = sin(cos(i * 213.523) * 1924.23);
         x *= 512.f;
         y *= 512.f;
         z *= 64.f;
@@ -193,24 +196,24 @@ void FrameResources::Update(float totalTime, float deltaTime, Muon::SceneSetting
     }
 
     // Updating Cloud Data
-    Muon::cbCloudGenData cloudData;
-    int numClouds = 4;
-    cloudData.numSeeds = numClouds;
-    for (int i = 0; i < numClouds; ++i)
-    {
-        float x = static_cast<float>(rand()) / (static_cast<float>(RAND_MAX) + 1.0f);
-        float y = static_cast<float>(rand()) / (static_cast<float>(RAND_MAX) + 1.0f);
-        float z = static_cast<float>(rand()) / (static_cast<float>(RAND_MAX) + 1.0f);
-        x *= 512.f;
-        y *= 512.f;
-        z *= 64.f;
-        cloudData.seeds[i] = DirectX::XMFLOAT4(x, y, z, 1.0f);
-    }
-    mapped = mCloudGenBuffer.GetMappedPtr();
-    if (mapped)
-    {
-        memcpy(mapped, &cloudData, sizeof(cbCloudGenData));
-    }
+    //Muon::cbCloudGenData cloudData;
+    //int numClouds = 4;
+    //cloudData.numSeeds = numClouds;
+    //for (int i = 0; i < numClouds; ++i)
+    //{
+    //    float x = static_cast<float>(rand()) / (static_cast<float>(RAND_MAX) + 1.0f);
+    //    float y = static_cast<float>(rand()) / (static_cast<float>(RAND_MAX) + 1.0f);
+    //    float z = static_cast<float>(rand()) / (static_cast<float>(RAND_MAX) + 1.0f);
+    //    x *= 512.f;
+    //    y *= 512.f;
+    //    z *= 64.f;
+    //    cloudData.seeds[i] = DirectX::XMFLOAT4(x, y, z, 1.0f);
+    //}
+    //mapped = mCloudGenBuffer.GetMappedPtr();
+    //if (mapped)
+    //{
+    //    memcpy(mapped, &cloudData, sizeof(cbCloudGenData));
+    //}
 
     const float PI = 3.14159f;
     DirectX::XMMATRIX debugEntityWorld = DirectX::XMMatrixIdentity();

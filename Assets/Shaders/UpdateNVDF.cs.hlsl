@@ -29,9 +29,9 @@ float3 random3(float3 p)
                  * 43758.5453);
 }
 
-float WorleyNoise3D(float3 p)
+float WorleyNoise3D(float3 p, int tiles)
 {
-    p *= 30;
+    p *= tiles;
     // Tile the space
     float3 pointInt = floor(p);
     float3 pointFract = frac(p);
@@ -116,13 +116,13 @@ float SDF_Cloud(float3 query, int numSeed, float3 origin, float scale)
     float3 cone_a = float3(origin.x - 2 * hash(origin) * scale, origin.y, origin.z + hash(origin) * scale);
     float3 cone_b = float3(origin.x + 3 * (1.0 - hash(origin)) * scale, origin.y, origin.z - hash(origin) * scale);
     float cone = SDF_RoundCone(query, cone_a, cone_b,
-                             max(WorleyNoise3D(cone_a) * scale, 0.3), max(WorleyNoise3D(cone_b) * scale, 0.3));
+                             max(WorleyNoise3D(cone_a, 12) * scale, 0.3), max(WorleyNoise3D(cone_b, 16) * scale, 0.3));
     d = smooth_min(d, cone, 0.8);
     float3 midpoint = (cone_a + cone_b) * 0.5;
     for (int i = 0; i < numSeed; ++i)
     {
-        float3 offset = hash3(float3(i, numSeed * 0.76734, i * numSeed * 0.2784)) * 3.6 - 1.0;
-        float sphere = SDF_Sphere(query, midpoint + offset, (WorleyNoise3D(midpoint + offset) * 0.7 + 0.15) * scale);
+        float3 offset = hash3(float3(i, numSeed, i * numSeed)) * 2.4 - 1.2;
+        float sphere = SDF_Sphere(query, midpoint + offset * scale, (WorleyNoise3D(midpoint + offset, 12) * 0.9 + 0.2) * scale);
         d = smooth_min(d, sphere, 0.7);
     }
     return d;
@@ -155,26 +155,26 @@ void main(int3 dispatchThreadID : SV_DispatchThreadID)
     //------------------------------
     // SDF is getting clouds around the given seeds
     float d = 999999999.f;
-    if (numSeeds != 0)
+    //if (numSeeds != 0)
+    //{
+    for (uint i = 0; i < numSeeds; ++i)
     {
-        for (uint i = 0; i < numSeeds; ++i)
-        {
-            d = smooth_min(d, SDF_Cloud(worldPos, i % 4 + 2, seeds[i], 1.2), 0.8);
-        }
+        d = smooth_min(d, SDF_Cloud(worldPos, i % 4 + 2, seeds[i].xyz, 50.f), 0.8);
     }
-    else
-    {
-        // if num seeds is 0 then we are bugged for now, so we need to get cloud positions here.
-        // this is really jank and is just here to test stuff
-        for (uint i = 0; i < 1; ++i)
-        {
-            float3 center = (VOLUME_MIN_WS + VOLUME_MAX_WS) * 0.5;
-            float3 currPos = center;// random3(float3(i * 0.123, i * 0.456, i * 0.789)) * 5.f + center;
-            d = smooth_min(d, SDF_Cloud(worldPos, 5, currPos, 100.f), 0.8);
-            //d = SDF_Sphere(worldPos, center, 50.f);
-        }
-    }
-    gOutput[coord].g = clamp(-d, 0.0, 1.0) * WorleyNoise3D(worldPos);
+    //}
+    //else
+    //{
+    //    // if num seeds is 0 then we are bugged for now, so we need to get cloud positions here.
+    //    // this is really jank and is just here to test stuff
+    //    for (uint i = 0; i < 1; ++i)
+    //    {
+    //        float3 center = (VOLUME_MIN_WS + VOLUME_MAX_WS) * 0.5;
+    //        float3 currPos = center;// random3(float3(i * 0.123, i * 0.456, i * 0.789)) * 5.f + center;
+    //        d = smooth_min(d, SDF_Cloud(worldPos, 5, currPos, 100.f), 0.8);
+    //        //d = SDF_Sphere(worldPos, center, 50.f);
+    //    }
+    //}
+    gOutput[coord].g = clamp(-d, 0.0, 1.0) * WorleyNoise3D(worldPos, 64);
     const float sdfMin = -256.0;
     const float sdfMax = 4096.0;
     float encodedSdf = (d - sdfMin) / (sdfMax - sdfMin);
