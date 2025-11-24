@@ -29,10 +29,19 @@ We utilize the cloud rendering framework from the Horizon game series, as outlin
  - World-space NVDF placement — volumes positioned consistently in world coordinates
  - Ray-marched rendering — integrates density with Beer–Lambert absorption/compositing
  - SDF-guided stepping — signed-distance field cached in 3D textures to skip empty space
- - Adaptive step sizing — step length scales with camera distance for quality/perf balance
- - Jittered sampling — per-pixel/step jitter to decorrelate samples and reduce voxel-grid artifacts
+ - Noise-based Details — Additional details at 0.5m scale using Alligator and "Curly-Alligator" noise
 #### Generation
- - SDF based GPU cloud generation is currently in progress
+<p align="center">
+  <img width="80%" alt="image" src="images/gpu_cloud.png" />
+  <br>
+  <em>A cloud created in a compute shader</em>
+</p>
+
+ - We support procedurally creating cloud NVDF data in a compute shader pass. However, this is a recent addition, and the set noise and detail values still need to be finetuned for a more realistic look.
+ - Creation starts by initializing cloud "seeds" on the CPU side, which become world-space coordinates where clouds get initialized. These positions can be updated to show cloud movement and formation.
+ - For each seed, we create an SDF (given by [Inigo Quilez's blog](https://iquilezles.org/articles/distfunctions/)) that is a simple round cone with "Vesica Segments" aka football shapes around them. The number of these shapes, their size, and the orientation of all of these is given by noise.
+ - Next, based on this SDF, we create density values. Importantly, these values must slowly ease in, so we don't see the edge of the sdf shapes.
+ - Finally, density type and shape profile are also generated with some added noise.
 ### Engine
 #### Core
  - Atmosphere rendering pass
@@ -58,6 +67,14 @@ We utilize the cloud rendering framework from the Horizon game series, as outlin
 
  - Convex Hull object bounds
  - Managed via several structured buffers on GPU – built to be dynamic as meshes update position / animation
+
+
+https://github.com/user-attachments/assets/75663386-7b17-41eb-a8a1-4c755ff82367
+
+
+
+  - Compute Shader: Modify Density Texture when cell collides with convex hull 
+
 ### Atmosphere
 <p align="center">
   <img width="80%" alt="image" src="images/sunrise.png" />
@@ -70,6 +87,8 @@ We utilize the cloud rendering framework from the Horizon game series, as outlin
   - Blends Polar and Cartesian camera models
   - Day and night cycle with selectable time of day
   - Fully calculated in a pre-pass with raycasting
+  - Added moon and night time sky.
+  - Daytime can be modified in the UI to set sun position.
 
 ## Building
 This project uses the Premake 5 build system, which is bundled with the application and the executable can be found under ./external/
