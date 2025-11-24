@@ -112,7 +112,7 @@ struct alignas(16) cbAtmosphere
 
 struct alignas(16) cbCloudGenData
 {
-    DirectX::XMFLOAT3 seeds[32];
+    DirectX::XMFLOAT4 seeds[32];
     
     int numSeeds;
     float pad[3];

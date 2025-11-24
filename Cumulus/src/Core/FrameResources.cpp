@@ -88,7 +88,7 @@ bool FrameResources::Create(UINT width, UINT height)
         x *= 512.f;
         y *= 512.f;
         z *= 64.f;
-        cloudData.seeds[i] = { x, y, z };
+        cloudData.seeds[i] = DirectX::XMFLOAT4(x, y, z, 1.0f);
     }
     mapped = mCloudGenBuffer.GetMappedPtr();
     if (mapped)
@@ -204,7 +204,7 @@ void FrameResources::Update(float totalTime, float deltaTime, Muon::SceneSetting
         x *= 512.f;
         y *= 512.f;
         z *= 64.f;
-        cloudData.seeds[i] = { x, y, z };
+        cloudData.seeds[i] = DirectX::XMFLOAT4(x, y, z, 1.0f);
     }
     mapped = mCloudGenBuffer.GetMappedPtr();
     if (mapped)

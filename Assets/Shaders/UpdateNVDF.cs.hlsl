@@ -2,7 +2,7 @@ RWTexture3D<float4> gOutput : register(u0);
 
 cbuffer cbCloudGenBuffer : register(b6)
 {
-    float3 seeds[32];
+    float4 seeds[32];
     
     int numSeeds;
     float pad[3];
@@ -142,9 +142,11 @@ void main(int3 dispatchThreadID : SV_DispatchThreadID)
     float3 uvw = float3(coord) / float3(width, height, depth);
     float3 worldPos = NvdfUVToWorld(uvw);
     
-    //if (numSeeds == 0)
+    //if (numSeeds == 4)
     //{
+    //    gOutput[coord].r = 0.0;
     //    gOutput[coord].g = 1.0;
+    //    gOutput[coord].a = 1.0;
     //    return;
     //}
 
