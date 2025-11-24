@@ -26,7 +26,6 @@ struct FrameResources
     
     bool Create(UINT width, UINT height);
     void Update(float totalTime, float deltaTime, Muon::SceneSettings& settings, Muon::Camera& camera);
-    void UpdateEntities();
 
     void Destroy();
 
@@ -37,6 +36,7 @@ struct FrameResources
     UploadBuffer mTimeBuffer;
     UploadBuffer mAABBBuffer;
     UploadBuffer mAtmosphereBuffer;
+    UploadBuffer mCloudGenBuffer;
     Muon::UploadBuffer mHullBuffer;
     Muon::UploadBuffer mHullFaceBuffer;
 

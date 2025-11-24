@@ -6,6 +6,7 @@
 #define USE_JITTERED_STEP 1
 #define USE_HIGH_HIGH_FREQUENCY 1
 #define DEBUG_AABB_INTERSECT 0
+#define USE_GPU_CLOUD 1
 
 Texture2D gInput : register(t0);
 Texture3D sdfNvdfTex : register(t1); // Sdf and model textures combined [sdf.r, model.r, model.g, model.b] 
@@ -304,11 +305,19 @@ float3 VolumeRaymarchNvdf(float3 eyePos, float3 dir, float3 bgColor, int3 dispat
         float3 samplePos = eyePos + march.distance * dir;
 
         // Sample NVDF volume: .r = encoded SDF, .g = density (dimensional profile)
+#if USE_GPU_CLOUD
+        float4 sdfSample = gpuCloudTex.SampleLevel(linearClamp, WorldToNvdfUV(samplePos), 0.0f);
+        // dimensional profile is 1 where there is cloud I think, but we are storing
+        // intersection data in this field, so we resolve that here
+        //sdfSample.g = DecodeSdf(sdfSample.r) < -255 ? DecodeSdf(sdfSample.r) + 256 : 0.0f;
+        float sdfDistance = DecodeSdf(sdfSample.r) * AUTHORING_TO_WORLD_SCALE;// * (1.0 - sdfSample.g);
+#else
         float4 sdfSample = sdfNvdfTex.SampleLevel(linearClamp, WorldToNvdfUV(samplePos), 0.0f);
         float4 collisionSample = gpuCloudTex.SampleLevel(linearClamp, WorldToNvdfUV(samplePos), 0.0f);
         sdfSample.g *= (1.0 - collisionSample.g);
-
         float sdfDistance = DecodeSdf(sdfSample.r) * AUTHORING_TO_WORLD_SCALE * (1.0 - collisionSample.g);
+#endif
+
 
 #if USE_ADAPTIVE_STEP
         float adaptive = ComputeAdaptiveStepSize(march.distance);

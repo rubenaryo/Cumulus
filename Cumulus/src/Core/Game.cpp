@@ -224,6 +224,12 @@ void Game::UpdateProceduralNVDF()
         pCommandList->SetComputeRootConstantBufferView(hullFaceIdx, currFrameResources.mHullFaceBuffer.GetGPUVirtualAddress());
     }
 
+    int32_t cloudIdx = mProcNVDFPass.GetResourceRootIndex("cbCloudGenBuffer");
+    if (cloudIdx != ROOTIDX_INVALID)
+    {
+        pCommandList->SetComputeRootConstantBufferView(cloudIdx, currFrameResources.mCloudGenBuffer.GetGPUVirtualAddress());
+    }
+
 
     pCommandList->ResourceBarrier(1, &CD3DX12_RESOURCE_BARRIER::Transition(pProcNVDFTex->GetResource(),
         D3D12_RESOURCE_STATE_GENERIC_READ, D3D12_RESOURCE_STATE_UNORDERED_ACCESS));
@@ -424,7 +430,7 @@ void Game::Render()
             pCommandList->SetComputeRootDescriptorTable(depthBufferIdx, GetDepthStencilSRV().HandleGPU);
         }
 
-        int32_t collisionIndex = mRaymarchPass.GetResourceRootIndex("collisionTex");
+        int32_t collisionIndex = mRaymarchPass.GetResourceRootIndex("gpuCloudTex");
         if (collisionIndex != ROOTIDX_INVALID)
         {
             pCommandList->SetComputeRootDescriptorTable(collisionIndex, collisionTexture->GetSRVHandleGPU());

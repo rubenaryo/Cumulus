@@ -66,6 +66,7 @@ bool FrameResources::Create(UINT width, UINT height)
     mLightBuffer.Create(L"Light Buffer", sizeof(cbLights));
     mTimeBuffer.Create(L"Time", sizeof(cbTime));
     mAtmosphereBuffer.Create(L"Atmosphere CB", sizeof(cbAtmosphere));
+    mCloudGenBuffer.Create(L"CloudGen CG", sizeof(cbCloudGenData));
 
     cbAtmosphere atmosphereParams;
     InitializeAtmosphereConstants(atmosphereParams, width, height);
@@ -74,6 +75,25 @@ bool FrameResources::Create(UINT width, UINT height)
     if (mapped)
     {
         memcpy(mapped, &atmosphereParams, sizeof(cbAtmosphere));
+    }
+
+    cbCloudGenData cloudData;
+    int numClouds = 4;
+    cloudData.numSeeds = numClouds;
+    for (int i = 0; i < numClouds; ++i)
+    {
+        float x = static_cast<float>(rand()) / (static_cast<float>(RAND_MAX) + 1.0f);
+        float y = static_cast<float>(rand()) / (static_cast<float>(RAND_MAX) + 1.0f);
+        float z = static_cast<float>(rand()) / (static_cast<float>(RAND_MAX) + 1.0f);
+        x *= 512.f;
+        y *= 512.f;
+        z *= 64.f;
+        cloudData.seeds[i] = { x, y, z };
+    }
+    mapped = mCloudGenBuffer.GetMappedPtr();
+    if (mapped)
+    {
+        memcpy(mapped, &cloudData, sizeof(cbCloudGenData));
     }
 
     mAABBBuffer.Create(L"AABB Buffer", sizeof(cbIntersections));
@@ -172,6 +192,26 @@ void FrameResources::Update(float totalTime, float deltaTime, Muon::SceneSetting
         memcpy(mapped, &atmosphereParams, sizeof(Muon::cbAtmosphere));
     }
 
+    // Updating Cloud Data
+    Muon::cbCloudGenData cloudData;
+    int numClouds = 4;
+    cloudData.numSeeds = numClouds;
+    for (int i = 0; i < numClouds; ++i)
+    {
+        float x = static_cast<float>(rand()) / (static_cast<float>(RAND_MAX) + 1.0f);
+        float y = static_cast<float>(rand()) / (static_cast<float>(RAND_MAX) + 1.0f);
+        float z = static_cast<float>(rand()) / (static_cast<float>(RAND_MAX) + 1.0f);
+        x *= 512.f;
+        y *= 512.f;
+        z *= 64.f;
+        cloudData.seeds[i] = { x, y, z };
+    }
+    mapped = mCloudGenBuffer.GetMappedPtr();
+    if (mapped)
+    {
+        memcpy(mapped, &cloudData, sizeof(cbCloudGenData));
+    }
+
     const float PI = 3.14159f;
     DirectX::XMMATRIX debugEntityWorld = DirectX::XMMatrixIdentity();
     debugEntityWorld = XMMatrixMultiply(debugEntityWorld, DirectX::XMMatrixRotationRollPitchYaw(0, 0, PI / 2.0f));
@@ -208,10 +248,6 @@ void FrameResources::Update(float totalTime, float deltaTime, Muon::SceneSetting
     }
 }
 
-void FrameResources::UpdateEntity(int32_t entityId, EntityData newData)
-{
-}
-
 void FrameResources::Destroy()
 {
     mCmdAllocator.Reset();
@@ -220,6 +256,7 @@ void FrameResources::Destroy()
     mTimeBuffer.Destroy();
     mAABBBuffer.Destroy();
     mAtmosphereBuffer.Destroy();
+    mCloudGenBuffer.Destroy();
     mHullBuffer.Destroy();
     mHullFaceBuffer.Destroy();
 }
