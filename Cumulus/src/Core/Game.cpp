@@ -24,6 +24,7 @@ Description : Implementation of Game.h
 Game::Game() :
     mInput(),
     mCamera(),
+    mTerrainPass(L"TerrainPass"),
     mOpaquePass(L"OpaquePass"),
     mAtmospherePass(L"AtmospherePass"),
     mSobelPass(L"SobelPass"),
@@ -56,6 +57,16 @@ bool Game::Init(HWND window, int width, int height)
     ResourceCodex& codex = ResourceCodex::GetSingleton();
 
     mCamera.Init(DirectX::XMFLOAT3(500.0, 300.0, 100.0), width / (float)height, 0.1f, 1000.0f);
+
+    // Assemble opaque terrain pass
+    {
+        mTerrainPass.SetVertexShader(codex.GetVertexShader(GetResourceID(L"Terrain.vs")));
+        mTerrainPass.SetPixelShader(codex.GetPixelShader(GetResourceID(L"Terrain.ps")));
+        mTerrainPass.SetEnableDepth(true);
+
+        if (!mTerrainPass.Generate())
+            Printf(L"Warning: %s failed to generate!\n", mTerrainPass.GetName());
+    }
 
     // Assemble opaque render pass
     {
@@ -509,6 +520,7 @@ Game::~Game()
     mCube.Destroy();
     mCamera.Destroy();
     mInput.Destroy();
+    mTerrainPass.Destroy();
     mOpaquePass.Destroy();
     mAtmospherePass.Destroy();
     mSobelPass.Destroy();

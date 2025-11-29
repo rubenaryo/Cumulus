@@ -60,6 +60,7 @@ private:
     Muon::Camera mCamera;
 
     Muon::GraphicsPass mOpaquePass;
+    Muon::GraphicsPass mTerrainPass;
     Muon::GraphicsPass mAtmospherePass;
     Muon::ComputePass mSobelPass;
     Muon::ComputePass mRaymarchPass;
