@@ -309,7 +309,11 @@ float3 VolumeRaymarchNvdf(float3 eyePos, float3 dir, float3 bgColor, int3 dispat
         if (USE_GPU_CLOUD)
         {
             sdfSample = gpuCloudTex.SampleLevel(linearClamp, WorldToNvdfUV(samplePos), 0.0f);
-            sdfDistance = DecodeSdf(sdfSample.r) * AUTHORING_TO_WORLD_SCALE; // * (1.0 - sdfSample.g);
+            float collisionSample = sdfSample.a;
+            sdfDistance = DecodeSdf(sdfSample.r) * AUTHORING_TO_WORLD_SCALE * (1.0 - collisionSample);
+            // NVDF range for a is [0.2, 0.6] -> mapping smoothstep [0, 1] to it
+            sdfSample.a = smoothstep(-4.0, -12.0, sdfDistance) * 0.4 + 0.2;
+            sdfSample.g *= 1.0 - collisionSample;
         }
         else
         {
