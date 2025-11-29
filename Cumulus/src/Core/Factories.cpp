@@ -181,6 +181,156 @@ bool MeshFactory::LoadMesh(const wchar_t* fileName, UploadBuffer& stagingBuffer,
     return true;
 }
 
+bool MeshFactory::BuildTerrainMesh(UploadBuffer& stagingBuffer,
+    uint32_t resolutionX, uint32_t resolutionZ,
+    float sizeX, float sizeZ, Mesh& out_mesh)
+{
+    using namespace DirectX;
+
+    // Validate parameters
+    if (resolutionX < 2 || resolutionZ < 2)
+    {
+        Muon::Printf("Error: Terrain resolution must be at least 2x2\n");
+        return false;
+    }
+
+    const uint32_t vertexCount = resolutionX * resolutionZ;
+    const uint32_t quadCountX = resolutionX - 1;
+    const uint32_t quadCountZ = resolutionZ - 1;
+    const uint32_t indexCount = quadCountX * quadCountZ * 6; // 2 triangles per quad, 3 indices per triangle
+
+    // Calculate vertex size (Position + Normal + TexCoord)
+    const uint32_t vertexSize = sizeof(float) * 3 + sizeof(float) * 3 + sizeof(float) * 2;
+    const uint32_t totalVBOSize = vertexCount * vertexSize;
+
+    std::vector<uint8_t> vertexData;
+    vertexData.resize(totalVBOSize);
+
+    std::vector<uint32_t> indices;
+    indices.reserve(indexCount);
+
+    uint8_t* writeHead = vertexData.data();
+
+    // Helper lambdas for writing vertex data
+    auto WriteFloat2 = [](uint8_t*& writeHead, float x, float y)
+    {
+        float data[2] = { x, y };
+        memcpy(writeHead, data, sizeof(data));
+        writeHead += sizeof(data);
+    };
+
+    auto WriteFloat3 = [](uint8_t*& writeHead, float x, float y, float z)
+    {
+        float data[3] = { x, y, z };
+        memcpy(writeHead, data, sizeof(data));
+        writeHead += sizeof(data);
+    };
+
+    // Calculate step sizes
+    const float stepX = sizeX / (resolutionX - 1);
+    const float stepZ = sizeZ / (resolutionZ - 1);
+    const float halfSizeX = sizeX * 0.5f;
+    const float halfSizeZ = sizeZ * 0.5f;
+
+    // Bounding box
+    DirectX::XMFLOAT3A min = DirectX::XMFLOAT3A(-halfSizeX, 0.0f, -halfSizeZ);
+    DirectX::XMFLOAT3A max = DirectX::XMFLOAT3A(halfSizeX, 0.0f, halfSizeZ);
+
+    // Store positions for hull calculation
+    std::vector<DirectX::XMFLOAT3> positions;
+    positions.reserve(vertexCount);
+
+    // Generate vertices
+    for (uint32_t z = 0; z < resolutionZ; ++z)
+    {
+        for (uint32_t x = 0; x < resolutionX; ++x)
+        {
+            // Position (centered at origin, Y=0 plane)
+            float posX = -halfSizeX + x * stepX;
+            float posY = 0.0f;
+            float posZ = -halfSizeZ + z * stepZ;
+
+            WriteFloat3(writeHead, posX, posY, posZ);
+            positions.push_back(DirectX::XMFLOAT3(posX, posY, posZ));
+
+            // Normal (pointing up)
+            WriteFloat3(writeHead, 0.0f, 1.0f, 0.0f);
+
+            // Texture coordinates
+            float u = (float)x / (resolutionX - 1);
+            float v = (float)z / (resolutionZ - 1);
+            WriteFloat2(writeHead, u, v);
+        }
+    }
+
+    // Generate indices (two triangles per quad)
+    for (uint32_t z = 0; z < quadCountZ; ++z)
+    {
+        for (uint32_t x = 0; x < quadCountX; ++x)
+        {
+            uint32_t topLeft = z * resolutionX + x;
+            uint32_t topRight = topLeft + 1;
+            uint32_t bottomLeft = (z + 1) * resolutionX + x;
+            uint32_t bottomRight = bottomLeft + 1;
+
+            // First triangle (counter-clockwise winding)
+            indices.push_back(topLeft);
+            indices.push_back(bottomLeft);
+            indices.push_back(topRight);
+
+            // Second triangle (counter-clockwise winding)
+            indices.push_back(topRight);
+            indices.push_back(bottomLeft);
+            indices.push_back(bottomRight);
+        }
+    }
+
+    //Hull hull(reinterpret_cast<const float*>(positions.data()), vertexCount);
+
+    // Create AABB
+    AABB boundingBox;
+    boundingBox.min = min;
+    boundingBox.max = max;
+
+    // Create mesh
+    bool success = out_mesh.Create(
+        L"TerrainPlane",
+        (UINT)vertexData.size(),
+        vertexSize,
+        vertexCount,
+        (UINT)(indices.size() * sizeof(uint32_t)),
+        (UINT)indices.size(),
+        DXGI_FORMAT_R32_UINT,
+        boundingBox
+    );
+
+    if (!success)
+    {
+        Muon::Printf(L"Error: Failed to create terrain mesh\n");
+        out_mesh.Destroy();
+        return false;
+    }
+
+    // Upload to GPU
+    success = stagingBuffer.UploadToMesh(
+        Muon::GetCommandList(),
+        out_mesh,
+        vertexData.data(),
+        (UINT)vertexData.size(),
+        indices.data(),
+        (UINT)(indices.size() * sizeof(uint32_t))
+    );
+
+    if (!success)
+    {
+        Muon::Printf(L"Error: Failed to upload terrain mesh\n");
+        out_mesh.Destroy();
+        return false;
+    }
+
+    return true;
+}
+
 void MeshFactory::LoadAllMeshes(ResourceCodex& codex)
 {
     namespace fs = std::filesystem;
@@ -206,6 +356,22 @@ void MeshFactory::LoadAllMeshes(ResourceCodex& codex)
 
         codex.RegisterMesh(temp);
 
+        Muon::CloseCommandList();
+        Muon::ExecuteCommandList();
+    }
+
+    // Build the terrain mesh
+    {
+        Muon::ResetCommandList(nullptr);
+
+        Mesh temp;
+        if (!MeshFactory::BuildTerrainMesh(codex.GetMeshStagingBuffer(), 128, 128, 128.0f, 128.0f, temp))
+        {
+            Muon::CloseCommandList();
+            return;
+        }
+
+        codex.RegisterMesh(temp);
         Muon::CloseCommandList();
         Muon::ExecuteCommandList();
     }
