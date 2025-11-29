@@ -1,14 +1,21 @@
 #include "VS_Common.hlsli"
 #include "Raymarch_Common.hlsli"
 
-// Toggle features
-#define USE_ADAPTIVE_STEP 1 // Shows some artifact ATM. Will debug again after uprez. 
-#define USE_JITTERED_STEP 1
-#define USE_HIGH_HIGH_FREQUENCY 1
-#define DEBUG_AABB_INTERSECT 0
-#define DEBUG_STEP_COUNT 0   // 1 = show step-count debug gradient, 0 = normal shading
 #define GPU_CLOUD 1
+#define USE_ADAPTIVE_STEP        1   // Adaptive step size along ray
+#define USE_JITTERED_STEP        1   // Stochastic jitter per step
+#define USE_HIGH_HIGH_FREQUENCY  1   // Extra near-camera detail
 
+// === Lighting ===
+// Preset: "Density only"  -> all USE_*_LIGHTING = 0
+// Preset: "Lit clouds"    -> enable desired USE_*_LIGHTING = 1
+#define USE_DIRECT_LIGHTING      0   // Sun / directional lighting
+#define USE_AMBIENT_LIGHTING     0   // Sky / ambient term
+#define USE_MULTIPLE_SCATTERING  0   // Approx. multiple scattering
+
+// === Debug / Visualization ===
+#define DEBUG_AABB_INTERSECT     0   // Visualize volume/hull hits
+#define DEBUG_STEP_COUNT         0   // Step-count gradient debug
 
 Texture2D gInput : register(t0);
 Texture3D sdfTex : register(t1); // Cached sdf for accelerating sdf 
@@ -262,6 +269,16 @@ float GetUprezzedVoxelCloudDensity(
     return uprezzed_density;
 }
 
+float GetOpticalDepthToSun(
+    float3 samplePos,
+    float3 sunDir)
+{
+    // Ray-march towards the sun from the sample position
+    
+    return 0.0; 
+}
+
+
 float3 VolumeRaymarchNvdf(float3 eyePos, float3 dir, float3 bgColor, int3 dispatchThreadID)
 {
     float tEnter, tExit;
@@ -324,14 +341,16 @@ float3 VolumeRaymarchNvdf(float3 eyePos, float3 dir, float3 bgColor, int3 dispat
         // NOTE: doing nothing atm, need to fix this below
         // TODO: FIX THIS TO WORK WITH NEW METHOD
 
-#if USE_ADAPTIVE_STEP
-        float adaptive = ComputeAdaptiveStepSize(march.distance);
-        march.stepSize = ComputeBaseStepSize(sdfDistance, adaptive);
-#else
-        march.stepSize = max(sdfDistance, AUTHORING_TO_WORLD_SCALE);
-#endif
+        #if USE_ADAPTIVE_STEP
+            float adaptive = ComputeAdaptiveStepSize(march.distance);
+            march.stepSize = ComputeBaseStepSize(sdfDistance, adaptive);
+        #else
+            march.stepSize = max(sdfDistance, AUTHORING_TO_WORLD_SCALE);
+        #endif
+        
         if (sdfDistance < 0.0)
         {
+
 #if USE_JITTERED_STEP
             float jitter = StaticStepJitter(dispatchThreadID.xy, march.stepIndex); // [-0.5, 0.5]
             float jitterDistance = jitter * march.stepSize;
@@ -348,6 +367,7 @@ float3 VolumeRaymarchNvdf(float3 eyePos, float3 dir, float3 bgColor, int3 dispat
             float densityScale = smoothstep(-4.0, -12.0, sdfDistance) * 0.4 + 0.2;
             dimensionalProfile *= (1.0 - collisionValue);
 #else
+
             float4 nvdfSample = nvdfTex.SampleLevel(linearClamp, WorldToNvdfUV(samplePos), 0.0f);
             float dimensionalProfile = nvdfSample.g;
             float detailType = nvdfSample.b;
@@ -362,19 +382,40 @@ float3 VolumeRaymarchNvdf(float3 eyePos, float3 dir, float3 bgColor, int3 dispat
                 dimensionalProfile,
                 detailType,
                 densityScale
-            );
-            
+                );
+
             float sigma = density * DENSITY_SCALE;
             float alpha = 1.0 - exp(-sigma * march.stepSize);
 
-            float3 contrib = cloudColor * alpha * march.transmittance;
-            march.accumColor += contrib;
-        
-            march.transmittance *= (1.0 - alpha);
-            if (march.transmittance < MIN_TRANSMITTANCE)
-                break;
-        }
+            #if (USE_DIRECT_LIGHTING || USE_AMBIENT_LIGHTING || USE_MULTIPLE_SCATTERING)
+                float3 lighting = 0.0.xxx;
 
+                #if USE_DIRECT_LIGHTING
+                    lighting += ComputeDirectLighting(samplePos, dir, density, sigma, march.stepSize);
+                #endif
+
+                #if USE_AMBIENT_LIGHTING
+                    lighting += ComputeAmbientLighting(samplePos, density);
+                #endif
+
+                #if USE_MULTIPLE_SCATTERING
+                    lighting += ComputeMultipleScattering(samplePos, density);
+                #endif
+
+                float3 contrib = lighting * alpha * march.transmittance;
+                march.accumColor += contrib;
+                march.transmittance *= (1.0 - alpha);
+                if (march.transmittance < MIN_TRANSMITTANCE)
+                    break;
+            #else
+                // Pure density-based fallback (your current behavior)
+                float3 contrib = cloudColor * alpha * march.transmittance;
+                march.accumColor += contrib;
+                march.transmittance *= (1.0 - alpha);
+                if (march.transmittance < MIN_TRANSMITTANCE)
+                    break;
+            #endif
+        }
         march.distance += march.stepSize;
     }
     
