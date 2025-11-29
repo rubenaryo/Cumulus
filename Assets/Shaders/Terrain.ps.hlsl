@@ -27,6 +27,7 @@ SamplerState samplerOptions : register(s0);
 
 float4 main(VertexOut input) : SV_TARGET
 {
+    return float4(1,0, 0, 1);
     // Sample diffuse texture
     float3 surfaceColor = diffuseTexture.Sample(samplerOptions, input.uv).rgb;
     
