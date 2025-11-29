@@ -15,6 +15,10 @@ static const float MAX_DIST = 1000.0; // Global far distance
 static const float EPSILON = 0.001; // Small epsilon for safety
 static const float MIN_TRANSMITTANCE = 0.01; // Early-out when mostly opaque
 
+// Lighting Settings 
+static const float3 DIR_SUN = normalize(float3(-0.5, -1.0, -0.5)); // Temporary hardcoded light dir
+static const float3 LIGHT_SUN = float3(10.0, 9.5, 9.0); // sun color/brightness
+
 // Volume bounds in world space
 static const float SIDE_LENGTH = 4000.0; 
 static const float3 VOLUME_MIN_WS = float3(-SIDE_LENGTH / 2, 0.0, -SIDE_LENGTH / 2);
