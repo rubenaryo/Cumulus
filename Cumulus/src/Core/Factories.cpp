@@ -365,7 +365,7 @@ void MeshFactory::LoadAllMeshes(ResourceCodex& codex)
         Muon::ResetCommandList(nullptr);
 
         Mesh temp;
-        if (!MeshFactory::BuildTerrainMesh(codex.GetMeshStagingBuffer(), 128, 128, 128.0f, 128.0f, temp))
+        if (!MeshFactory::BuildTerrainMesh(codex.GetMeshStagingBuffer(), 128, 128, 5000.0f, 5000.0f, temp))
         {
             Muon::CloseCommandList();
             return;
