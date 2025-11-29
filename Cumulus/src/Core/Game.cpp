@@ -62,7 +62,7 @@ bool Game::Init(HWND window, int width, int height)
     {
         mTerrainPass.SetVertexShader(codex.GetVertexShader(GetResourceID(L"Terrain.vs")));
         mTerrainPass.SetPixelShader(codex.GetPixelShader(GetResourceID(L"Terrain.ps")));
-        mTerrainPass.SetEnableDepth(true);
+        mTerrainPass.SetEnableDepth(false);
 
         if (!mTerrainPass.Generate())
             Printf(L"Warning: %s failed to generate!\n", mTerrainPass.GetName());
@@ -333,6 +333,39 @@ void Game::Render()
         pCommandList->IASetPrimitiveTopology(D3D_PRIMITIVE_TOPOLOGY_TRIANGLELIST);
 
         pCommandList->DrawInstanced(6, 1, 0, 0);
+    }
+
+    if (mTerrainPass.Bind(pCommandList))
+    {
+        // Bind's the materials parameter buffer and textures.
+        mTerrainPass.BindMaterial(*pPhongMaterial, pCommandList);
+
+        // Bind the Camera's Upload Buffer to the root index known by the material
+        int32_t cameraRootIdx = mTerrainPass.GetResourceRootIndex("VSCamera");
+        if (cameraRootIdx != ROOTIDX_INVALID)
+        {
+            mCamera.Bind(cameraRootIdx, pCommandList);
+        }
+
+        // Bind the world matrix Upload Buffer to the root index known by the material
+        // TODO: Just uses the same world matrix as the teapot for now.
+        int32_t worldMatrixRootIdx = mTerrainPass.GetResourceRootIndex("VSWorld");
+        if (worldMatrixRootIdx != ROOTIDX_INVALID)
+        {
+            pCommandList->SetGraphicsRootConstantBufferView(worldMatrixRootIdx, currFrameResources.mWorldMatrixBuffer.GetGPUVirtualAddress());
+        }
+
+        int32_t lightsRootIdx = mTerrainPass.GetResourceRootIndex("PSLights");
+        if (lightsRootIdx != ROOTIDX_INVALID)
+        {
+            pCommandList->SetGraphicsRootConstantBufferView(lightsRootIdx, currFrameResources.mLightBuffer.GetGPUVirtualAddress());
+        }
+
+        const Mesh* pMesh = codex.GetMesh(GetResourceID(L"TerrainPlane"));
+        if (pMesh)
+        {
+            pMesh->DrawIndexed(pCommandList);
+        }
     }
 
     if (mOpaquePass.Bind(pCommandList))
