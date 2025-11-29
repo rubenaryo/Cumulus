@@ -63,7 +63,7 @@ bool Game::Init(HWND window, int width, int height)
     {
         mTerrainPass.SetVertexShader(codex.GetVertexShader(GetResourceID(L"Terrain.vs")));
         mTerrainPass.SetPixelShader(codex.GetPixelShader(GetResourceID(L"Terrain.ps")));
-        mTerrainPass.SetEnableDepth(false);
+        mTerrainPass.SetEnableDepth(true);
 
         if (!mTerrainPass.Generate())
             Printf(L"Warning: %s failed to generate!\n", mTerrainPass.GetName());
