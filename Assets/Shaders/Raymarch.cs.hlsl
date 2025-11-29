@@ -9,6 +9,7 @@
 #define DEBUG_STEP_COUNT 0   // 1 = show step-count debug gradient, 0 = normal shading
 #define GPU_CLOUD 1
 
+
 Texture2D gInput : register(t0);
 Texture3D sdfTex : register(t1); // Cached sdf for accelerating sdf 
 Texture3D nvdfTex : register(t2); // Model textures combined [sdf.r, model.r, model.g, model.b] 
