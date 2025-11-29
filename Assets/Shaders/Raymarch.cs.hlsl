@@ -6,12 +6,14 @@
 #define USE_JITTERED_STEP 1
 #define USE_HIGH_HIGH_FREQUENCY 1
 #define DEBUG_AABB_INTERSECT 0
+#define DEBUG_STEP_COUNT 0   // 1 = show step-count debug gradient, 0 = normal shading
 
 Texture2D gInput : register(t0);
-Texture3D sdfNvdfTex : register(t1); // Sdf and model textures combined [sdf.r, model.r, model.g, model.b] 
-Texture3D noiseTex : register(t2); // Low frequency, high frequency noises for wispy and billowy clouds 
+Texture3D sdfTex : register(t1); // Cached sdf for accelerating sdf 
+Texture3D nvdfTex : register(t2); // Model textures combined [sdf.r, model.r, model.g, model.b] 
+Texture3D noiseTex : register(t3); // Low frequency, high frequency noises for wispy and billowy clouds 
 Texture2D depthStencilBuffer : register(t3); // The scene's depth-stencil buffer, bound here post-graphics passes
-Texture3D gpuCloudTex : register(t4); // Sdf and model textures combined [sdf.r, model.r, model.g, model.b] 
+Texture3D proceduralNvdfTex : register(t4); // Sdf and model textures combined [sdf.r, model.r, model.g, model.b] 
 
 SamplerState linearWrap : register(s2);
 SamplerState linearClamp : register(s3); 
@@ -139,7 +141,7 @@ float ValueErosion(float baseValue, float erosionValue)
 
 float FoldBase(float n)
 {
-    // Map n in [0,1] to a "folded" 0�1 pattern
+    // Map n in [0,1] to a "folded" pattern
     return abs(abs(n * 2.0 - 1.0) * 2.0 - 1.0);
 }
 
@@ -264,7 +266,6 @@ float3 VolumeRaymarchNvdf(float3 eyePos, float3 dir, float3 bgColor, int3 dispat
     if (!RayBoxIntersect(eyePos, dir, VOLUME_MIN_WS, VOLUME_MAX_WS, tEnter, tExit))
     {
         // Ray misses the volume entirely
-        //return float3(1, 1, 1);
         return bgColor;
     }
 
@@ -304,24 +305,26 @@ float3 VolumeRaymarchNvdf(float3 eyePos, float3 dir, float3 bgColor, int3 dispat
         float3 samplePos = eyePos + march.distance * dir;
 
         // Sample NVDF volume: .r = encoded SDF, .g = density (dimensional profile)
-        float4 sdfSample;
-        float sdfDistance;
-        if (USE_GPU_CLOUD)
-        {
-            sdfSample = gpuCloudTex.SampleLevel(linearClamp, WorldToNvdfUV(samplePos), 0.0f);
-            float collisionSample = sdfSample.a;
-            sdfDistance = DecodeSdf(sdfSample.r) * AUTHORING_TO_WORLD_SCALE * (1.0 - collisionSample);
-            // NVDF range for a is [0.2, 0.6] -> mapping smoothstep [0, 1] to it
-            sdfSample.a = smoothstep(-4.0, -12.0, sdfDistance) * 0.4 + 0.2;
-            sdfSample.g *= 1.0 - collisionSample;
-        }
-        else
-        {
-            sdfSample = sdfNvdfTex.SampleLevel(linearClamp, WorldToNvdfUV(samplePos), 0.0f);
-            float4 collisionSample = gpuCloudTex.SampleLevel(linearClamp, WorldToNvdfUV(samplePos), 0.0f);
-            sdfSample.g *= (1.0 - collisionSample.g);
-            sdfDistance = DecodeSdf(sdfSample.r) * AUTHORING_TO_WORLD_SCALE * (1.0 - collisionSample.g);
-        }
+        //float4 sdfSample;
+        //float sdfDistance;
+        //if (USE_GPU_CLOUD)
+        //{
+        //    sdfSample = proceduralNvdfTex.SampleLevel(linearClamp, WorldToNvdfUV(samplePos), 0.0f);
+        //    float collisionSample = sdfSample.a;
+        //    sdfDistance = DecodeSdf(sdfSample.r) * AUTHORING_TO_WORLD_SCALE * (1.0 - collisionSample);
+        //    // NVDF range for a is [0.2, 0.6] -> mapping smoothstep [0, 1] to it
+        //    sdfSample.a = smoothstep(-4.0, -12.0, sdfDistance) * 0.4 + 0.2;
+        //    sdfSample.g *= 1.0 - collisionSample;
+        //}
+        //else
+        //{
+        //    sdfSample = sdfNvdfTex.SampleLevel(linearClamp, WorldToNvdfUV(samplePos), 0.0f);
+        //    float4 collisionSample = proceduralNvdfTex.SampleLevel(linearClamp, WorldToNvdfUV(samplePos), 0.0f);
+        //    sdfSample.g *= (1.0 - collisionSample.g);
+        //    sdfDistance = DecodeSdf(sdfSample.r) * AUTHORING_TO_WORLD_SCALE * (1.0 - collisionSample.g);
+        //}
+        // NOTE: doing nothing atm, need to fix this below
+        // TODO: FIX THIS TO WORK WITH NEW METHOD
 
 #if USE_ADAPTIVE_STEP
         float adaptive = ComputeAdaptiveStepSize(march.distance);
@@ -329,18 +332,17 @@ float3 VolumeRaymarchNvdf(float3 eyePos, float3 dir, float3 bgColor, int3 dispat
 #else
         march.stepSize = max(sdfDistance, AUTHORING_TO_WORLD_SCALE);
 #endif
-
-#if USE_JITTERED_STEP
-        float jitter = StaticStepJitter(dispatchThreadID.xy, march.stepIndex); // [-0.5, 0.5]
-        float jitterDistance = jitter * march.stepSize;
-        samplePos += dir * jitterDistance;
-#endif
-        
         if (sdfDistance < 0.0)
         {
-            float dimensionalProfile = sdfSample.g;
-            float detailType = sdfSample.b;
-            float densityScale = sdfSample.a;
+#if USE_JITTERED_STEP
+            float jitter = StaticStepJitter(dispatchThreadID.xy, march.stepIndex); // [-0.5, 0.5]
+            float jitterDistance = jitter * march.stepSize;
+            samplePos += dir * jitterDistance;
+#endif
+            float4 nvdfSample = nvdfTex.SampleLevel(linearClamp, WorldToNvdfUV(samplePos), 0.0f);
+            float dimensionalProfile = nvdfSample.g;
+            float detailType = nvdfSample.b;
+            float densityScale = nvdfSample.a;
             
             float density = GetUprezzedVoxelCloudDensity(
                 march,
@@ -363,9 +365,22 @@ float3 VolumeRaymarchNvdf(float3 eyePos, float3 dir, float3 bgColor, int3 dispat
 
         march.distance += march.stepSize;
     }
+    
+#if DEBUG_STEP_COUNT
+    // Number of steps actually taken (body executions)
+    float stepsTaken = (march.stepIndex + 1);
 
+    // Normalize to [0,1] using MAX_STEPS as the "max step count"
+    float t = stepsTaken / (float) MAX_STEPS;
+    t = saturate(t);
+
+    // Simple black→white gradient
+    float3 debugColor = lerp(float3(0.0, 0.0, 0.0), float3(1.0, 1.0, 1.0), t);
+    return debugColor;
+#else
     float3 finalColor = march.accumColor + bgColor * march.transmittance;
     return finalColor;
+#endif
 }
 
 
