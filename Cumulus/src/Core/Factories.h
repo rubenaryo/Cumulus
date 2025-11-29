@@ -37,6 +37,7 @@ struct TextureFactory final
 
 struct MeshFactory final
 {
+    static bool BuildTerrainMesh(UploadBuffer& stagingBuffer, uint32_t resolutionX, uint32_t resolutionZ, float sizeX, float sizeZ, Mesh& out_mesh);
     static bool LoadMesh(const wchar_t* fileName, UploadBuffer& stagingBuffer, Mesh& out_meshDX12);
     static void LoadAllMeshes(ResourceCodex& codex);
 };
