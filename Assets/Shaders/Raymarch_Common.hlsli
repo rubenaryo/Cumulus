@@ -24,11 +24,7 @@ static const float NOISE_DOMAIN_SIDE_LENGTH = 100.0; // Noise domain: 3D noise p
 static const float AUTHORING_TO_WORLD_SCALE = SIDE_LENGTH / NVDF_DOMAIN_SIDE_LENGTH;
 
 // Density -> extinction scaling
-static const float DENSITY_SCALE = 1; // To be tuned / driven by NVDF
-
-// GPU cloud or Nubis
-static const bool USE_GPU_CLOUD = true;
-
+static const float DENSITY_SCALE = 0.03; // To be tuned / driven by NVDF
 
 struct AABB
 {

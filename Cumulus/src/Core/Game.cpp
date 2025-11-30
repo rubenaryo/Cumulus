@@ -437,7 +437,7 @@ void Game::Render()
             pCommandList->SetComputeRootDescriptorTable(depthBufferIdx, GetDepthStencilSRV().HandleGPU);
         }
 
-        int32_t collisionIndex = mRaymarchPass.GetResourceRootIndex("gpuCloudTex");
+        int32_t collisionIndex = mRaymarchPass.GetResourceRootIndex("proceduralNvdfTex");
         if (collisionIndex != ROOTIDX_INVALID)
         {
             pCommandList->SetComputeRootDescriptorTable(collisionIndex, collisionTexture->GetSRVHandleGPU());

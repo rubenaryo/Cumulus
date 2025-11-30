@@ -112,8 +112,7 @@ void main(int3 dispatchThreadID : SV_DispatchThreadID)
     //------------------------------
     // SDF is getting clouds around the given seeds
     float d = 999999999.f;
-    //if (numSeeds != 0)
-    //{
+
 #if TEST
     float3 center = (VOLUME_MIN_WS + VOLUME_MAX_WS) * 0.5;
     float scale = 125.f;
@@ -181,6 +180,5 @@ void main(int3 dispatchThreadID : SV_DispatchThreadID)
     if (!collision)
     {
         gOutput[coord].a = max(gOutput[coord].a - 0.01, 0.0);
-
     }
 }
