@@ -69,11 +69,13 @@ private:
     // TEMP: For testing
     Muon::Mesh mCube;
 
-    static const size_t NUM_FRAMES_IN_FLIGHT = 1;
+    static const size_t NUM_FRAMES_IN_FLIGHT = 2;
     std::array<Muon::FrameResources, NUM_FRAMES_IN_FLIGHT> mFrameResources;
     size_t mCurrFrameResourceIdx = 0;
 
     std::unordered_map<int32_t, Muon::EntityData> mEntityCBData;
+
+    Muon::cbCloudGenData mCloudData;
 
     // Timer for the main game loop
     Muon::StepTimer mTimer;
