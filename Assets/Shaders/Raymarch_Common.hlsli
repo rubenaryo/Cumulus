@@ -7,7 +7,7 @@ Description : Common Raymarching Structures for Collision
 #define RAYMARCH_COMMON_HLSLI
 
 // Raymarch settings
-static const int MAX_STEPS = 1024; // Max steps per ray
+static const int MAX_STEPS = 256; // Max steps per ray
 static const float MIN_DIST = 0.001; // Global near distance
 static const float MAX_DIST = 1000.0; // Global far distance
 static const float EPSILON = 0.001; // Small epsilon for safety
@@ -24,7 +24,7 @@ static const float NOISE_DOMAIN_SIDE_LENGTH = 100.0; // Noise domain: 3D noise p
 static const float AUTHORING_TO_WORLD_SCALE = SIDE_LENGTH / NVDF_DOMAIN_SIDE_LENGTH;
 
 // Density -> extinction scaling
-static const float DENSITY_SCALE = .035; // To be tuned / driven by NVDF
+static const float DENSITY_SCALE = 1; // To be tuned / driven by NVDF
 
 // GPU cloud or Nubis
 static const bool USE_GPU_CLOUD = true;

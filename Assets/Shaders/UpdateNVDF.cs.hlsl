@@ -107,14 +107,6 @@ void main(int3 dispatchThreadID : SV_DispatchThreadID)
     float3 uvw = float3(coord) / float3(width, height, depth);
     float3 worldPos = NvdfUVToWorld(uvw);
     
-    //if (numSeeds == 4)
-    //{
-    //    gOutput[coord].r = 0.0;
-    //    gOutput[coord].g = 1.0;
-    //    gOutput[coord].a = 1.0;
-    //    return;
-    //}
-
     //------------------------------
     // CLOUD GEN
     //------------------------------
@@ -133,7 +125,6 @@ void main(int3 dispatchThreadID : SV_DispatchThreadID)
     encodedSdf = saturate(encodedSdf);
     gOutput[coord].r = encodedSdf;
     
-    //gOutput[coord].g = d > 0 ? 0.0 : min(fbm_3D_Perlin(worldPos * 0.003, 4) * 2.0f + 0.2f, 1.0f);
     // normalize scale distance
     float norm_scale = d / scale;
     float billow = fbm_3D_BillowNoise(worldPos * 0.009, float3(6.0, 6.0, 6.0), 12);
@@ -173,12 +164,6 @@ void main(int3 dispatchThreadID : SV_DispatchThreadID)
     // COLLISION CODE
     //---------------------------
 
-    // if(hullCount == 0)
-    // {
-    //     gOutput[coord] = float4(1.0, 1.0, 1.0, 1.0);
-    //     return;
-    // }
-
     bool collision = false;
     for (uint i = 0; i < hullCount; ++i)
     {
@@ -187,7 +172,6 @@ void main(int3 dispatchThreadID : SV_DispatchThreadID)
         float3 dir = float3(1.0, 1.0, 1.0);
         if (PointInsideConvexHull(worldPos, ch))
         {
-            //gOutput[coord] = float4(0.0, 1.0, 0.0, 0.0);
             gOutput[coord].a = 1.0f;
             collision = true;
             break;
@@ -196,7 +180,6 @@ void main(int3 dispatchThreadID : SV_DispatchThreadID)
 
     if (!collision)
     {
-        //gOutput[coord] = float4(0.0, max(gOutput[coord].g - 0.01, 0.0), 1.0, 1.0);
         gOutput[coord].a = max(gOutput[coord].a - 0.01, 0.0);
 
     }

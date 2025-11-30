@@ -303,7 +303,8 @@ float3 VolumeRaymarchNvdf(float3 eyePos, float3 dir, float3 bgColor, int3 dispat
         march.stepIndex = i;
 
         float3 samplePos = eyePos + march.distance * dir;
-
+        float4 sdfSample = sdfTex.SampleLevel(linearClamp, WorldToNvdfUV(samplePos), 0.0f);
+        float sdfDistance = DecodeSdf(sdfSample.r) * AUTHORING_TO_WORLD_SCALE;
         // Sample NVDF volume: .r = encoded SDF, .g = density (dimensional profile)
         //float4 sdfSample;
         //float sdfDistance;
