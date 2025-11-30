@@ -90,13 +90,13 @@ bool FrameResources::UpdateCloudData(cbCloudGenData& data)
 bool FrameResources::UpdateHulls(cbHulls& data)
 {
     memcpy(mHullBuffer.GetMappedPtr(), &data, sizeof(cbHulls));
-    return false;
+    return true;
 }
 
 bool FrameResources::UpdateHullFaces(cbHullFaces& data)
 {
     memcpy(mHullFaceBuffer.GetMappedPtr(), &data, sizeof(cbHullFaces));
-    return false;
+    return true;
 }
 
 void FrameResources::Destroy()
