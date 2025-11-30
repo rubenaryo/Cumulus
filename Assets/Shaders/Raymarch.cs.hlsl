@@ -7,7 +7,7 @@
 #define USE_HIGH_HIGH_FREQUENCY 1
 #define DEBUG_AABB_INTERSECT 0
 #define DEBUG_STEP_COUNT 0   // 1 = show step-count debug gradient, 0 = normal shading
-#define GPU_CLOUD 0
+#define GPU_CLOUD 1
 
 Texture2D gInput : register(t0);
 Texture3D sdfTex : register(t1); // Cached sdf for accelerating sdf 
