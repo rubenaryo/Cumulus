@@ -69,7 +69,7 @@ private:
     // TEMP: For testing
     Muon::Mesh mCube;
 
-    static const size_t NUM_FRAMES_IN_FLIGHT = 2;
+    static const size_t NUM_FRAMES_IN_FLIGHT = 1;
     std::array<Muon::FrameResources, NUM_FRAMES_IN_FLIGHT> mFrameResources;
     size_t mCurrFrameResourceIdx = 0;
 

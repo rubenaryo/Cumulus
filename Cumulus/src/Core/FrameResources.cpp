@@ -79,7 +79,7 @@ bool FrameResources::Create(UINT width, UINT height)
     }
 
     cbCloudGenData cloudData;
-    InitializeCloudGenConstants(cloudData);
+    GenerateCloudGenConstants(cloudData);
     mapped = mCloudGenBuffer.GetMappedPtr();
     if (mapped)
     {
@@ -182,25 +182,18 @@ void FrameResources::Update(float totalTime, float deltaTime, Muon::SceneSetting
         memcpy(mapped, &atmosphereParams, sizeof(Muon::cbAtmosphere));
     }
 
-    // Updating Cloud Data
-    //Muon::cbCloudGenData cloudData;
-    //int numClouds = 4;
-    //cloudData.numSeeds = numClouds;
-    //for (int i = 0; i < numClouds; ++i)
-    //{
-    //    float x = static_cast<float>(rand()) / (static_cast<float>(RAND_MAX) + 1.0f);
-    //    float y = static_cast<float>(rand()) / (static_cast<float>(RAND_MAX) + 1.0f);
-    //    float z = static_cast<float>(rand()) / (static_cast<float>(RAND_MAX) + 1.0f);
-    //    x *= 512.f;
-    //    y *= 512.f;
-    //    z *= 64.f;
-    //    cloudData.seeds[i] = DirectX::XMFLOAT4(x, y, z, 1.0f);
-    //}
-    //mapped = mCloudGenBuffer.GetMappedPtr();
-    //if (mapped)
-    //{
-    //    memcpy(mapped, &cloudData, sizeof(cbCloudGenData));
-    //}
+    if (settings.updateClouds)
+    {
+        settings.updateClouds = false;
+        cbCloudGenData cloudData;
+        GenerateCloudGenConstants(cloudData, settings.numClouds, settings.cloudScale);
+        mapped = mCloudGenBuffer.GetMappedPtr();
+        if (mapped)
+        {
+            memcpy(mapped, &cloudData, sizeof(cbCloudGenData));
+        }
+    }
+
 
     const float PI = 3.14159f;
     DirectX::XMMATRIX debugEntityWorld = DirectX::XMMatrixIdentity();

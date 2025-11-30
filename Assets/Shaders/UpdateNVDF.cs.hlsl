@@ -92,7 +92,7 @@ float SDF_Cloud(float3 query, int numSeed, float3 origin, float scale)
     }
     return d;
 }
-#define TEST 0
+
 [numthreads(16, 16, 2)]
 void main(int3 dispatchThreadID : SV_DispatchThreadID)
 {
@@ -113,29 +113,6 @@ void main(int3 dispatchThreadID : SV_DispatchThreadID)
     // SDF is getting clouds around the given seeds
     float d = 999999999.f;
 
-#if TEST
-    float3 center = (VOLUME_MIN_WS + VOLUME_MAX_WS) * 0.5;
-    float scale = 125.f;
-    d = smooth_min(d, SDF_Cloud(worldPos, 5, center, scale), 0.8);  // this is our actual SDF result
-    // We then encode SDF into the range [0, 1] from [-256, 4096], as this is what Nubis expects
-    const float sdfMin = -256.0;
-    const float sdfMax = 4096.0;
-    // We offset d by scale so we can add a bit more  detail around the harsh sdf edges
-    float encodedSdf = ((d - scale) - sdfMin) / (sdfMax - sdfMin);
-    encodedSdf = saturate(encodedSdf);
-    gOutput[coord].r = encodedSdf;      // r is sdf output
-    
-    // g is the cloud's detail - aka its actual form and outline
-    // to get it, we calculate billowy noise with 12 iterations of fbm
-    // it also slowly fades out based on distance from d by scale
-    float norm_scale = d / scale;
-    float billow = d > scale ? 0.0 : fbm_3D_BillowNoise(worldPos * 0.009, float3(6.0, 6.0, 6.0), 12);
-    gOutput[coord].g = billow < norm_scale ? 0.0 : billow * (1.0 - norm_scale);
-    // b is detail type, which is a bit larger billows that get attenuated by height, as higher parts are more whispy
-    float normalized_height = (worldPos.y - VOLUME_MIN_WS.y) / (VOLUME_MAX_WS.y - VOLUME_MIN_WS.y) + 0.2;
-    gOutput[coord].b = d > scale * 1.5 ? 0.0 : fbm_3D_BillowNoise(worldPos * 0.007, float3(6.0, 6.0, 6.0), 3) * normalized_height;
-    
-#else
     float scale = 0;
     for (uint i = 0; i < numSeeds; ++i)
     {
@@ -156,12 +133,11 @@ void main(int3 dispatchThreadID : SV_DispatchThreadID)
     // to get it, we calculate billowy noise with 12 iterations of fbm
     // it also slowly fades out based on distance from d by scale
     float norm_scale = d / scale;
-    float billow = d > scale ? 0.0 : fbm_3D_BillowNoise(worldPos * 0.009, float3(6.0, 6.0, 6.0), 12);
+    float billow = d > scale ? 0.0 : fbm_3D_BillowNoise(worldPos * 0.009 * (scale / 250.f), float3(6.0, 6.0, 6.0), 12);
     gOutput[coord].g = billow < norm_scale ? 0.0 : billow * (1.0 - norm_scale);
     // b is detail type, which is a bit larger billows that get attenuated by height, as higher parts are more whispy
     float normalized_height = (worldPos.y - VOLUME_MIN_WS.y) / (VOLUME_MAX_WS.y - VOLUME_MIN_WS.y) + 0.2;
-    gOutput[coord].b = d > scale * 1.5 ? 0.0 : fbm_3D_BillowNoise(worldPos * 0.007, float3(6.0, 6.0, 6.0), 3) * normalized_height;
-#endif
+    gOutput[coord].b = d > scale * 1.5 ? 0.0 : fbm_3D_BillowNoise(worldPos * 0.007 * (scale / 250.f), float3(6.0, 6.0, 6.0), 3) * normalized_height;
     
     //---------------------------
     // COLLISION CODE
