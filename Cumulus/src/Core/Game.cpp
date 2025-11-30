@@ -133,8 +133,7 @@ bool Game::InitFrameResources(UINT width, UINT height)
     InitializeAtmosphereConstants(atmosphereParams, width, height);
 
     // Updating Clouds
-    Muon::cbCloudGenData cloudData;
-    GenerateCloudGenConstants(cloudData, settings.numClouds, settings.cloudScale);
+    GenerateCloudGenConstants(mCloudData, settings.numClouds, settings.cloudScale);
     
     // Updating AABBs
     const Mesh* m = codex.GetMesh(GetResourceID(L"teapot.obj"));
@@ -172,7 +171,7 @@ bool Game::InitFrameResources(UINT width, UINT height)
         frameResource.Create(width, height);
         
         frameResource.UpdateAtmosphere(atmosphereParams);
-        frameResource.UpdateCloudData(cloudData);
+        frameResource.UpdateCloudData(mCloudData);
         frameResource.UpdateAABB(intersections);
         frameResource.UpdateHullFaces(faces);
     }
@@ -239,7 +238,8 @@ void Game::Update(Muon::StepTimer const& timer)
             Muon::FrameResources& frameResource = mFrameResources.at(i);
             frameResource.mNeedsCloudUpdate = true;
         }
-
+        
+        Muon::GenerateCloudGenConstants(mCloudData, settings.numClouds, settings.cloudScale);
         settings.updateClouds = false;
     }
 
@@ -267,9 +267,7 @@ void Game::Update(Muon::StepTimer const& timer)
     // Updating Cloud Data
     if (currFrameResources.mNeedsCloudUpdate)
     {
-        Muon::cbCloudGenData cloudData;
-        GenerateCloudGenConstants(cloudData, settings.numClouds, settings.cloudScale);
-        currFrameResources.UpdateCloudData(cloudData);
+        currFrameResources.UpdateCloudData(mCloudData);
         currFrameResources.mNeedsCloudUpdate = false;
     }
 
