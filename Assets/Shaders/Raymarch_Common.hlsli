@@ -1,7 +1,8 @@
 /*----------------------------------------------
 Eli Asimow (eliasimow@gmail.com)
+Avi Serebrenik
 Date : 2025/11
-Description : Common Raymarching Structures for Collision
+Description : Common Raymarching Structures for Collision and Noise for Cloud Data Generatin
 ----------------------------------------------*/
 #ifndef RAYMARCH_COMMON_HLSLI
 #define RAYMARCH_COMMON_HLSLI

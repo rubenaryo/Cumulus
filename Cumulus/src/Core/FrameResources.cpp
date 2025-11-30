@@ -10,6 +10,7 @@ Description : Resources needed for a single frame
 #include <Core/Mesh.h>
 #include <Core/Hull.h>
 #include <Utils/AtmosphereUtils.h>
+#include <Utils/CloudGenerationUtils.h>
 #include <Utils/Utils.h>
 #include <assert.h>
 #include <cmath>
@@ -78,21 +79,7 @@ bool FrameResources::Create(UINT width, UINT height)
     }
 
     cbCloudGenData cloudData;
-    int numClouds = 4;
-    cloudData.numSeeds = numClouds;
-    for (int i = 0; i < numClouds; ++i)
-    {
-        //float x = static_cast<float>(rand()) / (static_cast<float>(RAND_MAX) + 1.0f);
-        //float y = static_cast<float>(rand()) / (static_cast<float>(RAND_MAX) + 1.0f);
-        //float z = static_cast<float>(rand()) / (static_cast<float>(RAND_MAX) + 1.0f);
-        float x = cos(i * 12723.123);
-        float y = sin(i * 1284.789);
-        float z = sin(cos(i * 213.523) * 1924.23);
-        x *= 512.f;
-        y *= 512.f;
-        z *= 64.f;
-        cloudData.seeds[i] = DirectX::XMFLOAT4(x, y, z, 1.0f);
-    }
+    InitializeCloudGenConstants(cloudData);
     mapped = mCloudGenBuffer.GetMappedPtr();
     if (mapped)
     {
