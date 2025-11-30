@@ -16,6 +16,7 @@ Description : Implementation of Game.h
 #include <Core/Shader.h>
 #include <Core/Texture.h>
 #include <Utils/AtmosphereUtils.h>
+#include <Utils/CloudGenerationUtils.h>
 #include <Utils/Utils.h>
 
 #include <imgui.h>
@@ -130,6 +131,10 @@ bool Game::InitFrameResources(UINT width, UINT height)
     // Updating Atmosphere
     cbAtmosphere atmosphereParams;
     InitializeAtmosphereConstants(atmosphereParams, width, height);
+
+    // Updating Clouds
+    Muon::cbCloudGenData cloudData;
+    GenerateCloudGenConstants(cloudData, settings.numClouds, settings.cloudScale);
     
     // Updating AABBs
     const Mesh* m = codex.GetMesh(GetResourceID(L"teapot.obj"));
@@ -167,6 +172,7 @@ bool Game::InitFrameResources(UINT width, UINT height)
         frameResource.Create(width, height);
         
         frameResource.UpdateAtmosphere(atmosphereParams);
+        frameResource.UpdateCloudData(cloudData);
         frameResource.UpdateAABB(intersections);
         frameResource.UpdateHullFaces(faces);
     }
@@ -224,6 +230,19 @@ void Game::Update(Muon::StepTimer const& timer)
     mInput.Frame(elapsedTime, &mCamera);
     mCamera.UpdateView();    
 
+    // The UI has flagged for a cloud update
+    if (settings.updateClouds)
+    {
+        // Mark the update on each frame resource. They will consume it when they next run. 
+        for (size_t i = 0; i != NUM_FRAMES_IN_FLIGHT; ++i)
+        {
+            Muon::FrameResources& frameResource = mFrameResources.at(i);
+            frameResource.mNeedsCloudUpdate = true;
+        }
+
+        settings.updateClouds = false;
+    }
+
     Muon::FrameResources& currFrameResources = mFrameResources.at(mCurrFrameResourceIdx);
     
     // Updating Lights
@@ -246,25 +265,13 @@ void Game::Update(Muon::StepTimer const& timer)
     currFrameResources.UpdateAtmosphere(atmosphere);
 
     // Updating Cloud Data
-    Muon::cbCloudGenData cloudData;
-    //int numClouds = 4;
-    //cloudData.numSeeds = numClouds;
-    //for (int i = 0; i < numClouds; ++i)
-    //{
-    //    float x = static_cast<float>(rand()) / (static_cast<float>(RAND_MAX) + 1.0f);
-    //    float y = static_cast<float>(rand()) / (static_cast<float>(RAND_MAX) + 1.0f);
-    //    float z = static_cast<float>(rand()) / (static_cast<float>(RAND_MAX) + 1.0f);
-    //    x *= 512.f;
-    //    y *= 512.f;
-    //    z *= 64.f;
-    //    cloudData.seeds[i] = DirectX::XMFLOAT4(x, y, z, 1.0f);
-    //}
-    //mapped = mCloudGenBuffer.GetMappedPtr();
-    //if (mapped)
-    //{
-    //    memcpy(mapped, &cloudData, sizeof(cbCloudGenData));
-    //}
-    currFrameResources.UpdateCloudData(cloudData);
+    if (currFrameResources.mNeedsCloudUpdate)
+    {
+        Muon::cbCloudGenData cloudData;
+        GenerateCloudGenConstants(cloudData, settings.numClouds, settings.cloudScale);
+        currFrameResources.UpdateCloudData(cloudData);
+        currFrameResources.mNeedsCloudUpdate = false;
+    }
 
     // Updating Entities
     const float PI = 3.14159f;

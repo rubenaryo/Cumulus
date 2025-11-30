@@ -9,7 +9,6 @@ Description : Resources needed for a single frame
 #include <Core/MuonImgui.h>
 #include <Core/Mesh.h>
 #include <Core/Hull.h>
-#include <Utils/CloudGenerationUtils.h>
 #include <Utils/Utils.h>
 #include <assert.h>
 #include <cmath>
