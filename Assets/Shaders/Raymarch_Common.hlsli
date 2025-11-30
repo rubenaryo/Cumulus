@@ -176,6 +176,15 @@ bool PointInsideConvexHull(float3 pointWS, ConvexHull hull)
     return true;
 }
 
+float DistToEdge(float3 p)
+{
+    float3 closest_point;
+    closest_point.x = clamp(p.x, VOLUME_MIN_WS.x, VOLUME_MAX_WS.x);
+    closest_point.y = clamp(p.y, VOLUME_MIN_WS.y, VOLUME_MAX_WS.y);
+    closest_point.z = clamp(p.z, VOLUME_MIN_WS.z, VOLUME_MAX_WS.z);
+    return distance(p, closest_point);
+}
+
 //------------------
 //NOISE FUNCTIONS
 //------------------

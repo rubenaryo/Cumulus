@@ -133,6 +133,8 @@ void main(int3 dispatchThreadID : SV_DispatchThreadID)
     // to get it, we calculate billowy noise with 12 iterations of fbm
     // it also slowly fades out based on distance from d by scale
     float norm_scale = d / scale;
+    // fade out as we get closer to the edge
+    //float norm_edge_dist = DistToEdge(worldPos) / scale;
     float billow = d > scale ? 0.0 : fbm_3D_BillowNoise(worldPos * 0.009 * (scale / 250.f), float3(6.0, 6.0, 6.0), 12);
     gOutput[coord].g = billow < norm_scale ? 0.0 : billow * (1.0 - norm_scale);
     // b is detail type, which is a bit larger billows that get attenuated by height, as higher parts are more whispy
