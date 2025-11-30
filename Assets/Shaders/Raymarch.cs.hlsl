@@ -541,8 +541,30 @@ float3 VolumeRaymarchNvdf(float3 eyePos, float3 dir, float3 bgColor, int3 dispat
     float3 debugColor = lerp(float3(0.0, 0.0, 0.0), float3(1.0, 1.0, 1.0), t);
     return debugColor;
 #else
+
     float3 finalColor = march.accumColor + bgColor * march.transmittance;
-    return finalColor;
+
+    // bgColor is already tonemapped/gamma-corrected, so:
+    // 1) Work in linear for clouds.
+    // 2) Apply tonemapping only to the cloud contribution.
+    // 3) Composite clouds over bgColor in display space.
+
+    // Split terms:
+    float3 cloudColorLin = march.accumColor; // HDR / linear clouds
+    float3 bgColorDisplay = bgColor; // already tonemapped
+
+    // Tonemap clouds only (Reinhard in linear)
+    float3 cloudMapped = cloudColorLin / (1.0 + cloudColorLin);
+
+    // Optional gamma for clouds if bgColor is in gamma 2.2
+    cloudMapped = pow(cloudMapped, 1.0 / 2.2);
+
+    // Composite: clouds over background, using cloud alpha ≈ (1 - transmittance)
+    float cloudAlpha = 1.0 - march.transmittance;
+    cloudAlpha = saturate(cloudAlpha);
+
+    float3 outColor = lerp(bgColorDisplay, cloudMapped, cloudAlpha);
+    return outColor;
 #endif
 }
 
