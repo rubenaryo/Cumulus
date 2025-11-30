@@ -136,7 +136,7 @@ void main(int3 dispatchThreadID : SV_DispatchThreadID)
     float billow = d > scale ? 0.0 : fbm_3D_BillowNoise(worldPos * 0.009 * (scale / 250.f), float3(6.0, 6.0, 6.0), 12);
     gOutput[coord].g = billow < norm_scale ? 0.0 : billow * (1.0 - norm_scale);
     // b is detail type, which is a bit larger billows that get attenuated by height, as higher parts are more whispy
-    float normalized_height = (worldPos.y - VOLUME_MIN_WS.y) / (VOLUME_MAX_WS.y - VOLUME_MIN_WS.y) + 0.2;
+    float normalized_height = (worldPos.y - VOLUME_MIN_WS.y) / (VOLUME_MAX_WS.y - VOLUME_MIN_WS.y) + 0.3;
     gOutput[coord].b = d > scale * 1.5 ? 0.0 : fbm_3D_BillowNoise(worldPos * 0.007 * (scale / 250.f), float3(6.0, 6.0, 6.0), 3) * normalized_height;
     
     //---------------------------
