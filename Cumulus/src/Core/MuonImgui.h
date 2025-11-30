@@ -13,6 +13,7 @@ namespace Muon
 {
 	struct SceneSettings {
 		bool isSunDynamic = false;
+		bool drawObjects = true;
 		int timeOfDay = 800; // stored as military time for now
 		DirectX::XMFLOAT3 sunDir;
 	};

@@ -110,6 +110,19 @@ struct alignas(16) cbAtmosphere
     float pad3;
 };
 
+struct alignas(16) cbCloudGenData
+{
+    DirectX::XMFLOAT4 seeds[32];
+    
+    int numSeeds;
+    float pad[3];
+};
+
+struct EntityData {
+    cbPerEntity entityMatrices;
+    cbConvexHull hull;
+};
+
 }
 
 #endif

@@ -8,6 +8,8 @@ Description : Resources needed for a single frame
 
 #include <Core/DXCore.h>
 #include <Core/Buffers.h>
+#include <unordered_map>
+#include <Core/CBufferStructs.h>
 
 namespace Muon
 {
@@ -24,6 +26,7 @@ struct FrameResources
     
     bool Create(UINT width, UINT height);
     void Update(float totalTime, float deltaTime, Muon::SceneSettings& settings, Muon::Camera& camera);
+
     void Destroy();
 
     Microsoft::WRL::ComPtr<ID3D12CommandAllocator> mCmdAllocator;
@@ -33,8 +36,12 @@ struct FrameResources
     UploadBuffer mTimeBuffer;
     UploadBuffer mAABBBuffer;
     UploadBuffer mAtmosphereBuffer;
+    UploadBuffer mCloudGenBuffer;
     Muon::UploadBuffer mHullBuffer;
     Muon::UploadBuffer mHullFaceBuffer;
+
+    // Entity Data
+    std::unordered_map<int32_t, EntityData> entityCbData;
 
     UINT64 mFence = 0;
 };

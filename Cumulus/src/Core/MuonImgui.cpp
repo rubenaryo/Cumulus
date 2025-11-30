@@ -124,6 +124,7 @@ void ImguiNewFrame(float gameTime, const Camera& cam, SceneSettings& settings)
         if (ImGui::BeginTabItem("Interactables"))
         {
             ImGui::Checkbox("Visualize Convex Hull", &settings.isSunDynamic);
+            ImGui::Checkbox("Draw Objects", &settings.drawObjects);
             ImGui::EndTabItem();
         }
 
