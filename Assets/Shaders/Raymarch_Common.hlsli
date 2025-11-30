@@ -6,12 +6,19 @@ Description : Common Raymarching Structures for Collision
 #ifndef RAYMARCH_COMMON_HLSLI
 #define RAYMARCH_COMMON_HLSLI
 
+// Constants 
+static const float PI = 3.14159265359;
+
 // Raymarch settings
 static const int MAX_STEPS = 256; // Max steps per ray
 static const float MIN_DIST = 0.001; // Global near distance
 static const float MAX_DIST = 1000.0; // Global far distance
 static const float EPSILON = 0.001; // Small epsilon for safety
 static const float MIN_TRANSMITTANCE = 0.01; // Early-out when mostly opaque
+
+// Lighting Settings 
+static const float3 DIR_SUN = normalize(float3(0.5, 1.0, 0.5)); // Temporary hardcoded light dir
+static const float3 LIGHT_SUN = float3(100.0, 90.5, 90.0); // sun color/brightness
 
 // Volume bounds in world space
 static const float SIDE_LENGTH = 4000.0; 
@@ -24,7 +31,25 @@ static const float NOISE_DOMAIN_SIDE_LENGTH = 100.0; // Noise domain: 3D noise p
 static const float AUTHORING_TO_WORLD_SCALE = SIDE_LENGTH / NVDF_DOMAIN_SIDE_LENGTH;
 
 // Density -> extinction scaling
-static const float DENSITY_SCALE = 0.03; // To be tuned / driven by NVDF
+static const float DENSITY_SCALE = 1; // To be tuned / driven by NVDF
+
+struct NoiseSample
+{
+    float lowFreqWispy;
+    float highFreqWispy;
+    float lowFreqBillow;
+    float highFreqBillow;
+};
+
+NoiseSample MakeNoiseSample(float4 sample)
+{
+    NoiseSample ns;
+    ns.lowFreqWispy = sample.x;
+    ns.highFreqWispy = sample.y;
+    ns.lowFreqBillow = sample.z;
+    ns.highFreqBillow = sample.w;
+    return ns;
+}
 
 struct AABB
 {
