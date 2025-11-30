@@ -2,6 +2,7 @@
 #include "Raymarch_Common.hlsli"
 
 // === Raymarch / Quality ===
+#define GPU_CLOUD 0
 #define USE_ADAPTIVE_STEP        1   // Adaptive step size along ray
 #define USE_JITTERED_STEP        1   // Stochastic jitter per step
 #define USE_HIGH_HIGH_FREQUENCY  1   // Extra near-camera detail
@@ -17,35 +18,13 @@
 #define DEBUG_AABB_INTERSECT     0   // Visualize volume/hull hits
 #define DEBUG_STEP_COUNT         0   // Step-count gradient debug
 
-// Raymarch settings
-static const int MAX_STEPS = 256; // Max steps per ray
-static const float MIN_DIST = 0.001; // Global near distance
-static const float MAX_DIST = 1000.0; // Global far distance
-static const float EPSILON = 0.001; // Small epsilon for safety
-static const float MIN_TRANSMITTANCE = 0.01; // Early-out when mostly opaque
-
-// Lighting Settings 
-static const float3 DIR_SUN = normalize(float3(-0.5, -1.0, -0.5)); // Temporary hardcoded light dir
-static const float3 LIGHT_SUN = float3(10.0, 9.5, 9.0); // sun color/brightness
-
-// Volume bounds in world space
-static const float SIDE_LENGTH = 4000.0; 
-static const float3 VOLUME_MIN_WS = float3(-SIDE_LENGTH / 2, 0.0, -SIDE_LENGTH / 2);
-static const float3 VOLUME_MAX_WS = float3(SIDE_LENGTH / 2, SIDE_LENGTH / 8, SIDE_LENGTH / 2);
-
-// Mapping from NVDF authoring space to world 
-static const float NVDF_DOMAIN_SIDE_LENGTH = 4000.0; // NVDF authoring domain: 4km x 4km x 0.5km (matches the world volume).
-static const float NOISE_DOMAIN_SIDE_LENGTH = 100.0; // Noise domain: 3D noise pattern repeats every 100m in X/Y/Z.
-static const float AUTHORING_TO_WORLD_SCALE = SIDE_LENGTH / NVDF_DOMAIN_SIDE_LENGTH;
-
-// Density -> extinction scaling
-static const float DENSITY_SCALE = 1; // To be tuned / driven by NVDF
-
 Texture2D gInput : register(t0);
 Texture3D sdfTex : register(t1); // Cached sdf for accelerating sdf 
 Texture3D nvdfTex : register(t2); // Model textures combined [sdf.r, model.r, model.g, model.b] 
 Texture3D noiseTex : register(t3); // Low frequency, high frequency noises for wispy and billowy clouds 
 Texture2D depthStencilBuffer : register(t3); // The scene's depth-stencil buffer, bound here post-graphics passes
+Texture3D proceduralNvdfTex : register(t4); // Sdf and model textures combined [sdf.r, model.r, model.g, model.b] 
+
 SamplerState linearWrap : register(s2);
 SamplerState linearClamp : register(s3); 
 RWTexture2D<float4> gOutput : register(u0);
@@ -97,20 +76,6 @@ void InitRayMarchInfo(out RayMarchInfo info, float tEnter, float tExit)
     info.stepIndex = 0;
 }
 
-
-float3 WorldToNvdfUV(float3 worldPos)
-{
-    float3 local = (worldPos - VOLUME_MIN_WS) / (VOLUME_MAX_WS - VOLUME_MIN_WS);
-
-    // local: (X, Y, Z) normalized into [0,1]
-
-    float u = local.x; // world X -> texture X
-    float v = local.z; // world Z -> texture Y (so each slice is an XZ plane)
-    float w = local.y; // world Y -> texture Z (stacking along Y)
-
-    return float3(u, v, w);
-}
-
 bool RayBoxIntersect(
     float3 origin,
     float3 dir,
@@ -133,64 +98,6 @@ bool RayBoxIntersect(
     // Need a positive interval where enter < exit
     return tExit > max(tEnter, 0.0);
 }
-
-bool RayConvexHullIntersect(
-    float3 origin,
-    float3 dir,
-    ConvexHull hull,
-    out float tEnter,
-    out float tExit)
-{
-    // Initial interval: (-∞, +∞)
-    tEnter = -1e20;
-    tExit  =  1e20;
-
-    uint faceStart = hull.faceOffset;
-    uint faceEnd   = hull.faceOffset + hull.faceCount;
-
-    float3 localOrigin = mul(hull.invWorld, float4(origin, 1.0)).xyz;
-    float3 localDir    = mul(hull.invWorld, float4(dir, 0.0)).xyz;
-
-
-    for (uint fi = faceStart; fi < faceEnd; ++fi)
-    {
-        float4 face = hullFaces[fi];
-        float distance = face.w;
-        float4 normal = float4(face.xyz, 0.0);
-
-        float dist0 = dot(normal, localOrigin) + distance;
-        float denom = dot(normal, localDir);
-
-        if (abs(denom) < 1e-8)
-        {
-            // Ray is parallel to plane
-            if (dist0 > 0.0)
-                return false;   // outside → cannot intersect
-            else
-                continue;       // inside → this plane imposes no limit
-        }
-
-        float tHit = -dist0 / denom;
-
-        if (denom < 0.0)
-        {
-            // entering half-space
-            tEnter = max(tEnter, tHit);
-        }
-        else
-        {
-            // exiting half-space
-            tExit = min(tExit, tHit);
-        }
-
-        if (tEnter > tExit)
-            return false;
-    }
-
-    // Need exit to be after enter, and at least one must be in front
-    return tExit > max(tEnter, 0.0);
-}
-
 // Encoded value in [0, 1]  ->  real SDF in [-256, 4096]
 float DecodeSdf(float encodedSdf)
 {
@@ -406,22 +313,7 @@ float3 VolumeRaymarchNvdf(float3 eyePos, float3 dir, float3 bgColor, int3 dispat
         return bgColor;
     }
 
-    float minBoxEnter = tEnter;
-    float maxBoxExit = tExit;
-    for (uint i = 0; i < aabbCount; ++i)
-    {
-        float aabbEnter, aabbExit;
-        if (RayBoxIntersect(eyePos, dir, aabbs[i].minBounds, aabbs[i].maxBounds, aabbEnter, aabbExit))
-        {
-            minBoxEnter = min(minBoxEnter, aabbEnter);
-            maxBoxExit = max(maxBoxExit, aabbExit);
 #if DEBUG_AABB_INTERSECT
-            return float3(1, 0, 0) * bgColor; // Visualize AABB intersection
-#endif
-        }
-    }
-
-
     for(uint i = 0; i < hullCount; ++i)
     {
         float hullEnter, hullExit;
@@ -431,11 +323,10 @@ float3 VolumeRaymarchNvdf(float3 eyePos, float3 dir, float3 bgColor, int3 dispat
         {
             // minBoxEnter = min(minBoxEnter, hullEnter);
             // maxBoxExit = max(maxBoxExit, hullExit);
-#if DEBUG_AABB_INTERSECT
             return float3(1, 0, 0) * bgColor; // Visualize hull intersection
-#endif
         }
     }
+#endif
 
     // Clamp to your global near/far
     tEnter = max(tEnter, MIN_DIST);
@@ -456,10 +347,24 @@ float3 VolumeRaymarchNvdf(float3 eyePos, float3 dir, float3 bgColor, int3 dispat
         march.stepIndex = i;
 
         float3 samplePos = eyePos + march.distance * dir;
-
-        // Sample NVDF volume: .r = encoded SDF, .g = density (dimensional profile)
+#if GPU_CLOUD
+        float4 sdfSample = proceduralNvdfTex.SampleLevel(linearClamp, WorldToNvdfUV(samplePos), 0.0f);
+        float collisionValue = sdfSample.a;
+        float sdfDistance =  DecodeSdf(sdfSample.r) * AUTHORING_TO_WORLD_SCALE * (1.0 - collisionValue);
+        // NVDF range for a is [0.2, 0.6] -> mapping smoothstep [0, 1] to it
+        sdfSample.a = smoothstep(-4.0, -12.0, sdfDistance) * 0.4 + 0.2;
+        sdfSample.g *= 1.0 - collisionValue;
+#else
         float4 sdfSample = sdfTex.SampleLevel(linearClamp, WorldToNvdfUV(samplePos), 0.0f);
-        float sdfDistance = DecodeSdf(sdfSample.r) * AUTHORING_TO_WORLD_SCALE;
+        float collisionValue = proceduralNvdfTex.SampleLevel(linearClamp, WorldToNvdfUV(samplePos), 0.0f).a;
+        sdfSample.g *= (1.0 - collisionValue);
+        // collision hack, step size is reduced to show the hole better
+        float sdfDistance = DecodeSdf(sdfSample.r) * AUTHORING_TO_WORLD_SCALE * (1.0 - collisionValue);
+#endif
+        // Sample NVDF volume: .r = encoded SDF, .g = density (dimensional profile)
+        
+        // NOTE: doing nothing atm, need to fix this below
+        // TODO: FIX THIS TO WORK WITH NEW METHOD
 
         #if USE_ADAPTIVE_STEP
             float adaptive = ComputeAdaptiveStepSize(march.distance);
@@ -470,16 +375,29 @@ float3 VolumeRaymarchNvdf(float3 eyePos, float3 dir, float3 bgColor, int3 dispat
         
         if (sdfDistance < 0.0)
         {
-            #if USE_JITTERED_STEP
-                float jitter = StaticStepJitter(dispatchThreadID.xy, march.stepIndex); // [-0.5, 0.5]
-                float jitterDistance = jitter * march.stepSize;
-                samplePos += dir * jitterDistance;
-            #endif
+#if USE_JITTERED_STEP
+            float jitter = StaticStepJitter(dispatchThreadID.xy, march.stepIndex); // [-0.5, 0.5]
+            float jitterDistance = jitter * march.stepSize;
+            samplePos += dir * jitterDistance;
+#endif
             
+#if GPU_CLOUD
+            float4 nvdfSample = proceduralNvdfTex.SampleLevel(linearClamp, WorldToNvdfUV(samplePos), 0.0f);
+            float collisionValue = nvdfSample.a;
+        
+            float dimensionalProfile = nvdfSample.g;
+            float detailType = nvdfSample.b;
+            // NVDF range for density scale is [0.2, 0.6] -> mapping smoothstep [0, 1] to it
+            float densityScale = smoothstep(-4.0, -12.0, sdfDistance) * 0.4 + 0.2;
+            dimensionalProfile *= (1.0 - collisionValue);
+#else
             float4 nvdfSample = nvdfTex.SampleLevel(linearClamp, WorldToNvdfUV(samplePos), 0.0f);
             float dimensionalProfile = nvdfSample.g;
             float detailType = nvdfSample.b;
             float densityScale = nvdfSample.a;
+            float collisionValue = proceduralNvdfTex.SampleLevel(linearClamp, WorldToNvdfUV(samplePos), 0.0f).a;
+            dimensionalProfile *= (1.0 - collisionValue);
+#endif
             
             float density = GetUprezzedVoxelCloudDensity(
                 march,

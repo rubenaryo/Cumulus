@@ -12,6 +12,7 @@ Description : Resources needed for a single frame
 #include <Utils/AtmosphereUtils.h>
 #include <Utils/Utils.h>
 #include <assert.h>
+#include <cmath>
 
 namespace Muon
 {
@@ -46,8 +47,11 @@ bool FrameResources::Create(UINT width, UINT height)
     DirectX::XMMATRIX debugEntityWorld = DirectX::XMMatrixIdentity();
     debugEntityWorld = XMMatrixMultiply(debugEntityWorld, DirectX::XMMatrixRotationRollPitchYaw(0, 0, PI / 2.0f));
     debugEntityWorld = XMMatrixMultiply(debugEntityWorld, DirectX::XMMatrixRotationRollPitchYaw(-PI / 2.0f, 0, 0));
-    debugEntityWorld = XMMatrixMultiply(debugEntityWorld, DirectX::XMMatrixScaling(0.12f, 0.12f, 0.12f));
+    debugEntityWorld = XMMatrixMultiply(debugEntityWorld, DirectX::XMMatrixScaling(10.12f, 10.12f, 10.12f));
     debugEntityWorld = XMMatrixMultiply(debugEntityWorld, DirectX::XMMatrixTranslation(0, 1, 0));
+
+    EntityData entityData{};
+
 
     if (mapped)
     {
@@ -55,12 +59,14 @@ bool FrameResources::Create(UINT width, UINT height)
         cbPerEntity entity;
         XMStoreFloat4x4(&entity.world, debugEntityWorld);
         XMStoreFloat4x4(&entity.invWorld, DirectX::XMMatrixInverse(nullptr, debugEntityWorld));
+        entityData.entityMatrices = entity;
         memcpy(mapped, &entity, sizeof(entity));
     }
 
     mLightBuffer.Create(L"Light Buffer", sizeof(cbLights));
     mTimeBuffer.Create(L"Time", sizeof(cbTime));
     mAtmosphereBuffer.Create(L"Atmosphere CB", sizeof(cbAtmosphere));
+    mCloudGenBuffer.Create(L"CloudGen CG", sizeof(cbCloudGenData));
 
     cbAtmosphere atmosphereParams;
     InitializeAtmosphereConstants(atmosphereParams, width, height);
@@ -69,6 +75,28 @@ bool FrameResources::Create(UINT width, UINT height)
     if (mapped)
     {
         memcpy(mapped, &atmosphereParams, sizeof(cbAtmosphere));
+    }
+
+    cbCloudGenData cloudData;
+    int numClouds = 4;
+    cloudData.numSeeds = numClouds;
+    for (int i = 0; i < numClouds; ++i)
+    {
+        //float x = static_cast<float>(rand()) / (static_cast<float>(RAND_MAX) + 1.0f);
+        //float y = static_cast<float>(rand()) / (static_cast<float>(RAND_MAX) + 1.0f);
+        //float z = static_cast<float>(rand()) / (static_cast<float>(RAND_MAX) + 1.0f);
+        float x = cos(i * 12723.123);
+        float y = sin(i * 1284.789);
+        float z = sin(cos(i * 213.523) * 1924.23);
+        x *= 512.f;
+        y *= 512.f;
+        z *= 64.f;
+        cloudData.seeds[i] = DirectX::XMFLOAT4(x, y, z, 1.0f);
+    }
+    mapped = mCloudGenBuffer.GetMappedPtr();
+    if (mapped)
+    {
+        memcpy(mapped, &cloudData, sizeof(cbCloudGenData));
     }
 
     mAABBBuffer.Create(L"AABB Buffer", sizeof(cbIntersections));
@@ -103,6 +131,7 @@ bool FrameResources::Create(UINT width, UINT height)
         hulls.hulls[0] = cHull;
         hulls.hullCount = 1;
         memcpy(mHullBuffer.GetMappedPtr(), &hulls, sizeof(hulls));
+        entityData.hull = cHull;
     }
 
     mHullFaceBuffer.Create(L"Hull Faces Buffer", sizeof(cbHullFaces));
@@ -127,6 +156,7 @@ bool FrameResources::Create(UINT width, UINT height)
 
     mTimeBuffer.Create(L"Time", sizeof(cbTime));
 
+    this->entityCbData[0] = entityData;
 	return true;
 }
 
@@ -165,6 +195,60 @@ void FrameResources::Update(float totalTime, float deltaTime, Muon::SceneSetting
         memcpy(mapped, &atmosphereParams, sizeof(Muon::cbAtmosphere));
     }
 
+    // Updating Cloud Data
+    //Muon::cbCloudGenData cloudData;
+    //int numClouds = 4;
+    //cloudData.numSeeds = numClouds;
+    //for (int i = 0; i < numClouds; ++i)
+    //{
+    //    float x = static_cast<float>(rand()) / (static_cast<float>(RAND_MAX) + 1.0f);
+    //    float y = static_cast<float>(rand()) / (static_cast<float>(RAND_MAX) + 1.0f);
+    //    float z = static_cast<float>(rand()) / (static_cast<float>(RAND_MAX) + 1.0f);
+    //    x *= 512.f;
+    //    y *= 512.f;
+    //    z *= 64.f;
+    //    cloudData.seeds[i] = DirectX::XMFLOAT4(x, y, z, 1.0f);
+    //}
+    //mapped = mCloudGenBuffer.GetMappedPtr();
+    //if (mapped)
+    //{
+    //    memcpy(mapped, &cloudData, sizeof(cbCloudGenData));
+    //}
+
+    const float PI = 3.14159f;
+    DirectX::XMMATRIX debugEntityWorld = DirectX::XMMatrixIdentity();
+    debugEntityWorld = XMMatrixMultiply(debugEntityWorld, DirectX::XMMatrixRotationRollPitchYaw(0, 0, PI / 2.0f));
+    debugEntityWorld = XMMatrixMultiply(debugEntityWorld, DirectX::XMMatrixRotationRollPitchYaw(-PI / 2.0f, 0, 0));
+    debugEntityWorld = XMMatrixMultiply(debugEntityWorld,  DirectX::XMMatrixScaling(10.f, 10.f, 10.f));
+    float yPos = 1000*(sin(time.totalTime * .5f));
+    debugEntityWorld = XMMatrixMultiply(debugEntityWorld, DirectX::XMMatrixTranslation(0, yPos, 0));
+
+    UINT8* worldMatrix = mWorldMatrixBuffer.GetMappedPtr();
+    assert(worldMatrix);
+
+    if (worldMatrix)
+    {
+        using namespace DirectX;
+        cbPerEntity entity;
+        XMStoreFloat4x4(&entity.world, debugEntityWorld);
+        XMStoreFloat4x4(&entity.invWorld, DirectX::XMMatrixInverse(nullptr, debugEntityWorld));
+        memcpy(worldMatrix, &entity, sizeof(entity));
+    }
+
+    cbConvexHull cHull = this->entityCbData[0].hull;
+    mHullBuffer.Create(L"Hull Buffer", sizeof(cbHulls));
+
+    if (mHullBuffer.GetMappedPtr())
+    {
+        cbHulls hulls = {};
+
+        XMStoreFloat4x4(&cHull.world, debugEntityWorld);
+        XMStoreFloat4x4(&cHull.invWorld, DirectX::XMMatrixInverse(nullptr, debugEntityWorld));
+
+        hulls.hulls[0] = cHull;
+        hulls.hullCount = 1;
+        memcpy(mHullBuffer.GetMappedPtr(), &hulls, sizeof(hulls));
+    }
 }
 
 void FrameResources::Destroy()
@@ -175,6 +259,7 @@ void FrameResources::Destroy()
     mTimeBuffer.Destroy();
     mAABBBuffer.Destroy();
     mAtmosphereBuffer.Destroy();
+    mCloudGenBuffer.Destroy();
     mHullBuffer.Destroy();
     mHullFaceBuffer.Destroy();
 }

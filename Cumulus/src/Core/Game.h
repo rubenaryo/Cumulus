@@ -44,6 +44,7 @@ public:
 
 private:
     void Update(Muon::StepTimer const& timer);
+    void UpdateProceduralNVDF();
     void Render();
 
     void CreateDeviceDependentResources();
@@ -62,6 +63,7 @@ private:
     Muon::GraphicsPass mAtmospherePass;
     Muon::ComputePass mSobelPass;
     Muon::ComputePass mRaymarchPass;
+    Muon::ComputePass mProcNVDFPass;
     Muon::GraphicsPass mPostProcessPass;
 
     // TEMP: For testing
