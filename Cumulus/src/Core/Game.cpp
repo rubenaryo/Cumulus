@@ -189,10 +189,7 @@ void Game::Frame()
         Update(mTimer);
     });
 
-    //if (mTimer.GetTotalTicks() % 2 == 0)
-    //{
-        UpdateProceduralNVDF();
-    //}
+    UpdateProceduralNVDF();
 
     Render();
     AdvanceFence();
