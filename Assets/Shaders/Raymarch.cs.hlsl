@@ -9,7 +9,7 @@
 // === Lighting ===
 // Preset: "Density only"  -> all USE_*_LIGHTING = 0
 // Preset: "Lit clouds"    -> enable desired USE_*_LIGHTING = 1
-#define USE_DIRECT_LIGHTING      0   // Sun / directional lighting
+#define USE_DIRECT_LIGHTING      1   // Sun / directional lighting
 #define USE_AMBIENT_LIGHTING     0   // Sky / ambient term
 #define USE_MULTIPLE_SCATTERING  0   // Approx. multiple scattering
 
@@ -372,6 +372,30 @@ float GetOpticalDepthToSun(
     return 0.0; 
 }
 
+float3 ComputeDirectLighting(
+    float3 samplePos,
+    float3 viewDir,
+    float density,
+    float sigma,
+    float stepSize)
+{
+    return float3(0.0, 0.0, 0.0);
+}
+
+float3 ComputeAmbientLighting(
+    float3 samplePos,
+    float density)
+{
+    return float3(0.0, 0.0, 0.0);
+}
+
+float3 ComputeMultipleScattering(
+    float3 samplePos,
+    float density)
+{
+    return float3(0.0, 0.0, 0.0);
+}
+
 
 float3 VolumeRaymarchNvdf(float3 eyePos, float3 dir, float3 bgColor, int3 dispatchThreadID)
 {
@@ -468,6 +492,7 @@ float3 VolumeRaymarchNvdf(float3 eyePos, float3 dir, float3 bgColor, int3 dispat
             float sigma = density * DENSITY_SCALE;
             float alpha = 1.0 - exp(-sigma * march.stepSize);
 
+            // Lighting 
             #if (USE_DIRECT_LIGHTING || USE_AMBIENT_LIGHTING || USE_MULTIPLE_SCATTERING)
                 float3 lighting = 0.0.xxx;
 
