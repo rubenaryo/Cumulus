@@ -303,7 +303,7 @@ float GetOpticalDepthToSun(float3 samplePos, float3 sunDir)
                 densityScale
             );
 
-            float sigma = density * 0.1;
+            float sigma = density * 0.05;
 
             float stepSizeInside = minStepSize; // or a tuned fixed step
             depth += sigma * stepSizeInside;
