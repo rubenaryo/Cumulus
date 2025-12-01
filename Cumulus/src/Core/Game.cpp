@@ -205,6 +205,11 @@ void Game::Frame()
         UpdateRaymarchCache();
     }
 
+    if (mTimer.GetTotalTicks() % 16 == 0)
+    {
+        UpdateRaymarchCache();
+    }
+
     Render();
     AdvanceFence();
 
