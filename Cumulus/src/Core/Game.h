@@ -62,6 +62,7 @@ private:
     Muon::GraphicsPass mOpaquePass;
     Muon::GraphicsPass mAtmospherePass;
     Muon::ComputePass mSobelPass;
+    Muon::ComputePass mRaymarchCachePass;
     Muon::ComputePass mRaymarchPass;
     Muon::ComputePass mProcNVDFPass;
     Muon::GraphicsPass mPostProcessPass;

@@ -27,6 +27,7 @@ Game::Game() :
     mOpaquePass(L"OpaquePass"),
     mAtmospherePass(L"AtmospherePass"),
     mSobelPass(L"SobelPass"),
+    mRaymarchCachePass(L"RaymarchCachePass"),
     mRaymarchPass(L"RaymarchPass"),
     mProcNVDFPass(L"ProcNVDFPass"),
     mPostProcessPass(L"PostProcessPass")
@@ -83,6 +84,14 @@ bool Game::Init(HWND window, int width, int height)
 
         if (!mSobelPass.Generate())
             Printf(L"Warning: %s failed to generate!\n", mSobelPass.GetName());
+    }
+
+    // Assemble raymarch cache pass
+    {
+        mRaymarchCachePass.SetComputeShader(codex.GetComputeShader(GetResourceID(L"RaymarchCache.cs")));
+
+        if (!mRaymarchCachePass.Generate())
+            Printf(L"Warning: %s failed to generate!\n", mRaymarchCachePass.GetName());
     }
 
     // Assemble raymarch pass
