@@ -542,8 +542,6 @@ float3 VolumeRaymarchNvdf(float3 eyePos, float3 dir, float3 bgColor, float depth
     return debugColor;
 #else
 
-    float3 finalColor = march.accumColor + bgColor * march.transmittance;
-
     // bgColor is already tonemapped/gamma-corrected, so:
     // 1) Work in linear for clouds.
     // 2) Apply tonemapping only to the cloud contribution.
@@ -561,7 +559,8 @@ float3 VolumeRaymarchNvdf(float3 eyePos, float3 dir, float3 bgColor, float depth
 
     // Composite: clouds over background, using cloud alpha ≈ (1 - transmittance)
     float cloudAlpha = 1.0 - march.transmittance;
-    cloudAlpha = saturate(cloudAlpha);
+    // Apply a power curve to make small alphas vanish faster so there are less dark edge artifacts 
+    cloudAlpha = saturate(pow(cloudAlpha, 2.0)); 
 
     float3 outColor = lerp(bgColorDisplay, cloudMapped, cloudAlpha);
     return outColor;
@@ -595,12 +594,8 @@ void main(int3 dispatchThreadID : SV_DispatchThreadID)
     
     float3 bgColor = gInput[pixelCoord].rgb;
     float depth = depthStencilBuffer[dispatchThreadID.xy].r;
-    
-    // Volume composite against NVDF dimensional profile (green channel)
+
     float3 finalColor = VolumeRaymarchNvdf(eyePos, worldDir, bgColor, depth, dispatchThreadID);
-    
-    // Example: Visulize depth
-    // finalColor = depth.rrr;
     
     gOutput[dispatchThreadID.xy] = float4(finalColor, 1.0);
 }
