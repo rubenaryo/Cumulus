@@ -127,20 +127,6 @@ void ImguiNewFrame(float gameTime, const Camera& cam, SceneSettings& settings)
             ImGui::Checkbox("Draw Objects", &settings.drawObjects);
             ImGui::EndTabItem();
         }
-        if (ImGui::BeginTabItem("Clouds"))
-        {
-            int cloudNum = settings.numClouds;
-            float cloudScale = settings.cloudScale;
-            ImGui::SliderInt("Number of Clouds", &cloudNum, 0, 32);
-            ImGui::SliderFloat("Cloud Scale", &cloudScale, 0.1f, 25.f, "%.1f");
-            if (ImGui::Button("Regenerate Clouds") || cloudNum != settings.numClouds || cloudScale != settings.cloudScale)
-            {
-                settings.numClouds = cloudNum;
-                settings.cloudScale = cloudScale;
-                settings.updateClouds = true;
-            }
-            ImGui::EndTabItem();
-        }
 
         ImGui::EndTabBar();
     }

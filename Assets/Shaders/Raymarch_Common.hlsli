@@ -1,8 +1,7 @@
 /*----------------------------------------------
 Eli Asimow (eliasimow@gmail.com)
-Avi Serebrenik
 Date : 2025/11
-Description : Common Raymarching Structures for Collision and Noise for Cloud Data Generatin
+Description : Common Raymarching Structures for Collision
 ----------------------------------------------*/
 #ifndef RAYMARCH_COMMON_HLSLI
 #define RAYMARCH_COMMON_HLSLI
@@ -199,15 +198,6 @@ bool PointInsideConvexHull(float3 pointWS, ConvexHull hull)
     }
 
     return true;
-}
-
-float DistToEdge(float3 p)
-{
-    float3 closest_point;
-    closest_point.x = clamp(p.x, VOLUME_MIN_WS.x, VOLUME_MAX_WS.x);
-    closest_point.y = clamp(p.y, VOLUME_MIN_WS.y, VOLUME_MAX_WS.y);
-    closest_point.z = clamp(p.z, VOLUME_MIN_WS.z, VOLUME_MAX_WS.z);
-    return distance(p, closest_point);
 }
 
 //------------------

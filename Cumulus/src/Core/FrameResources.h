@@ -25,15 +25,7 @@ struct FrameResources
     FrameResources();
     
     bool Create(UINT width, UINT height);
-
-    bool UpdateEntities(cbPerEntity& data);
-    bool UpdateLights(cbLights& data);
-    bool UpdateTime(cbTime& data);
-    bool UpdateAABB(cbIntersections& data);
-    bool UpdateAtmosphere(cbAtmosphere& data);
-    bool UpdateCloudData(cbCloudGenData& data);
-    bool UpdateHulls(cbHulls& data);
-    bool UpdateHullFaces(cbHullFaces& data);
+    void Update(float totalTime, float deltaTime, Muon::SceneSettings& settings, Muon::Camera& camera);
 
     void Destroy();
 
@@ -45,12 +37,13 @@ struct FrameResources
     UploadBuffer mAABBBuffer;
     UploadBuffer mAtmosphereBuffer;
     UploadBuffer mCloudGenBuffer;
-    UploadBuffer mHullBuffer;
-    UploadBuffer mHullFaceBuffer;
+    Muon::UploadBuffer mHullBuffer;
+    Muon::UploadBuffer mHullFaceBuffer;
+
+    // Entity Data
+    std::unordered_map<int32_t, EntityData> entityCbData;
 
     UINT64 mFence = 0;
-
-    bool mNeedsCloudUpdate = false;
 };
 
 }

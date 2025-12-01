@@ -73,10 +73,6 @@ private:
     std::array<Muon::FrameResources, NUM_FRAMES_IN_FLIGHT> mFrameResources;
     size_t mCurrFrameResourceIdx = 0;
 
-    std::unordered_map<int32_t, Muon::EntityData> mEntityCBData;
-
-    Muon::cbCloudGenData mCloudData;
-
     // Timer for the main game loop
     Muon::StepTimer mTimer;
 };

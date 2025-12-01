@@ -92,7 +92,7 @@ float SDF_Cloud(float3 query, int numSeed, float3 origin, float scale)
     }
     return d;
 }
-
+#define TEST 1
 [numthreads(16, 16, 2)]
 void main(int3 dispatchThreadID : SV_DispatchThreadID)
 {
@@ -113,38 +113,56 @@ void main(int3 dispatchThreadID : SV_DispatchThreadID)
     // SDF is getting clouds around the given seeds
     float d = 999999999.f;
 
-    float scale = 0;
-    for (uint i = 0; i < numSeeds; ++i)
-    {
-        float4 curr = seeds[i];
-        scale += curr.a;
-        d = smooth_min(d, SDF_Cloud(worldPos, i % 4 + 3, curr.xyz, curr.a), 0.8);
-    }
-    scale /= numSeeds;  // scale is an average of all scales
-    // We then encode SDF into the range [0, 1] from [-256, 4096], as this is what Nubis expects
+#if TEST
+    float3 center = (VOLUME_MIN_WS + VOLUME_MAX_WS) * 0.5;
+    float scale = 125.f;
+    d = smooth_min(d, SDF_Cloud(worldPos, 5, center, scale), 0.8);  // this is our actual SDF result
     const float sdfMin = -256.0;
     const float sdfMax = 4096.0;
-    // We offset d by scale so we can add a bit more  detail around the harsh sdf edges
+    // we offset d by scale and a bit, so we can add more detail around the actual sdf value
     float encodedSdf = ((d - scale) - sdfMin) / (sdfMax - sdfMin);
     encodedSdf = saturate(encodedSdf);
-    gOutput[coord].r = encodedSdf; // r is sdf output
+    gOutput[coord].r = encodedSdf;
     
-    // g is the cloud's detail - aka its actual form and outline
-    // to get it, we calculate billowy noise with 12 iterations of fbm
-    // it also slowly fades out based on distance from d by scale
+    // normalize scale distance
     float norm_scale = d / scale;
-    // fade out as we get closer to the edge
-    //float norm_edge_dist = DistToEdge(worldPos) / scale;
-    float billow = d > scale ? 0.0 : fbm_3D_BillowNoise(worldPos * 0.009 * (scale / 250.f), float3(6.0, 6.0, 6.0), 12);
-    gOutput[coord].g = billow < norm_scale ? 0.0 : billow * (1.0 - norm_scale);
-    // b is detail type, which is a bit larger billows that get attenuated by height, as higher parts are more whispy
-    float normalized_height = (worldPos.y - VOLUME_MIN_WS.y) / (VOLUME_MAX_WS.y - VOLUME_MIN_WS.y) + 0.3;
-    gOutput[coord].b = d > scale * 1.5 ? 0.0 : fbm_3D_BillowNoise(worldPos * 0.007 * (scale / 250.f), float3(6.0, 6.0, 6.0), 3) * normalized_height;
+    float billow = fbm_3D_BillowNoise(worldPos * 0.009, float3(6.0, 6.0, 6.0), 12);
+    gOutput[coord].g = d > scale ? 0.0 : billow < norm_scale ? 0.0 : billow * (1.0 - norm_scale);
+    // way too noisy
+    //gOutput[coord].b = d <= -0.1 ? 0.0 : clamp(cnoise(worldPos * 0.01), 0.2, 1.0);
+    float normalized_height = (worldPos.y - VOLUME_MIN_WS.y) / (VOLUME_MAX_WS.y - VOLUME_MIN_WS.y) + 0.1;
+    float3 g = float3(0.0, 0.0, 0.0);
+    //gOutput[coord].b = d > scale + 10 ? 0.0 : lerp(0.0, psrdnoise(worldPos * 0.01, float3(6.0, 6.0, 6.0), 1.0, g), (d + scale) * 0.01 + normalized_height);
+    //gOutput[coord].b = lerp(0.0, smoothstep(0.0, 0.9, fbm_3D_BillowNoise(worldPos * 0.007, float3(6.0, 6.0, 6.0), 2)), (1.0 - (scale * 0.1 - abs(d)) / (scale * 0.1f)) * normalized_height);
+    gOutput[coord].b = fbm_3D_BillowNoise(worldPos * 0.007, float3(6.0, 6.0, 6.0), 2) * normalized_height;
+    
+#else
+    for (uint i = 0; i < numSeeds; ++i)
+    {
+        d = smooth_min(d, SDF_Cloud(worldPos, i % 4 + 2, seeds[i].xyz, 50.f), 0.8);
+    }
+    // density scale is just a worley noise for now
+    // might need to edit the noise for this to be right
+    gOutput[coord].g = clamp(-d, 0.0, 1.0) * WorleyNoise3D(worldPos, 64);
+    // density itself needs to start a bit inside the sdf to look good
+    gOutput[coord].a = d < -5.0 ? hash3(worldPos) : 0.0f;
+    const float sdfMin = -256.0;
+    const float sdfMax = 4096.0;
+    float encodedSdf = (d - sdfMin) / (sdfMax - sdfMin);
+    encodedSdf = clamp(encodedSdf, 0.0, 1.0);
+    gOutput[coord].r = encodedSdf;
+    // detail type for now fully depends on sdf
+    // curently its a quadratic fall off to be more billowy the deeper we are
+    // is 0 if we're too far away from the cloud
+    float norm_height = (worldPos.z - VOLUME_MIN_WS.z) / (VOLUME_MAX_WS.z - VOLUME_MIN_WS.z);
+    gOutput[coord].b = (random(gOutput[coord].a) + 0.1) * norm_height;
+    //gOutput[coord].b = 1.0;
+#endif
     
     //---------------------------
     // COLLISION CODE
     //---------------------------
-    // collision gets put into the density scale part for now, which gets calculated in raymarch for now
+
     bool collision = false;
     for (uint i = 0; i < hullCount; ++i)
     {
