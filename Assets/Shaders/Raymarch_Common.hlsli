@@ -17,7 +17,7 @@ static const float EPSILON = 0.001; // Small epsilon for safety
 static const float MIN_TRANSMITTANCE = 0.01; // Early-out when mostly opaque
 
 // Lighting Settings 
-static const float3 DIR_SUN = normalize(float3(0.5, 1.0, 0.5)); // Temporary hardcoded light dir
+static const float3 DIR_SUN = normalize(float3(0.0, 1.0, 0.0)); // Temporary hardcoded light dir
 static const float3 LIGHT_SUN = float3(90.25, 90.22, 100.0);; // sun color/brightness
 
 // Volume bounds in world space
