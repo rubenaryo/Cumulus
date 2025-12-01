@@ -1105,7 +1105,7 @@ void TextureFactory::CreateProceduralNVDFTexture(ID3D12Device* pDevice, ID3D12Gr
 
 void TextureFactory::CreateRaymarchCacheTexture(ID3D12Device* pDevice, ID3D12GraphicsCommandList* pCommandList, ResourceCodex& codex)
 {
-    const wchar_t* VOL_CACHE_NAME = L"RaymarchVolumeCache";
+    const wchar_t* VOL_CACHE_NAME = L"LightingCache";
     Texture& tex = codex.InsertTexture(GetResourceID(VOL_CACHE_NAME));
 
     UINT PROC_NVDF_WIDTH = 256;

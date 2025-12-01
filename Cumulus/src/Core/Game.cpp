@@ -396,7 +396,7 @@ void Game::UpdateRaymarchCache()
     pCommandList->SetDescriptorHeaps(1, GetSRVHeap()->GetHeapAddr());
 
     ResourceCodex& codex = ResourceCodex::GetSingleton();
-    Texture* pRaymarchCache = codex.GetTexture(GetResourceID(L"RaymarchVolumeCache"));
+    Texture* pLightingCache = codex.GetTexture(GetResourceID(L"LightingCache"));
     Texture* pSdf = codex.GetTexture(GetResourceID(L"StormbirdCloudSDF_3D")); // TODO: Ensure same resource IDs are used in main raymarch pass. These MUST match.
     Texture* pNVDF = codex.GetTexture(GetResourceID(L"StormbirdCloud_NVDF"));
     Texture* pNoise = codex.GetTexture(GetResourceID(L"Noise_3D"));
@@ -422,21 +422,21 @@ void Game::UpdateRaymarchCache()
     int32_t cacheIdx = mRaymarchCachePass.GetResourceRootIndex("gCache");
     if (cacheIdx != ROOTIDX_INVALID)
     {
-        pCommandList->SetComputeRootDescriptorTable(cacheIdx, pRaymarchCache->GetUAVHandleGPU());
+        pCommandList->SetComputeRootDescriptorTable(cacheIdx, pLightingCache->GetUAVHandleGPU());
     }
     
     // Prepare volume cache for writing
-    pCommandList->ResourceBarrier(1, &CD3DX12_RESOURCE_BARRIER::Transition(pRaymarchCache->GetResource(),
+    pCommandList->ResourceBarrier(1, &CD3DX12_RESOURCE_BARRIER::Transition(pLightingCache->GetResource(),
         D3D12_RESOURCE_STATE_GENERIC_READ, D3D12_RESOURCE_STATE_UNORDERED_ACCESS));
     
     // TODO: Figure out workgroup size
-    UINT numGroupsX = (UINT)ceilf(pRaymarchCache->GetWidth() / 8.0f);
-    UINT numGroupsY = (UINT)ceilf(pRaymarchCache->GetHeight() / 8.0f);
-    UINT numGroupsZ = (UINT)ceilf(pRaymarchCache->GetDepth() / 4.0f);
+    UINT numGroupsX = (UINT)ceilf(pLightingCache->GetWidth() / 8.0f);
+    UINT numGroupsY = (UINT)ceilf(pLightingCache->GetHeight() / 8.0f);
+    UINT numGroupsZ = (UINT)ceilf(pLightingCache->GetDepth() / 4.0f);
     pCommandList->Dispatch(numGroupsX, numGroupsY, numGroupsZ);
     
     // Done writing, prepare for reading
-    pCommandList->ResourceBarrier(1, &CD3DX12_RESOURCE_BARRIER::Transition(pRaymarchCache->GetResource(),
+    pCommandList->ResourceBarrier(1, &CD3DX12_RESOURCE_BARRIER::Transition(pLightingCache->GetResource(),
         D3D12_RESOURCE_STATE_UNORDERED_ACCESS, D3D12_RESOURCE_STATE_GENERIC_READ));
         
     CloseCommandList();
@@ -569,6 +569,7 @@ void Game::Render()
         Texture* pSdf = codex.GetTexture(GetResourceID(L"StormbirdCloudSDF_3D"));
         Texture* pNVDF = codex.GetTexture(GetResourceID(L"StormbirdCloud_NVDF"));
         Texture* pNoise = codex.GetTexture(GetResourceID(L"Noise_3D"));
+        Texture* pLightingCache = codex.GetTexture(GetResourceID(L"LightingCache"));
 
         pCommandList->ResourceBarrier(1, &CD3DX12_RESOURCE_BARRIER::Transition(pOffscreenTarget->GetResource(),
             D3D12_RESOURCE_STATE_RENDER_TARGET, D3D12_RESOURCE_STATE_GENERIC_READ));
@@ -640,11 +641,17 @@ void Game::Render()
             pCommandList->SetComputeRootDescriptorTable(collisionIndex, collisionTexture->GetSRVHandleGPU());
         }
 
+        int32_t lightingCacheIndex = mRaymarchPass.GetResourceRootIndex("lightCacheTex");
+        if (lightingCacheIndex != ROOTIDX_INVALID)
+        {
+            pCommandList->SetComputeRootDescriptorTable(lightingCacheIndex, pLightingCache->GetSRVHandleGPU());
+        }
+
         pCommandList->ResourceBarrier(1, &CD3DX12_RESOURCE_BARRIER::Transition(pComputeOutput->GetResource(),
             D3D12_RESOURCE_STATE_GENERIC_READ, D3D12_RESOURCE_STATE_UNORDERED_ACCESS));
 
-        UINT numGroupsX = (UINT)ceilf(pOffscreenTarget->GetWidth() / 16.0f);
-        UINT numGroupsY = (UINT)ceilf(pOffscreenTarget->GetHeight() / 16.0f);
+        UINT numGroupsX = (UINT)ceilf(pOffscreenTarget->GetWidth() / 8.0f);
+        UINT numGroupsY = (UINT)ceilf(pOffscreenTarget->GetHeight() / 8.0f);
         pCommandList->Dispatch(numGroupsX, numGroupsY, 1);
 
         pCommandList->ResourceBarrier(1, &CD3DX12_RESOURCE_BARRIER::Transition(pComputeOutput->GetResource(),

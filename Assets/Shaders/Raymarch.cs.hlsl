@@ -22,8 +22,9 @@ Texture2D gInput : register(t0);
 Texture3D sdfTex : register(t1); // Cached sdf for accelerating sdf 
 Texture3D nvdfTex : register(t2); // Model textures combined [sdf.r, model.r, model.g, model.b] 
 Texture3D noiseTex : register(t3); // Low frequency, high frequency noises for wispy and billowy clouds 
-Texture2D depthStencilBuffer : register(t4); // The scene's depth-stencil buffer, bound here post-graphics passes
-Texture3D proceduralNvdfTex : register(t5); // Sdf and model textures combined [sdf.r, model.r, model.g, model.b] 
+Texture3D lightCacheTex : register(t4); // Optical depth from the centers of voxel 
+Texture2D depthStencilBuffer : register(t5); // The scene's depth-stencil buffer, bound hsere post-graphics passes
+Texture3D proceduralNvdfTex : register(t6); // Sdf and model textures combined [sdf.r, model.r, model.g, model.b] 
 
 SamplerState linearWrap : register(s2);
 SamplerState linearClamp : register(s3); 
@@ -475,7 +476,7 @@ float GetMaxRayDist(float depth, float3 eyePos, int3 dispatchThreadID)
 }
 
  
-[numthreads(32, 32, 1)]
+[numthreads(8, 8, 1)]
 void main(int3 dispatchThreadID : SV_DispatchThreadID)
 {
     int2 pixelCoord = dispatchThreadID.xy;
