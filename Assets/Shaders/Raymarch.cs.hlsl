@@ -274,7 +274,7 @@ float GetOpticalDepthToSun(float3 samplePos, float3 sunDir)
     const float depthThreshold = 5.0; // Appr 99% extinction)
 
     [loop]
-    for (int i = 0; i < MAX_STEPS; ++i)
+    for (int i = 0; i < 16; ++i)
     {
         float3 lightPos = samplePos + sunDir * t;
 
@@ -303,7 +303,7 @@ float GetOpticalDepthToSun(float3 samplePos, float3 sunDir)
                 densityScale
             );
 
-            float sigma = density * 0.05;
+            float sigma = dimensionalProfile * 0.01;
 
             float stepSizeInside = minStepSize; // or a tuned fixed step
             depth += sigma * stepSizeInside;
@@ -346,10 +346,10 @@ float3 ComputeDirectLighting(
 
     // Phase term: how strongly this point scatters sun light toward the camera
     // DIR_SUN points from world towards the sun
-    float3 sunDirToPoint = -DIR_SUN; // direction from point to sun
+    float3 sunDirToPoint = DIR_SUN; // direction from point to sun
     float cosAngle = dot(normalize(sunDirToPoint), normalize(viewDir)); // cos θ between sun and view
     float eccentricity = 0.75; // forward-scattering; tweak for look
-    float phase = saturate(HenyeyGreenstein(cosAngle, 0.75) * 2.0);
+    float phase = saturate(HenyeyGreenstein(cosAngle, 0.75) * 3.0);
 
     // Segment scattering amount
     float segmentScatter = 1.0 - exp(-sigma * stepSize);
