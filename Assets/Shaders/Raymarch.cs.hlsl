@@ -475,7 +475,7 @@ float GetMaxRayDist(float depth, float3 eyePos, int3 dispatchThreadID)
 }
 
  
-[numthreads(16, 16, 1)]
+[numthreads(32, 32, 1)]
 void main(int3 dispatchThreadID : SV_DispatchThreadID)
 {
     int2 pixelCoord = dispatchThreadID.xy;

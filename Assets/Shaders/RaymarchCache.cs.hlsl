@@ -84,54 +84,44 @@ float GetOpticalDepthToSun(float3 samplePos, float3 sunDir)
 #endif
 }
 
-// Simple Henyey–Greenstein phase function
-float HenyeyGreenstein(float cosAngle, float eccentricity)
+float3 UVToWorld(float3 uv)
 {
-    float eccentricity2 = eccentricity * eccentricity;
-    float denom = pow(1.0 + eccentricity2 - 2.0 * eccentricity * cosAngle, 1.5);
-    return (1.0 - eccentricity2) / (4.0 * PI * denom);
+    float3 diff = VOLUME_MAX_WS - VOLUME_MIN_WS; 
+    return float3(
+        uv.x * diff.x + VOLUME_MIN_WS.x,
+        uv.y * diff.y + VOLUME_MIN_WS.y,
+        uv.z * diff.z + VOLUME_MIN_WS.z
+    );
 }
 
-float3 ComputeDirectLighting(
-    RayMarchInfo rayMarchInfo,
-    float3 samplePos,
-    float3 viewDir,
-    float density,
-    float sigma,
-    float stepSize)
+float3 VoxelIndexToCenterUV(uint3 voxelIndex, uint3 texDim)
 {
-    float opticalDepthToSun = GetOpticalDepthToSun(samplePos, DIR_SUN);
-    float T_sun = exp(-opticalDepthToSun); // transmittance from sun to point
+    // Guard against invalid dimensions
+    float3 dim = max(float3(texDim), float3(1.0, 1.0, 1.0));
 
-    // Phase term: how strongly this point scatters sun light toward the camera
-    // DIR_SUN points from world towards the sun
-    float3 sunDirToPoint = DIR_SUN; // direction from point to sun
-    float cosAngle = dot(normalize(sunDirToPoint), normalize(viewDir)); // cos(theta) between sun and view
-    float eccentricity = 0.75; // forward-scattering; tweak for look
-    float phase = saturate(HenyeyGreenstein(cosAngle, 0.75) * 3.0);
-
-    // Segment scattering amount
-    float segmentScatter = 1.0 - exp(-sigma * stepSize);
-
-    // Direct lighting contribution for this step (before camera transmittance)
-    float3 L_step = LIGHT_SUN * T_sun * phase * segmentScatter;
-
-    return L_step;
+    // (i + 0.5) / dim -> center of the voxel in each axis
+    return (float3(voxelIndex) + 0.5f) / dim;
 }
 
-// TODO: Change workgroup size
-[numthreads(1, 1, 1)]
-void main(int3 dispatchThreadID : SV_DispatchThreadID)
+[numthreads(16, 16, 4)]
+void main(uint3 dispatchThreadID : SV_DispatchThreadID)
 {
-    float sdf = sdfTex.SampleLevel(linearClamp, dispatchThreadID, 0.0f).r;
-    float dimensionalProfile = nvdfTex.SampleLevel(linearClamp, dispatchThreadID, 0.0f).g;
-    NoiseSample noiseSample = MakeNoiseSample(noiseTex.SampleLevel(
-        linearWrap,
-        dispatchThreadID,
-        0.0f
-    ));
-    
-    // Debug: Fill with random stuff to test binding
-    gCache[dispatchThreadID] = float4(sdf, dimensionalProfile, noiseSample.highFreqBillow, 1.0);
+    uint width, height, depth;
+    gCache.GetDimensions(width, height, depth);
 
+    if (dispatchThreadID.x >= width ||
+        dispatchThreadID.y >= height ||
+        dispatchThreadID.z >= depth)
+    {
+        return;
+    }
+
+    uint3 texDim = uint3(width, height, depth);
+
+    // Convert dispatch index -> UV at voxel center
+    float3 sampleUV = VoxelIndexToCenterUV(dispatchThreadID, texDim);
+    float3 sampleWS = UVToWorld(sampleUV);
+
+    float tau = GetOpticalDepthToSun(sampleWS, DIR_SUN);
+    gCache[dispatchThreadID] = float4(tau, 0.0f, 0.0f, 0.0f);
 }
