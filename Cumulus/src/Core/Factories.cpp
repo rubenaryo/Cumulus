@@ -200,7 +200,16 @@ bool MeshFactory::BuildTerrainMesh(UploadBuffer& stagingBuffer,
     const uint32_t indexCount = quadCountX * quadCountZ * 6; // 2 triangles per quad, 3 indices per triangle
 
     // Calculate vertex size (Position + Normal + TexCoord)
-    const uint32_t vertexSize = sizeof(float) * 3 + sizeof(float) * 3 + sizeof(float) * 2;
+    const uint32_t vertexSize =
+        sizeof(float) * 3  // Position
+        + sizeof(float) * 3  // Normal
+        + sizeof(float) * 2  // TexCoord
+        + sizeof(float) * 3  // Tangent 
+        + sizeof(float) * 3 // Bitangent
+        //+ sizeof(float) * 4;
+        ;
+
+
     const uint32_t totalVBOSize = vertexCount * vertexSize;
 
     std::vector<uint8_t> vertexData;
@@ -260,6 +269,10 @@ bool MeshFactory::BuildTerrainMesh(UploadBuffer& stagingBuffer,
             float u = (float)x / (resolutionX - 1);
             float v = (float)z / (resolutionZ - 1);
             WriteFloat2(writeHead, u, v);
+            
+            WriteFloat3(writeHead, 1.0f, 0.0f, 0.0f);
+
+            WriteFloat3(writeHead, 0.0f, 0.0f, 1.0f);
         }
     }
 
@@ -274,13 +287,14 @@ bool MeshFactory::BuildTerrainMesh(UploadBuffer& stagingBuffer,
             uint32_t bottomRight = bottomLeft + 1;
 
             // First triangle (counter-clockwise winding)
-            indices.push_back(topLeft);
             indices.push_back(bottomLeft);
+            indices.push_back(topLeft);
             indices.push_back(topRight);
 
             // Second triangle (counter-clockwise winding)
-            indices.push_back(topRight);
+
             indices.push_back(bottomLeft);
+            indices.push_back(topRight);
             indices.push_back(bottomRight);
         }
     }
@@ -365,7 +379,7 @@ void MeshFactory::LoadAllMeshes(ResourceCodex& codex)
         Muon::ResetCommandList(nullptr);
 
         Mesh temp;
-        if (!MeshFactory::BuildTerrainMesh(codex.GetMeshStagingBuffer(), 128, 128, 5000.0f, 5000.0f, temp))
+        if (!MeshFactory::BuildTerrainMesh(codex.GetMeshStagingBuffer(), 12, 12, 5000.0f, 5000.0f, temp))
         {
             Muon::CloseCommandList();
             return;
