@@ -675,6 +675,9 @@ void Game::OnResize(int newWidth, int newHeight)
 
 void Game::OnMouseMove(short newX, short newY)
 {
+    if (ImGui::GetIO().WantCaptureMouse)
+        return;
+
     mInput.OnMouseMove(newX, newY);
 }
 #pragma endregion
