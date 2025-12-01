@@ -1,6 +1,7 @@
 #include "VS_Common.hlsli"
 #include "Raymarch_Common.hlsli"
 
+// === Raymarch / Quality ===
 #define GPU_CLOUD 1
 #define USE_ADAPTIVE_STEP        1   // Adaptive step size along ray
 #define USE_JITTERED_STEP        1   // Stochastic jitter per step
@@ -21,8 +22,8 @@ Texture2D gInput : register(t0);
 Texture3D sdfTex : register(t1); // Cached sdf for accelerating sdf 
 Texture3D nvdfTex : register(t2); // Model textures combined [sdf.r, model.r, model.g, model.b] 
 Texture3D noiseTex : register(t3); // Low frequency, high frequency noises for wispy and billowy clouds 
-Texture2D depthStencilBuffer : register(t3); // The scene's depth-stencil buffer, bound here post-graphics passes
-Texture3D proceduralNvdfTex : register(t4); // Sdf and model textures combined [sdf.r, model.r, model.g, model.b] 
+Texture2D depthStencilBuffer : register(t4); // The scene's depth-stencil buffer, bound here post-graphics passes
+Texture3D proceduralNvdfTex : register(t5); // Sdf and model textures combined [sdf.r, model.r, model.g, model.b] 
 
 SamplerState linearWrap : register(s2);
 SamplerState linearClamp : register(s3); 
@@ -375,7 +376,7 @@ float3 ComputeMultipleScattering(
 }
 
 
-float3 VolumeRaymarchNvdf(float3 eyePos, float3 dir, float3 bgColor, float depth, int3 dispatchThreadID)
+float3 VolumeRaymarchNvdf(float3 eyePos, float3 dir, float3 bgColor, float maxRayDist, int3 dispatchThreadID)
 {
     float tEnter, tExit;
     if (!RayBoxIntersect(eyePos, dir, VOLUME_MIN_WS, VOLUME_MAX_WS, tEnter, tExit))
@@ -401,7 +402,7 @@ float3 VolumeRaymarchNvdf(float3 eyePos, float3 dir, float3 bgColor, float depth
 
     // Clamp to your global near/far
     tEnter = max(tEnter, MIN_DIST);
-    tExit = min(tExit, MAX_DIST);
+    tExit = min(min(tExit, MAX_DIST), maxRayDist);
 
     if (tExit <= tEnter)
         return bgColor;
@@ -567,7 +568,34 @@ float3 VolumeRaymarchNvdf(float3 eyePos, float3 dir, float3 bgColor, float depth
 #endif
 }
 
+float GetMaxRayDist(float depth, float3 eyePos, int3 dispatchThreadID)
+{ 
+    uint width, height;
+    gOutput.GetDimensions(width, height);
+    
+    int2 pixelCoord = dispatchThreadID.xy;
+    
+    // NDC coordinates (already computed)
+    float2 uv = (float2(pixelCoord) + 0.5) / float2(width, height);
+    uv = uv * 2.0 - 1.0;
+    uv.y = -uv.y;
 
+    // Reconstruct clip-space position
+    float4 clipPos = float4(uv.x, uv.y, depth * 2.0f - 1.0f, 1.0f);
+
+    // To view space
+    float4 viewPos = mul(invProj, clipPos);
+    viewPos.xyz /= viewPos.w;
+
+    // To world space
+    float3 worldPosAtDepth = mul(invView, float4(viewPos.xyz, 1.0f)).xyz;
+
+    // Distance from eye along the view ray
+    float maxRayDist = length(worldPosAtDepth - eyePos);
+    return maxRayDist;
+}
+
+ 
 [numthreads(16, 16, 1)]
 void main(int3 dispatchThreadID : SV_DispatchThreadID)
 {
@@ -594,8 +622,9 @@ void main(int3 dispatchThreadID : SV_DispatchThreadID)
     
     float3 bgColor = gInput[pixelCoord].rgb;
     float depth = depthStencilBuffer[dispatchThreadID.xy].r;
+    float maxRayDist = GetMaxRayDist(depth, eyePos, dispatchThreadID);
 
-    float3 finalColor = VolumeRaymarchNvdf(eyePos, worldDir, bgColor, depth, dispatchThreadID);
+    float3 finalColor = VolumeRaymarchNvdf(eyePos, worldDir, bgColor, maxRayDist, dispatchThreadID);
     
     gOutput[dispatchThreadID.xy] = float4(finalColor, 1.0);
 }
