@@ -1103,6 +1103,43 @@ void TextureFactory::CreateProceduralNVDFTexture(ID3D12Device* pDevice, ID3D12Gr
     }
 }
 
+void TextureFactory::CreateRaymarchCacheTexture(ID3D12Device* pDevice, ID3D12GraphicsCommandList* pCommandList, ResourceCodex& codex)
+{
+    const wchar_t* VOL_CACHE_NAME = L"RaymarchVolumeCache";
+    Texture& tex = codex.InsertTexture(GetResourceID(VOL_CACHE_NAME));
+
+    UINT PROC_NVDF_WIDTH = 256;
+    UINT PROC_NVDF_HEIGHT = 256;
+    UINT PROC_NVDF_DEPTH = 32;
+
+    // Create a blank 3d texture in the common state.
+    bool success = tex.Create(VOL_CACHE_NAME, pDevice, PROC_NVDF_WIDTH, PROC_NVDF_HEIGHT, PROC_NVDF_DEPTH,
+        DXGI_FORMAT_R32G32B32A32_FLOAT,
+        D3D12_RESOURCE_FLAG_ALLOW_UNORDERED_ACCESS,
+        D3D12_RESOURCE_STATE_GENERIC_READ);
+
+    if (!success)
+    {
+        Muon::Printf(L"Error: Failed to create 3D Texture for Raymarch cache: %s\n", VOL_CACHE_NAME);
+        return;
+    }
+
+    Muon::DescriptorHeap* pSRVHeap = Muon::GetSRVHeap();
+    success &= tex.InitSRV(pDevice, pSRVHeap);
+    if (!success)
+    {
+        Muon::Printf(L"Error: Failed to init srv for Raymarch cache: %s\n", VOL_CACHE_NAME);
+        return;
+    }
+
+    success &= tex.InitUAV(pDevice, pSRVHeap);
+    if (!success)
+    {
+        Muon::Printf(L"Error: Failed to init uav for Raymarch cache: %s\n", VOL_CACHE_NAME);
+        return;
+    }
+}
+
 bool MaterialFactory::CreateAllMaterials(ResourceCodex& codex)
 {
     const ResourceID kPhongDiffuseId = GetResourceID(L"Bark_T.png");

@@ -522,6 +522,7 @@ Game::~Game()
     mAtmospherePass.Destroy();
     mSobelPass.Destroy();
     mRaymarchPass.Destroy();
+    mRaymarchCachePass.Destroy();
     mProcNVDFPass.Destroy();
     mPostProcessPass.Destroy();
 
