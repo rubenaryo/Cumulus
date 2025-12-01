@@ -15,6 +15,8 @@ Description : Implementation of Game.h
 #include <Core/ResourceCodex.h>
 #include <Core/Shader.h>
 #include <Core/Texture.h>
+#include <Utils/AtmosphereUtils.h>
+#include <Utils/CloudGenerationUtils.h>
 #include <Utils/Utils.h>
 
 #include <imgui.h>
@@ -120,9 +122,58 @@ bool Game::Init(HWND window, int width, int height)
 
 bool Game::InitFrameResources(UINT width, UINT height)
 {
+    using namespace Muon;
+
+    ResourceCodex& codex = ResourceCodex::GetSingleton();
+    
+    // Create static data to give to all frame resources
+
+    // Updating Atmosphere
+    cbAtmosphere atmosphereParams;
+    InitializeAtmosphereConstants(atmosphereParams, width, height);
+
+    // Updating Clouds
+    GenerateCloudGenConstants(mCloudData, settings.numClouds, settings.cloudScale);
+    
+    // Updating AABBs
+    const Mesh* m = codex.GetMesh(GetResourceID(L"teapot.obj"));
+    cbIntersections intersections = {};
+    intersections.aabbCount = 1;
+    intersections.aabbs[0] = m->GetAABB();
+
+    // Updating Hull Faces
+    //todo: concat all hulls
+    Hull h = m->GetHull();
+    cbHullFaces faces = {};
+    for (size_t i = 0; i < h.faces.size(); i++)
+    {
+        faces.faces[i] = DirectX::XMFLOAT4(
+            h.faces[i].normal.x,
+            h.faces[i].normal.y,
+            h.faces[i].normal.z,
+            h.faces[i].distance
+        );
+    }
+
+    // Initialize teapot's hull
+    cbConvexHull cHull = {};
+    cHull.faceCount = (uint32_t)h.faces.size();
+    cHull.faceOffset = 0;
+
+    mEntityCBData[0].hull = cHull;
+    mEntityCBData[0].entityMatrices.world = DirectX::XMFLOAT4X4(); // These get updated every frame anyway
+    mEntityCBData[0].entityMatrices.invWorld = DirectX::XMFLOAT4X4();
+
+    // Create each frame resource and fill it with static data.
     for (size_t i = 0; i != NUM_FRAMES_IN_FLIGHT; ++i)
     {
-        mFrameResources.at(i).Create(width, height);
+        FrameResources& frameResource = mFrameResources.at(i);
+        frameResource.Create(width, height);
+        
+        frameResource.UpdateAtmosphere(atmosphereParams);
+        frameResource.UpdateCloudData(mCloudData);
+        frameResource.UpdateAABB(intersections);
+        frameResource.UpdateHullFaces(faces);
     }
 
     return true;
@@ -138,10 +189,7 @@ void Game::Frame()
         Update(mTimer);
     });
 
-    if (mTimer.GetTotalTicks() % 2 == 0)
-    {
-        UpdateProceduralNVDF();
-    }
+    UpdateProceduralNVDF();
 
     Render();
     AdvanceFence();
@@ -178,8 +226,71 @@ void Game::Update(Muon::StepTimer const& timer)
     mInput.Frame(elapsedTime, &mCamera);
     mCamera.UpdateView();    
 
+    // The UI has flagged for a cloud update
+    if (settings.updateClouds)
+    {
+        // Mark the update on each frame resource. They will consume it when they next run. 
+        for (size_t i = 0; i != NUM_FRAMES_IN_FLIGHT; ++i)
+        {
+            Muon::FrameResources& frameResource = mFrameResources.at(i);
+            frameResource.mNeedsCloudUpdate = true;
+        }
+        
+        Muon::GenerateCloudGenConstants(mCloudData, settings.numClouds, settings.cloudScale);
+        settings.updateClouds = false;
+    }
+
     Muon::FrameResources& currFrameResources = mFrameResources.at(mCurrFrameResourceIdx);
-    currFrameResources.Update(totalTime, elapsedTime, settings, mCamera);
+    
+    // Updating Lights
+    Muon::cbLights lights;
+    lights.ambientColor = DirectX::XMFLOAT3A(+1.0f, +0.772f, +0.56f);
+    lights.directionalLight.diffuseColor = DirectX::XMFLOAT3A(1.0, 1.0, 1.0);
+    lights.directionalLight.dir = DirectX::XMFLOAT3A(0, 1, 0);
+    currFrameResources.UpdateLights(lights);
+
+    // Updating Time
+    Muon::cbTime time;
+    time.totalTime = totalTime;
+    time.deltaTime = elapsedTime;
+    currFrameResources.UpdateTime(time);
+
+    // Updating Atmosphere
+    Muon::cbAtmosphere atmosphere;
+    Muon::UpdateAtmosphere(atmosphere, mCamera, settings.isSunDynamic, settings.timeOfDay, time.totalTime);
+    settings.sunDir = atmosphere.sun_direction;
+    currFrameResources.UpdateAtmosphere(atmosphere);
+
+    // Updating Cloud Data
+    if (currFrameResources.mNeedsCloudUpdate)
+    {
+        currFrameResources.UpdateCloudData(mCloudData);
+        currFrameResources.mNeedsCloudUpdate = false;
+    }
+
+    // Updating Entities
+    const float PI = 3.14159f;
+    DirectX::XMMATRIX debugEntityWorld = DirectX::XMMatrixIdentity();
+    debugEntityWorld = XMMatrixMultiply(debugEntityWorld, DirectX::XMMatrixRotationRollPitchYaw(0, 0, PI / 2.0f));
+    debugEntityWorld = XMMatrixMultiply(debugEntityWorld, DirectX::XMMatrixRotationRollPitchYaw(-PI / 2.0f, 0, 0));
+    debugEntityWorld = XMMatrixMultiply(debugEntityWorld, DirectX::XMMatrixScaling(10.f, 10.f, 10.f));
+    float yPos = 1000 * (sin(time.totalTime * .5f));
+    debugEntityWorld = XMMatrixMultiply(debugEntityWorld, DirectX::XMMatrixTranslation(0, yPos, 0));
+
+    Muon::cbPerEntity& entity = mEntityCBData[0].entityMatrices;
+    XMStoreFloat4x4(&entity.world, debugEntityWorld);
+    XMStoreFloat4x4(&entity.invWorld, DirectX::XMMatrixInverse(nullptr, debugEntityWorld));
+    currFrameResources.UpdateEntities(entity);
+
+    // Updating Hulls
+    Muon::cbConvexHull cHull = mEntityCBData[0].hull;
+    cHull.world = entity.world;
+    cHull.invWorld = entity.invWorld;
+
+    Muon::cbHulls hulls = {};
+    hulls.hulls[0] = cHull;
+    hulls.hullCount = 1;
+    currFrameResources.UpdateHulls(hulls);
 }
 
 void Game::UpdateProceduralNVDF()
