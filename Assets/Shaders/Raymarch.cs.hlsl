@@ -349,7 +349,7 @@ float3 ComputeDirectLighting(
     float3 sunDirToPoint = -DIR_SUN; // direction from point to sun
     float cosAngle = dot(normalize(sunDirToPoint), normalize(viewDir)); // cos θ between sun and view
     float eccentricity = 0.75; // forward-scattering; tweak for look
-    float phase = HenyeyGreenstein(cosAngle, eccentricity);
+    float phase = saturate(HenyeyGreenstein(cosAngle, 0.75) * 2.0);
 
     // Segment scattering amount
     float segmentScatter = 1.0 - exp(-sigma * stepSize);
@@ -375,7 +375,7 @@ float3 ComputeMultipleScattering(
 }
 
 
-float3 VolumeRaymarchNvdf(float3 eyePos, float3 dir, float3 bgColor, int3 dispatchThreadID)
+float3 VolumeRaymarchNvdf(float3 eyePos, float3 dir, float3 bgColor, float depth, int3 dispatchThreadID)
 {
     float tEnter, tExit;
     if (!RayBoxIntersect(eyePos, dir, VOLUME_MIN_WS, VOLUME_MAX_WS, tEnter, tExit))
@@ -594,11 +594,10 @@ void main(int3 dispatchThreadID : SV_DispatchThreadID)
     float3 eyePos = float3(invView[0][3], invView[1][3], invView[2][3]); // from the 4th column instead of row..
     
     float3 bgColor = gInput[pixelCoord].rgb;
-
-    // Volume composite against NVDF dimensional profile (green channel)
-    float3 finalColor = VolumeRaymarchNvdf(eyePos, worldDir, bgColor, dispatchThreadID);
-
     float depth = depthStencilBuffer[dispatchThreadID.xy].r;
+    
+    // Volume composite against NVDF dimensional profile (green channel)
+    float3 finalColor = VolumeRaymarchNvdf(eyePos, worldDir, bgColor, depth, dispatchThreadID);
     
     // Example: Visulize depth
     // finalColor = depth.rrr;
