@@ -20,6 +20,7 @@ static const float MIN_TRANSMITTANCE = 0.01; // Early-out when mostly opaque
 // Lighting Settings 
 static const float3 DIR_SUN = normalize(float3(0.0, 1.0, 0.0)); // Temporary hardcoded light dir
 static const float3 LIGHT_SUN = float3(220, 240, 250);; // sun color/brightness
+static const float DIRECT_LIGHTING_SCALE = 0.975;
 
 // Volume bounds in world space
 static const float SIDE_LENGTH = 4000.0; 
@@ -33,6 +34,7 @@ static const float AUTHORING_TO_WORLD_SCALE = SIDE_LENGTH / NVDF_DOMAIN_SIDE_LEN
 
 // Density -> extinction scaling
 static const float DENSITY_SCALE = 1; // To be tuned / driven by NVDF
+
 
 struct RayMarchInfo
 {

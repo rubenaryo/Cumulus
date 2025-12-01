@@ -129,7 +129,7 @@ float GetFractionFromValue(float x, float minVal, float maxVal)
 
 // Compute optical depth from samplePos toward sunDir
 // Returns tau; transmittance is exp(-tau)
-float GetOpticalDepthToSun(float3 samplePos, float3 sunDir)
+float GetApproxOpticalDepthToSun(float3 samplePos, float3 sunDir)
 {
 #if GPU_CLOUD
     // TODO: Implement optical depth calculation to the sun using procedural NVDF 
@@ -149,8 +149,9 @@ float GetOpticalDepthToSun(float3 samplePos, float3 sunDir)
     const float minStepSize = AUTHORING_TO_WORLD_SCALE; // ~1 NVDF voxel
     const float depthThreshold = 5.0; // Appr 99% extinction)
 
+    // Ray march for the first two steps 
     [loop]
-    for (int i = 0; i < 16; ++i)
+    for (int i = 0; i < 128; ++i)
     {
         float3 lightPos = samplePos + sunDir * t;
 
@@ -181,7 +182,7 @@ float GetOpticalDepthToSun(float3 samplePos, float3 sunDir)
                 linearWrap
             );
 
-            float sigma = dimensionalProfile * 0.01;
+            float sigma = dimensionalProfile * (1 - DIRECT_LIGHTING_SCALE);
 
             float stepSizeInside = minStepSize; // or a tuned fixed step
             depth += sigma * stepSizeInside;
@@ -198,7 +199,10 @@ float GetOpticalDepthToSun(float3 samplePos, float3 sunDir)
             t += stepSize;
         }
     }
-
+    
+    // Use cached values to approximate remaining light ray march
+    
+    
     return depth;
 #endif
 }
@@ -220,7 +224,7 @@ float3 ComputeDirectLighting(
     float sigma,
     float stepSize)
 {
-    float opticalDepthToSun = GetOpticalDepthToSun(samplePos, DIR_SUN);
+    float opticalDepthToSun = GetApproxOpticalDepthToSun(samplePos, DIR_SUN);
     float T_sun = exp(-opticalDepthToSun); // transmittance from sun to point
 
     // Phase term: how strongly this point scatters sun light toward the camera

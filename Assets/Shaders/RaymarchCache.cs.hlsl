@@ -62,7 +62,7 @@ float GetOpticalDepthToSun(float3 samplePos, float3 sunDir)
                 linearWrap
             );
 
-            float sigma = dimensionalProfile * 0.01;
+            float sigma = dimensionalProfile * (1 - DIRECT_LIGHTING_SCALE);
 
             float stepSizeInside = minStepSize; // or a tuned fixed step
             depth += sigma * stepSizeInside;
