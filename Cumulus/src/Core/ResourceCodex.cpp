@@ -60,6 +60,7 @@ void ResourceCodex::Init()
     TextureFactory::LoadAllNVDF(GetDevice(), GetCommandList(), *gCodexInstance);
     TextureFactory::LoadAll3DTextures(GetDevice(), GetCommandList(), *gCodexInstance);
     TextureFactory::CreateProceduralNVDFTexture(GetDevice(), GetCommandList(), *gCodexInstance);
+    TextureFactory::CreateRaymarchCacheTexture(GetDevice(), GetCommandList(), *gCodexInstance);
     MaterialFactory::CreateAllMaterials(*gCodexInstance);
 
     // After initialization, before real frame loop:

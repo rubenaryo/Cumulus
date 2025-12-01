@@ -33,6 +33,35 @@ static const float AUTHORING_TO_WORLD_SCALE = SIDE_LENGTH / NVDF_DOMAIN_SIDE_LEN
 // Density -> extinction scaling
 static const float DENSITY_SCALE = 1; // To be tuned / driven by NVDF
 
+struct RayMarchInfo
+{
+    // Ray segment within the volume in world units
+    float tEnter; // where we start marching inside the volume
+    float tExit; // where we stop marching inside the volume
+
+    // Current marching state
+    float distance; // current param along the ray (world units)
+    float stepSize; // step size for this iteration
+
+    // Optical state
+    float transmittance; // remaining light (1 = fully transparent, 0 = fully opaque)
+    float3 accumColor; // accumulated in-scattered radiance / cloud color
+
+    // Bookkeeping
+    uint stepIndex; // current step index in the loop (for jitter, etc.)
+};
+
+void InitRayMarchInfo(out RayMarchInfo info, float tEnter, float tExit)
+{
+    info.tEnter = tEnter;
+    info.tExit = tExit;
+    info.distance = tEnter;
+    info.stepSize = 0.0f;
+    info.transmittance = 1.0f;
+    info.accumColor = float3(0.0f, 0.0f, 0.0f);
+    info.stepIndex = 0;
+}
+
 struct NoiseSample
 {
     float lowFreqWispy;
@@ -726,6 +755,106 @@ float fbm_3D_BillowNoise(float3 x, float3 period, int iteration)
     n += a * psrdnoise(f * x + disp, period, f * 2.0, grad);
     
     return n;
+}
+
+bool RayBoxIntersect(
+    float3 origin,
+    float3 dir,
+    float3 boxMin,
+    float3 boxMax,
+    out float tEnter,
+    out float tExit)
+{
+    float3 invDir = 1.0 / dir;
+
+    float3 t0s = (boxMin - origin) * invDir;
+    float3 t1s = (boxMax - origin) * invDir;
+
+    float3 tMin = min(t0s, t1s);
+    float3 tMax = max(t0s, t1s);
+
+    tEnter = max(max(tMin.x, tMin.y), tMin.z);
+    tExit = min(min(tMax.x, tMax.y), tMax.z);
+
+    // Need a positive interval where enter < exit
+    return tExit > max(tEnter, 0.0);
+}
+
+// Encoded value in [0, 1]  ->  real SDF in [-256, 4096]
+float DecodeSdf(float encodedSdf)
+{
+    const float sdfMin = -256.0;
+    const float sdfMax = 4096.0;
+    return lerp(sdfMin, sdfMax, encodedSdf);
+}
+
+// Erode normalized base value by erosionValue (noise), re-normalizing remaining range into [0,1].
+float ValueErosion(float baseValue, float erosionValue)
+{
+    // baseValue: [0,1], erosionValue: [0,1]
+    float denom = max(1e-4, 1.0 - erosionValue);
+    float v = (baseValue - erosionValue) / denom;
+    return saturate(v);
+}
+
+// Compute uprezzed voxel cloud density from dimensional profile, type and density scale.
+float GetUprezzedVoxelCloudDensity(
+    RayMarchInfo rayMarchInfo,
+    float3 samplePositionWS,
+    float dimensionalProfile,
+    float detailType,
+    float densityScale, 
+    Texture3D<float4> noiseTex,
+    SamplerState linearWrap)
+{
+    // Convert world position into NVDF authoring space (so noise sticks to authored asset, not world scale).
+    float3 samplePosNvdf = samplePositionWS / AUTHORING_TO_WORLD_SCALE;
+    
+    // Map NVDF space into noise UVW: one noise tile spans NOISE_DOMAIN_SIDE_LENGTH author units.
+    float nvdfToNoiseScale = 1.0 / NOISE_DOMAIN_SIDE_LENGTH;
+    float3 noiseUVW = samplePosNvdf * nvdfToNoiseScale;
+
+    // 3D noise look-up in authoring-relative space.
+    NoiseSample noiseSample = MakeNoiseSample(noiseTex.SampleLevel(
+        linearWrap,
+        noiseUVW,
+        0.0f // TODO: plug in distance-based mip
+    ));
+    
+    // Define wispy noise
+    float wispy_noise = lerp(noiseSample.lowFreqWispy, noiseSample.highFreqWispy, dimensionalProfile);
+
+    // Define billowy noise
+    float billowy_type_gradient = pow(dimensionalProfile, 0.25);
+    float billowy_noise = lerp(noiseSample.lowFreqBillow * 0.3, noiseSample.highFreqBillow * 0.3, billowy_type_gradient);
+    
+    // Define Noise composite - blend to wispy as the density scale decreases.
+    float noise_composite = lerp(wispy_noise, billowy_noise, detailType);
+
+#if USE_HIGH_HIGH_FREQUENCY
+    //Use HF details for parts near camera
+    float hhf = ComputeHighHighFreqNoise(noiseSample, detailType);
+    noise_composite = ApplyHighHighFreqNoise(noise_composite, hhf, rayMarchInfo.distance);
+#endif
+    
+    // Composite Noises and use as a Value Erosion
+    float uprezzed_density = ValueErosion(dimensionalProfile, noise_composite);
+    
+    // Modify User density scale
+    float powered_density_scale = pow(saturate(densityScale), 4.0);
+    
+    // Apply User Density Scale Data to Result
+    uprezzed_density *= powered_density_scale;
+    
+    // Sharpen result and lower Density close to camera to both add details and reduce undersampling noise
+    uprezzed_density = pow(uprezzed_density, lerp(0.3, 0.6, max(EPSILON, powered_density_scale)));
+    
+#if USE_HIGH_HIGH_FREQUENCY
+    float distance_range_blender = GetFractionFromValue(rayMarchInfo.distance, 50.0, 150.0);
+    uprezzed_density = pow(uprezzed_density, lerp(0.5, 1.0, distance_range_blender)) * lerp(0.666, 1.0, distance_range_blender);
+#endif
+    
+    return uprezzed_density;
 }
 
 #endif

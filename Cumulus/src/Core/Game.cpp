@@ -27,6 +27,7 @@ Game::Game() :
     mOpaquePass(L"OpaquePass"),
     mAtmospherePass(L"AtmospherePass"),
     mSobelPass(L"SobelPass"),
+    mRaymarchCachePass(L"RaymarchCachePass"),
     mRaymarchPass(L"RaymarchPass"),
     mProcNVDFPass(L"ProcNVDFPass"),
     mPostProcessPass(L"PostProcessPass")
@@ -85,6 +86,14 @@ bool Game::Init(HWND window, int width, int height)
             Printf(L"Warning: %s failed to generate!\n", mSobelPass.GetName());
     }
 
+    // Assemble raymarch cache pass
+    {
+        mRaymarchCachePass.SetComputeShader(codex.GetComputeShader(GetResourceID(L"RaymarchCache.cs")));
+
+        if (!mRaymarchCachePass.Generate())
+            Printf(L"Warning: %s failed to generate!\n", mRaymarchCachePass.GetName());
+    }
+
     // Assemble raymarch pass
     {
         mRaymarchPass.SetComputeShader(codex.GetComputeShader(GetResourceID(L"Raymarch.cs")));
@@ -141,6 +150,11 @@ void Game::Frame()
     if (mTimer.GetTotalTicks() % 2 == 0)
     {
         UpdateProceduralNVDF();
+    }
+
+    if (mTimer.GetTotalTicks() % 16 == 0)
+    {
+        UpdateRaymarchCache();
     }
 
     Render();
@@ -242,6 +256,73 @@ void Game::UpdateProceduralNVDF()
     pCommandList->ResourceBarrier(1, &CD3DX12_RESOURCE_BARRIER::Transition(pProcNVDFTex->GetResource(),
         D3D12_RESOURCE_STATE_UNORDERED_ACCESS, D3D12_RESOURCE_STATE_GENERIC_READ));
 
+    CloseCommandList();
+    ExecuteCommandList();
+    FlushCommandQueue(); // TODO: Give this process its own cmd allocator so we don't stall everything here
+}
+
+void Game::UpdateRaymarchCache()
+{
+    using namespace Muon;
+
+    ID3D12GraphicsCommandList* pCommandList = Muon::GetCommandList();
+    if (!pCommandList)
+        return;
+
+    ResetCommandList(nullptr);
+    if (!mRaymarchCachePass.Bind(pCommandList))
+    {
+        Muon::Print("Error: Failed to bind raymarch caching pass.\n");
+        CloseCommandList();
+        return;
+    }
+
+    pCommandList->SetDescriptorHeaps(1, GetSRVHeap()->GetHeapAddr());
+
+    ResourceCodex& codex = ResourceCodex::GetSingleton();
+    Texture* pRaymarchCache = codex.GetTexture(GetResourceID(L"RaymarchVolumeCache"));
+    Texture* pSdf = codex.GetTexture(GetResourceID(L"StormbirdCloudSDF_3D")); // TODO: Ensure same resource IDs are used in main raymarch pass. These MUST match.
+    Texture* pNVDF = codex.GetTexture(GetResourceID(L"StormbirdCloud_NVDF"));
+    Texture* pNoise = codex.GetTexture(GetResourceID(L"Noise_3D"));
+
+    int32_t sdfIndex = mRaymarchCachePass.GetResourceRootIndex("sdfTex");
+    if (sdfIndex != ROOTIDX_INVALID)
+    {
+        pCommandList->SetComputeRootDescriptorTable(sdfIndex, pSdf->GetSRVHandleGPU());
+    }
+    
+    int32_t nvdfIndex = mRaymarchCachePass.GetResourceRootIndex("nvdfTex");
+    if (nvdfIndex != ROOTIDX_INVALID)
+    {
+        pCommandList->SetComputeRootDescriptorTable(nvdfIndex, pNVDF->GetSRVHandleGPU());
+    }
+    
+    int32_t noiseIndex = mRaymarchCachePass.GetResourceRootIndex("noiseTex");
+    if (noiseIndex != ROOTIDX_INVALID)
+    {
+        pCommandList->SetComputeRootDescriptorTable(noiseIndex, pNoise->GetSRVHandleGPU());
+    }
+    
+    int32_t cacheIdx = mRaymarchCachePass.GetResourceRootIndex("gCache");
+    if (cacheIdx != ROOTIDX_INVALID)
+    {
+        pCommandList->SetComputeRootDescriptorTable(cacheIdx, pRaymarchCache->GetUAVHandleGPU());
+    }
+    
+    // Prepare volume cache for writing
+    pCommandList->ResourceBarrier(1, &CD3DX12_RESOURCE_BARRIER::Transition(pRaymarchCache->GetResource(),
+        D3D12_RESOURCE_STATE_GENERIC_READ, D3D12_RESOURCE_STATE_UNORDERED_ACCESS));
+    
+    // TODO: Figure out workgroup size
+    UINT numGroupsX = (UINT)ceilf(pRaymarchCache->GetWidth() / 16.0f);
+    UINT numGroupsY = (UINT)ceilf(pRaymarchCache->GetHeight() / 16.0f);
+    UINT numGroupsZ = (UINT)ceilf(pRaymarchCache->GetDepth() / 16.0f);
+    pCommandList->Dispatch(numGroupsX, numGroupsY, numGroupsZ);
+    
+    // Done writing, prepare for reading
+    pCommandList->ResourceBarrier(1, &CD3DX12_RESOURCE_BARRIER::Transition(pRaymarchCache->GetResource(),
+        D3D12_RESOURCE_STATE_UNORDERED_ACCESS, D3D12_RESOURCE_STATE_GENERIC_READ));
+        
     CloseCommandList();
     ExecuteCommandList();
     FlushCommandQueue(); // TODO: Give this process its own cmd allocator so we don't stall everything here
@@ -513,6 +594,7 @@ Game::~Game()
     mAtmospherePass.Destroy();
     mSobelPass.Destroy();
     mRaymarchPass.Destroy();
+    mRaymarchCachePass.Destroy();
     mProcNVDFPass.Destroy();
     mPostProcessPass.Destroy();
 
