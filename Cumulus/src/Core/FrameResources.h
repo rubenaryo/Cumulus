@@ -49,6 +49,8 @@ struct FrameResources
     UploadBuffer mHullFaceBuffer;
 
     UINT64 mFence = 0;
+
+    bool mNeedsCloudUpdate = false;
 };
 
 }
