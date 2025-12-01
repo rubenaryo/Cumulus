@@ -5,6 +5,7 @@ Made by [Ruben Young](https://www.rubenaryo.com/) [Jacky Park](https://jackypark
 
 [Project Document](https://docs.google.com/document/d/1CNzmIo68LndPGS8ccK94FSIFHYH-5GL8HYOYqQdy90E/edit?usp=sharing)
 [Milestone 1 Presentation](https://docs.google.com/presentation/d/1gGSEbZ7L8bbZHOn7OLQdZIwVBOCtymcEXTAHn48AE7w/edit?usp=sharing)
+[Milestone 2 Presentation](https://docs.google.com/presentation/d/1K_11dz4fgYK21hM76VZPrON-3IzXVvsdjsIIQxzjrf8/edit?usp=sharing)
 
 <p align="center">
   <img width="80%" alt="image" src="images/fly_in.gif" />
@@ -32,16 +33,17 @@ We utilize the cloud rendering framework from the Horizon game series, as outlin
  - Noise-based Details — Additional details at 0.5m scale using Alligator and "Curly-Alligator" noise
 #### Generation
 <p align="center">
-  <img width="80%" alt="image" src="images/gpu_cloud.png" />
+  <img width="80%" alt="image" src="images/CloudControl.gif" />
   <br>
-  <em>A cloud created in a compute shader</em>
+  <em>Clouds created in real-time in a compute shader</em>
 </p>
 
- - We support procedurally creating cloud NVDF data in a compute shader pass. However, this is a recent addition, and the set noise and detail values still need to be finetuned for a more realistic look.
+ - We support procedurally creating cloud NVDF data in a compute shader pass, which can be controlled in an ImGUI tab specifying cloud number and their average scale multiplier.
  - Creation starts by initializing cloud "seeds" on the CPU side, which become world-space coordinates where clouds get initialized. These positions can be updated to show cloud movement and formation.
- - For each seed, we create an SDF (given by [Inigo Quilez's blog](https://iquilezles.org/articles/distfunctions/)) that is a simple round cone with "Vesica Segments" aka football shapes around them. The number of these shapes, their size, and the orientation of all of these is given by noise.
- - Next, based on this SDF, we create density values. Importantly, these values must slowly ease in, so we don't see the edge of the sdf shapes.
- - Finally, density type and shape profile are also generated with some added noise.
+ - For each seed, we create an SDF (given by [Inigo Quilez's blog](https://iquilezles.org/articles/distfunctions/)) that is a simple round cone with "Vesica Segments" aka football shapes around them. The number of these shapes, their size, and the orientation of all of these is given by noise, scaled by the input scale value.
+ - Next, based on this SDF, we use a special "billow noise," which is a modified Perlin noise that gets its cells rotated to give a billowy look, as shown by the noise's authors [here](https://www.shadertoy.com/view/fdfcWs). Importantly, this noise gets the fractal sum treatment to ease out values for a less voxely look. It also gets eased out as we move away from the sdf boundaries for the same reason.
+ - Finally, detail type and density scale get calculated, which give the clouds their upscaled features. Detail type comes from the same billowy noise at a different scale and gets more intense the farther up we go, to mimic how clouds are more whispy lower down, and density scale is quite uniform for us within the cloud's profile.
+
 ### Engine
 #### Core
  - Atmosphere rendering pass
@@ -77,9 +79,9 @@ https://github.com/user-attachments/assets/75663386-7b17-41eb-a8a1-4c755ff82367
 
 ### Atmosphere
 <p align="center">
-  <img width="80%" alt="image" src="images/sunrise.png" />
+  <img width="80%" alt="image" src="images/atmosphere.png" />
   <br>
-  <em>Sunrise</em>
+  <em>Sunrise, daytime, sunset, night time, with the ImGUI controls</em>
 </p>
 
  - Based on [Eric Bruneton's Precomputed Atmospheric Scattering](https://ebruneton.github.io/precomputed_atmospheric_scattering/)
@@ -100,6 +102,13 @@ To generate a Visual Studio solution, simply run generate_vs2022.bat on Windows.
 
 ## Details
 This project is built using MSVC with the Visual Studio 2022 toolset (v143) for the C++17 standard.
+
+## External Credits
+ - [Nubis 3](https://www.guerrilla-games.com/read/nubis-cubed), the presentation behind this whole project
+ - Stefan Gustavson and Ian MacEwan for making [billowy noise](https://github.com/stegu/psrdnoise/), and Stefan and Ashima Arts for [fast perlin noise](https://github.com/ashima/webgl-noise/tree/master) as well
+ - Domenic Portera for the [HLSL port](https://github.com/domportera/hlsl-noise/tree/main) of the billowy noise.
+ - [Eric Bruneton's Precomputed Atmospheric Scattering](https://ebruneton.github.io/precomputed_atmospheric_scattering/)
+ - [Inigo Quilez's blog on SDFs](https://iquilezles.org/articles/distfunctions/)
 
 ## Dependencies
 * [DirectX Tex](https://github.com/microsoft/DirectXTex/)
