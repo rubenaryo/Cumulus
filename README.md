@@ -31,6 +31,7 @@ We utilize the cloud rendering framework from the Horizon game series, as outlin
  - Ray-marched rendering — integrates density with Beer–Lambert absorption/compositing
  - SDF-guided stepping — signed-distance field cached in 3D textures to skip empty space
  - Noise-based Details — Additional details at 0.5m scale using Alligator and "Curly-Alligator" noise
+ - Cloud Lighting - interactive lighting using atmosphere, as well as multiple scattering and ambient light
 #### Generation
 <p align="center">
   <img width="80%" alt="image" src="images/CloudControl.gif" />
@@ -45,9 +46,25 @@ We utilize the cloud rendering framework from the Horizon game series, as outlin
  - Finally, detail type and density scale get calculated, which give the clouds their upscaled features. Detail type comes from the same billowy noise at a different scale and gets more intense the farther up we go, to mimic how clouds are more whispy lower down, and density scale is quite uniform for us within the cloud's profile.
 
 ### Engine
+<table align="center">
+  <tr>
+    <td align="center">
+      <img src="images/Muon_Diagram.png"  width = "100%"/>
+      <br>
+      <em>Engine overview diagram</em>
+    </td>
+    <td align="center">
+      <img src="images/Render Pipeline.png"  width = "110%"/>
+      <br>
+      <em>Full render pipeline</em>
+    </td>
+  </tr>
+</table>
+
 #### Core
  - Atmosphere rendering pass
  - Compute Shader pipeline for ray-marching
+ - Compute Shader for collisions and cloud data generation
  - Post-processing pipeline
  - Automated loading of models/textures from files
  - Construction of 3D NVDF data fields for the core Nubis method, 3D textures for atmosphere
