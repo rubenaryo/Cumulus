@@ -103,7 +103,7 @@ float3 VoxelIndexToCenterUV(uint3 voxelIndex, uint3 texDim)
     return (float3(voxelIndex) + 0.5f) / dim;
 }
 
-[numthreads(16, 16, 4)]
+[numthreads(8, 8, 4)]
 void main(uint3 dispatchThreadID : SV_DispatchThreadID)
 {
     uint width, height, depth;

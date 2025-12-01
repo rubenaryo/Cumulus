@@ -430,9 +430,9 @@ void Game::UpdateRaymarchCache()
         D3D12_RESOURCE_STATE_GENERIC_READ, D3D12_RESOURCE_STATE_UNORDERED_ACCESS));
     
     // TODO: Figure out workgroup size
-    UINT numGroupsX = (UINT)ceilf(pRaymarchCache->GetWidth() / 16.0f);
-    UINT numGroupsY = (UINT)ceilf(pRaymarchCache->GetHeight() / 16.0f);
-    UINT numGroupsZ = (UINT)ceilf(pRaymarchCache->GetDepth() / 16.0f);
+    UINT numGroupsX = (UINT)ceilf(pRaymarchCache->GetWidth() / 8.0f);
+    UINT numGroupsY = (UINT)ceilf(pRaymarchCache->GetHeight() / 8.0f);
+    UINT numGroupsZ = (UINT)ceilf(pRaymarchCache->GetDepth() / 4.0f);
     pCommandList->Dispatch(numGroupsX, numGroupsY, numGroupsZ);
     
     // Done writing, prepare for reading
