@@ -60,22 +60,10 @@ We utilize the cloud rendering framework from the Horizon game series, as outlin
  - Automatic lifetime reporting for catching memory leaks in Debug mode
  - Diligent error detection and logging
  - ImGUI integration
-### Collision
-<p align="center">
-  <img width="80%" alt="image" src="images/ConvexHull.gif" />
-  <br>
-  <em>Dynamic Convex Hull of a teapot</em>
-</p>
+### Wind
 
- - Convex Hull object bounds
- - Managed via several structured buffers on GPU – built to be dynamic as meshes update position / animation
+![output](https://github.com/user-attachments/assets/de29dfd9-aaee-43ab-8449-aa158530d611)
 
-
-https://github.com/user-attachments/assets/75663386-7b17-41eb-a8a1-4c755ff82367
-
-
-
-  - Compute Shader: Modify Density Texture when cell collides with convex hull 
 
 ### Atmosphere
 <p align="center">
