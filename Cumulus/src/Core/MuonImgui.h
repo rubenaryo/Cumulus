@@ -11,11 +11,21 @@ Description : Helpers for initializing/using ImGui
 
 namespace Muon
 {
-	struct SceneSettings {
+	struct AtmosphereInput
+	{
 		bool isSunDynamic = false;
+		float timeScale = 1.f;
+		DirectX::XMFLOAT3 sunDir = {0.0f, 0.9f, 0.1f};
+		float sunSize = 1.f;
+		float viewport_width = 1280.f;
+		float viewport_height = 800.f;
+		float view_zenith_angle_radians = 1.47f;
+		float view_azimuth_angle_radians = -0.1f;
+	};
+
+	struct SceneSettings {
 		bool drawObjects = true;
-		int timeOfDay = 800; // stored as military time for now
-		DirectX::XMFLOAT3 sunDir;
+		AtmosphereInput atmosphere;
 		int numClouds = 4;
 		float cloudScale = 1.0;
 		bool updateClouds = false;
