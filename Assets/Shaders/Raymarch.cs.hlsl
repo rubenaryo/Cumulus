@@ -217,6 +217,23 @@ float HenyeyGreenstein(float cosAngle, float eccentricity)
 }
 
 
+float CloudPhase(float cosTheta)
+{
+    // Very forward lobe for silver lining
+    float g1 = 0.9;
+    float w1 = 0.8;
+
+    // Softer lobe for general fill
+    float g2 = 0.5;
+    float w2 = 0.2;
+
+    float p = w1 * HenyeyGreenstein(cosTheta, g1) + w2 * HenyeyGreenstein(cosTheta, g2);
+
+    // Scale to a reasonable range
+    return p * 4.0;
+}
+
+
 float3 ComputeDirectLighting(
     RayMarchInfo rayMarchInfo,
     float3 samplePos,
@@ -504,7 +521,6 @@ void main(int3 dispatchThreadID : SV_DispatchThreadID)
     // Transform to world space
     float3 worldDir = normalize(mul(invView, float4(viewDir, 0.0)).xyz);
     float3 eyePos = float3(invView[0][3], invView[1][3], invView[2][3]); // from the 4th column instead of row..
-    
     float3 bgColor = gInput[pixelCoord].rgb;
     float depth = depthStencilBuffer[dispatchThreadID.xy].r;
     float maxRayDist = GetMaxRayDist(depth, eyePos, dispatchThreadID);
