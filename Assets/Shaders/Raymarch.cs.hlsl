@@ -261,13 +261,6 @@ float3 ComputeDirectLighting(
     return L_step;
 }
 
-float3 ComputeAmbientLighting(
-    float3 samplePos,
-    float density)
-{
-    return float3(0.0, 0.0, 0.0);
-}
-
 float3 ComputeMultipleScattering(
     float dimensionalProfile,
     float opticalDepthToSun,
@@ -282,11 +275,14 @@ float3 ComputeMultipleScattering(
     // Exponential shaping based on summed density / tau to sun
     ms_volume *= exp(-opticalDepthToSun * factor);
 
-    // Turn into a soft, slightly warm secondary color
-    float3 SECONDARY_COLOR = float3(1.0, 0.96, 0.9);
-    float SECONDARY_STRENGTH = 2;
-
     return SECONDARY_COLOR * ms_volume * SECONDARY_STRENGTH;
+}
+
+float3 ComputeAmbientLighting(
+    float3 samplePos,
+    float density)
+{
+    return float3(0.0, 0.0, 0.0);
 }
 
 
