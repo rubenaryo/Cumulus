@@ -12,7 +12,7 @@
 // Preset: "Lit clouds"    -> enable desired USE_*_LIGHTING = 1
 #define USE_DIRECT_LIGHTING      1   // Sun / directional lighting
 #define USE_AMBIENT_LIGHTING     0   // Sky / ambient term
-#define USE_MULTIPLE_SCATTERING  0   // Approx. multiple scattering
+#define USE_MULTIPLE_SCATTERING  1   // Approx. multiple scattering
 
 // === Debug / Visualization ===
 #define DEBUG_AABB_INTERSECT     0   // Visualize volume/hull hits
@@ -269,10 +269,24 @@ float3 ComputeAmbientLighting(
 }
 
 float3 ComputeMultipleScattering(
-    float3 samplePos,
-    float density)
+    float dimensionalProfile,
+    float opticalDepthToSun,
+    float sunDot,
+    float sdfDistance)
 {
-    return float3(0.0, 0.0, 0.0);
+    float ms_volume = dimensionalProfile;
+    float cloud_distance = sdfDistance;
+    float depthTerm = ValueRemap(cloud_distance, -128.0, 0.0, 0.05, 0.25);
+    float factor = ValueRemap(sunDot, 0.0, 0.9, 0.25, depthTerm);
+
+    // Exponential shaping based on summed density / tau to sun
+    ms_volume *= exp(-opticalDepthToSun * factor);
+
+    // Turn into a soft, slightly warm secondary color
+    float3 SECONDARY_COLOR = float3(1.0, 0.96, 0.9);
+    float SECONDARY_STRENGTH = 2;
+
+    return SECONDARY_COLOR * ms_volume * SECONDARY_STRENGTH;
 }
 
 
@@ -408,7 +422,16 @@ float3 VolumeRaymarchNvdf(float3 eyePos, float3 dir, float3 bgColor, float maxRa
                 #endif
 
                 #if USE_MULTIPLE_SCATTERING
-                        float3 msL = ComputeMultipleScattering(samplePos, density);
+                        float opticalDepthToSun = GetApproxOpticalDepthToSun(samplePos, DIR_SUN);
+                        
+                        float sunDot = dot(normalize(DIR_SUN), normalize(dir));
+
+                        float3 msL = ComputeMultipleScattering(
+                            dimensionalProfile,        // or density
+                            opticalDepthToSun,         // inSunLightSummedDensitySamples analog
+                            sunDot,
+                            sdfDistance                // cloud_distance analog
+                        );
                         lighting += msL;
                 #endif
 
