@@ -1,101 +1,34 @@
 #include "VS_Common.hlsli"
 #include "Raymarch_Common.hlsli"
 
-// Toggle features
-#define USE_ADAPTIVE_STEP 1 // Shows some artifact ATM. Will debug again after uprez. 
-#define USE_JITTERED_STEP 1
-#define USE_HIGH_HIGH_FREQUENCY 1
-#define DEBUG_AABB_INTERSECT 0
-#define DEBUG_STEP_COUNT 0   // 1 = show step-count debug gradient, 0 = normal shading
-#define GPU_CLOUD 1
+// === Raymarch / Quality ===
+#define GPU_CLOUD 0
+#define USE_ADAPTIVE_STEP        1   // Adaptive step size along ray
+#define USE_JITTERED_STEP        1   // Stochastic jitter per step
+#define USE_HIGH_HIGH_FREQUENCY  1   // Extra near-camera detail
+
+// === Lighting ===
+// Preset: "Density only"  -> all USE_*_LIGHTING = 0
+// Preset: "Lit clouds"    -> enable desired USE_*_LIGHTING = 1
+#define USE_DIRECT_LIGHTING      1   // Sun / directional lighting
+#define USE_AMBIENT_LIGHTING     0   // Sky / ambient term
+#define USE_MULTIPLE_SCATTERING  0   // Approx. multiple scattering
+
+// === Debug / Visualization ===
+#define DEBUG_AABB_INTERSECT     0   // Visualize volume/hull hits
+#define DEBUG_STEP_COUNT         0   // Step-count gradient debug
 
 Texture2D gInput : register(t0);
 Texture3D sdfTex : register(t1); // Cached sdf for accelerating sdf 
 Texture3D nvdfTex : register(t2); // Model textures combined [sdf.r, model.r, model.g, model.b] 
 Texture3D noiseTex : register(t3); // Low frequency, high frequency noises for wispy and billowy clouds 
-Texture2D depthStencilBuffer : register(t3); // The scene's depth-stencil buffer, bound here post-graphics passes
-Texture3D proceduralNvdfTex : register(t4); // Sdf and model textures combined [sdf.r, model.r, model.g, model.b] 
+Texture3D lightCacheTex : register(t4); // Optical depth from the centers of voxel 
+Texture2D depthStencilBuffer : register(t5); // The scene's depth-stencil buffer, bound hsere post-graphics passes
+Texture3D proceduralNvdfTex : register(t6); // Sdf and model textures combined [sdf.r, model.r, model.g, model.b] 
 
 SamplerState linearWrap : register(s2);
 SamplerState linearClamp : register(s3); 
 RWTexture2D<float4> gOutput : register(u0);
-
-struct NoiseSample
-{
-    float lowFreqWispy;
-    float highFreqWispy;
-    float lowFreqBillow;
-    float highFreqBillow;
-};
-
-NoiseSample MakeNoiseSample(float4 sample)
-{
-    NoiseSample ns;
-    ns.lowFreqWispy = sample.x;
-    ns.highFreqWispy = sample.y;
-    ns.lowFreqBillow = sample.z;
-    ns.highFreqBillow = sample.w;
-    return ns;
-}
-
-struct RayMarchInfo
-{
-    // Ray segment within the volume in world units
-    float tEnter; // where we start marching inside the volume
-    float tExit; // where we stop marching inside the volume
-
-    // Current marching state
-    float distance; // current param along the ray (world units)
-    float stepSize; // step size for this iteration
-
-    // Optical state
-    float transmittance; // remaining light (1 = fully transparent, 0 = fully opaque)
-    float3 accumColor; // accumulated in-scattered radiance / cloud color
-
-    // Bookkeeping
-    uint stepIndex; // current step index in the loop (for jitter, etc.)
-};
-
-void InitRayMarchInfo(out RayMarchInfo info, float tEnter, float tExit)
-{
-    info.tEnter = tEnter;
-    info.tExit = tExit;
-    info.distance = tEnter;
-    info.stepSize = 0.0f;
-    info.transmittance = 1.0f;
-    info.accumColor = float3(0.0f, 0.0f, 0.0f);
-    info.stepIndex = 0;
-}
-
-bool RayBoxIntersect(
-    float3 origin,
-    float3 dir,
-    float3 boxMin,
-    float3 boxMax,
-    out float tEnter,
-    out float tExit)
-{
-    float3 invDir = 1.0 / dir;
-
-    float3 t0s = (boxMin - origin) * invDir;
-    float3 t1s = (boxMax - origin) * invDir;
-
-    float3 tMin = min(t0s, t1s);
-    float3 tMax = max(t0s, t1s);
-
-    tEnter = max(max(tMin.x, tMin.y), tMin.z);
-    tExit = min(min(tMax.x, tMax.y), tMax.z);
-
-    // Need a positive interval where enter < exit
-    return tExit > max(tEnter, 0.0);
-}
-// Encoded value in [0, 1]  ->  real SDF in [-256, 4096]
-float DecodeSdf(float encodedSdf)
-{
-    const float sdfMin = -256.0;
-    const float sdfMax = 4096.0;
-    return lerp(sdfMin, sdfMax, encodedSdf);
-}
 
 // Take smaller steps near the camera
 float ComputeAdaptiveStepSize(float distanceWorld)
@@ -129,15 +62,6 @@ float Hash231(uint2 p, uint stepIndex)
 float StaticStepJitter(uint2 pixelCoord, uint stepIndex)
 {
     return Hash231(pixelCoord, stepIndex) - 0.5f;
-}
-
-// Erode normalized base value by erosionValue (noise), re-normalizing remaining range into [0,1].
-float ValueErosion(float baseValue, float erosionValue)
-{
-    // baseValue: [0,1], erosionValue: [0,1]
-    float denom = max(1e-4, 1.0 - erosionValue);
-    float v = (baseValue - erosionValue) / denom;
-    return saturate(v);
 }
 
 float FoldBase(float n)
@@ -203,65 +127,139 @@ float GetFractionFromValue(float x, float minVal, float maxVal)
     return saturate(t);
 }
 
-// Compute uprezzed voxel cloud density from dimensional profile, type and density scale.
-float GetUprezzedVoxelCloudDensity(
-    RayMarchInfo rayMarchInfo,
-    float3 samplePositionWS,
-    float dimensionalProfile,
-    float detailType,
-    float densityScale)
+// Compute optical depth from samplePos toward sunDir
+// Returns tau; transmittance is exp(-tau)
+float GetApproxOpticalDepthToSun(float3 samplePos, float3 sunDir)
 {
-    // Convert world position into NVDF authoring space (so noise sticks to authored asset, not world scale).
-    float3 samplePosNvdf = samplePositionWS / AUTHORING_TO_WORLD_SCALE;
+#if GPU_CLOUD
+    // TODO: Implement optical depth calculation to the sun using procedural NVDF 
+    return 0.0;
+#else
+    // Intersect light ray with cloud volume
+    float tEnter, tExit;
+    if (!RayBoxIntersect(samplePos, sunDir, VOLUME_MIN_WS, VOLUME_MAX_WS, tEnter, tExit))
+    {
+        // Ray from samplePos in sunDir never enters volume
+        return 0.0;
+    }
     
-    // Map NVDF space into noise UVW: one noise tile spans NOISE_DOMAIN_SIDE_LENGTH author units.
-    float nvdfToNoiseScale = 1.0 / NOISE_DOMAIN_SIDE_LENGTH;
-    float3 noiseUVW = samplePosNvdf * nvdfToNoiseScale;
+    //return lightCacheTex.SampleLevel(linearClamp, WorldToNvdfUV(samplePos), 0.0f).r;
 
-    // 3D noise look-up in authoring-relative space.
-    NoiseSample noiseSample = MakeNoiseSample(noiseTex.SampleLevel(
-        linearWrap,
-        noiseUVW,
-        0.0f // TODO: plug in distance-based mip
-    ));
+    // Start inside the box at the sample position
+    float t = 0.0; // we are already at samplePos, so relative distance along sunDir
+    float depth = 0.0; // optical depth tau
+    const float minStepSize = AUTHORING_TO_WORLD_SCALE; // ~1 NVDF voxel
+    const float depthThreshold = 5.0; // Appr 99% extinction)
+
+    // Ray march for the first two steps 
+    [loop]
+    for (int i = 0; i < 2; ++i)
+    {
+        float3 lightPos = samplePos + sunDir * t;
+
+        // Exit if beyond volume intersection
+        if (t > tExit)
+            break;
+
+        // Sample SDF
+        float sdfEncoded = sdfTex.SampleLevel(linearClamp, WorldToNvdfUV(lightPos), 0.0f).r;
+        float sdfDistance = DecodeSdf(sdfEncoded) * AUTHORING_TO_WORLD_SCALE;
+
+        if (sdfDistance < 0.0)
+        {
+            // Inside cloud: approximate density similar to view ray
+            float4 nvdfSample = nvdfTex.SampleLevel(linearClamp, WorldToNvdfUV(lightPos), 0.0f);
+            float dimensionalProfile = nvdfSample.g;
+            float detailType = nvdfSample.b;
+            float densityScale = nvdfSample.a;
+
+            // Ideally reuse GetUprezzedVoxelCloudDensity here
+            float density = GetUprezzedVoxelCloudDensity(
+                /*dummy*/ (RayMarchInfo) 0,
+                lightPos,
+                dimensionalProfile,
+                detailType,
+                densityScale,
+                noiseTex,
+                linearWrap
+            );
+
+            float sigma = dimensionalProfile * (1 - DIRECT_LIGHTING_SCALE);
+
+            float stepSizeInside = minStepSize; // or a tuned fixed step
+            depth += sigma * stepSizeInside;
+
+            t += stepSizeInside;
+
+            if (depth >= depthThreshold)
+                return depth; // early-out: almost fully shadowed
+        }
+        else
+        {
+            // Outside cloud: advance by SDF distance, at least minStepSize
+            float stepSize = max(sdfDistance, minStepSize);
+            t += stepSize;
+        }
+    }
     
-    // Define wispy noise
-    float wispy_noise = lerp(noiseSample.lowFreqWispy, noiseSample.highFreqWispy, dimensionalProfile);
-
-    // Define billowy noise
-    float billowy_type_gradient = pow(dimensionalProfile, 0.25);
-    float billowy_noise = lerp(noiseSample.lowFreqBillow * 0.3, noiseSample.highFreqBillow * 0.3, billowy_type_gradient);
-    
-    // Define Noise composite - blend to wispy as the density scale decreases.
-    float noise_composite = lerp(wispy_noise, billowy_noise, detailType);
-
-#if USE_HIGH_HIGH_FREQUENCY
-    //Use HF details for parts near camera
-    float hhf = ComputeHighHighFreqNoise(noiseSample, detailType);
-    noise_composite = ApplyHighHighFreqNoise(noise_composite, hhf, rayMarchInfo.distance);
+    // Use cached values to approximate remaining light ray march
+    float cachedOpticalDepth = lightCacheTex.SampleLevel(linearClamp, WorldToNvdfUV(samplePos + sunDir * t), 0.0f).r;
+    return depth + cachedOpticalDepth;
 #endif
-    
-    // Composite Noises and use as a Value Erosion
-    float uprezzed_density = ValueErosion(dimensionalProfile, noise_composite);
-    
-    // Modify User density scale
-    float powered_density_scale = pow(saturate(densityScale), 4.0);
-    
-    // Apply User Density Scale Data to Result
-    uprezzed_density *= powered_density_scale;
-    
-    // Sharpen result and lower Density close to camera to both add details and reduce undersampling noise
-    uprezzed_density = pow(uprezzed_density, lerp(0.3, 0.6, max(EPSILON, powered_density_scale)));
-    
-#if USE_HIGH_HIGH_FREQUENCY
-    float distance_range_blender = GetFractionFromValue(rayMarchInfo.distance, 50.0, 150.0);
-    uprezzed_density = pow(uprezzed_density, lerp(0.5, 1.0, distance_range_blender)) * lerp(0.666, 1.0, distance_range_blender);
-#endif
-    
-    return uprezzed_density;
 }
 
-float3 VolumeRaymarchNvdf(float3 eyePos, float3 dir, float3 bgColor, int3 dispatchThreadID)
+// Simple Henyey–Greenstein phase function
+float HenyeyGreenstein(float cosAngle, float eccentricity)
+{
+    float eccentricity2 = eccentricity * eccentricity;
+    float denom = pow(1.0 + eccentricity2 - 2.0 * eccentricity * cosAngle, 1.5);
+    return (1.0 - eccentricity2) / (4.0 * PI * denom);
+}
+
+
+float3 ComputeDirectLighting(
+    RayMarchInfo rayMarchInfo,
+    float3 samplePos,
+    float3 viewDir,
+    float density,
+    float sigma,
+    float stepSize)
+{
+    float opticalDepthToSun = GetApproxOpticalDepthToSun(samplePos, DIR_SUN);
+    float T_sun = exp(-opticalDepthToSun); // transmittance from sun to point
+
+    // Phase term: how strongly this point scatters sun light toward the camera
+    // DIR_SUN points from world towards the sun
+    float3 sunDirToPoint = DIR_SUN; // direction from point to sun
+    float cosAngle = dot(normalize(sunDirToPoint), normalize(viewDir)); // cos(theta) between sun and view
+    float eccentricity = 0.75; // forward-scattering; tweak for look
+    float phase = saturate(HenyeyGreenstein(cosAngle, 0.75) * 3.0);
+
+    // Segment scattering amount
+    float segmentScatter = 1.0 - exp(-sigma * stepSize);
+
+    // Direct lighting contribution for this step (before camera transmittance)
+    float3 L_step = LIGHT_SUN * T_sun * phase * segmentScatter;
+
+    return L_step;
+}
+
+float3 ComputeAmbientLighting(
+    float3 samplePos,
+    float density)
+{
+    return float3(0.0, 0.0, 0.0);
+}
+
+float3 ComputeMultipleScattering(
+    float3 samplePos,
+    float density)
+{
+    return float3(0.0, 0.0, 0.0);
+}
+
+
+float3 VolumeRaymarchNvdf(float3 eyePos, float3 dir, float3 bgColor, float maxRayDist, int3 dispatchThreadID)
 {
     float tEnter, tExit;
     if (!RayBoxIntersect(eyePos, dir, VOLUME_MIN_WS, VOLUME_MAX_WS, tEnter, tExit))
@@ -287,7 +285,7 @@ float3 VolumeRaymarchNvdf(float3 eyePos, float3 dir, float3 bgColor, int3 dispat
 
     // Clamp to your global near/far
     tEnter = max(tEnter, MIN_DIST);
-    tExit = min(tExit, MAX_DIST);
+    tExit = min(min(tExit, MAX_DIST), maxRayDist);
 
     if (tExit <= tEnter)
         return bgColor;
@@ -323,14 +321,16 @@ float3 VolumeRaymarchNvdf(float3 eyePos, float3 dir, float3 bgColor, int3 dispat
         // NOTE: doing nothing atm, need to fix this below
         // TODO: FIX THIS TO WORK WITH NEW METHOD
 
-#if USE_ADAPTIVE_STEP
-        float adaptive = ComputeAdaptiveStepSize(march.distance);
-        march.stepSize = ComputeBaseStepSize(sdfDistance, adaptive);
-#else
-        march.stepSize = max(sdfDistance, AUTHORING_TO_WORLD_SCALE);
-#endif
+        #if USE_ADAPTIVE_STEP
+            float adaptive = ComputeAdaptiveStepSize(march.distance);
+            march.stepSize = ComputeBaseStepSize(sdfDistance, adaptive);
+        #else
+            march.stepSize = max(sdfDistance, AUTHORING_TO_WORLD_SCALE);
+        #endif
+        
         if (sdfDistance < 0.0)
         {
+
 #if USE_JITTERED_STEP
             float jitter = StaticStepJitter(dispatchThreadID.xy, march.stepIndex); // [-0.5, 0.5]
             float jitterDistance = jitter * march.stepSize;
@@ -347,6 +347,7 @@ float3 VolumeRaymarchNvdf(float3 eyePos, float3 dir, float3 bgColor, int3 dispat
             float densityScale = smoothstep(-4.0, -12.0, sdfDistance) * 0.4 + 0.2;
             dimensionalProfile *= (1.0 - collisionValue);
 #else
+
             float4 nvdfSample = nvdfTex.SampleLevel(linearClamp, WorldToNvdfUV(samplePos), 0.0f);
             float dimensionalProfile = nvdfSample.g;
             float detailType = nvdfSample.b;
@@ -360,20 +361,57 @@ float3 VolumeRaymarchNvdf(float3 eyePos, float3 dir, float3 bgColor, int3 dispat
                 samplePos,
                 dimensionalProfile,
                 detailType,
-                densityScale
-            );
-            
+                densityScale,
+                noiseTex,
+                linearWrap
+                );
+
             float sigma = density * DENSITY_SCALE;
             float alpha = 1.0 - exp(-sigma * march.stepSize);
 
-            float3 contrib = cloudColor * alpha * march.transmittance;
-            march.accumColor += contrib;
-        
-            march.transmittance *= (1.0 - alpha);
-            if (march.transmittance < MIN_TRANSMITTANCE)
-                break;
-        }
+            // Lighting 
+            #if (USE_DIRECT_LIGHTING || USE_AMBIENT_LIGHTING || USE_MULTIPLE_SCATTERING)
+                        float3 lighting = 0.0.xxx;
 
+                #if USE_DIRECT_LIGHTING
+                        float3 directL = ComputeDirectLighting(
+                            march,
+                            samplePos,
+                            dir, // viewDir
+                            density,
+                            sigma,
+                            march.stepSize
+                        );
+                        lighting += directL;
+                #endif
+
+                #if USE_AMBIENT_LIGHTING
+                        float3 ambientL = ComputeAmbientLighting(samplePos, density);
+                        lighting += ambientL;
+                #endif
+
+                #if USE_MULTIPLE_SCATTERING
+                        float3 msL = ComputeMultipleScattering(samplePos, density);
+                        lighting += msL;
+                #endif
+
+                // Single contribution: lighting * alpha * T_cam
+                        float3 contrib = lighting * alpha * march.transmittance;
+                        march.accumColor += contrib;
+
+                // Update camera transmittance using alpha
+                        march.transmittance *= (1.0 - alpha);
+                        if (march.transmittance < MIN_TRANSMITTANCE)
+                            break;
+            #else
+                // Pure density-based fallback (your current behavior)
+                float3 contrib = cloudColor * alpha * march.transmittance;
+                march.accumColor += contrib;
+                march.transmittance *= (1.0 - alpha);
+                if (march.transmittance < MIN_TRANSMITTANCE)
+                    break;
+            #endif
+        }
         march.distance += march.stepSize;
     }
     
@@ -389,13 +427,61 @@ float3 VolumeRaymarchNvdf(float3 eyePos, float3 dir, float3 bgColor, int3 dispat
     float3 debugColor = lerp(float3(0.0, 0.0, 0.0), float3(1.0, 1.0, 1.0), t);
     return debugColor;
 #else
-    float3 finalColor = march.accumColor + bgColor * march.transmittance;
-    return finalColor;
+
+    // bgColor is already tonemapped/gamma-corrected, so:
+    // 1) Work in linear for clouds.
+    // 2) Apply tonemapping only to the cloud contribution.
+    // 3) Composite clouds over bgColor in display space.
+
+    // Split terms:
+    float3 cloudColorLin = march.accumColor; // HDR / linear clouds
+    float3 bgColorDisplay = bgColor; // already tonemapped
+
+    // Tonemap clouds only (Reinhard in linear)
+    float3 cloudMapped = cloudColorLin / (1.0 + cloudColorLin);
+
+    // Optional gamma for clouds if bgColor is in gamma 2.2
+    cloudMapped = pow(cloudMapped, 1.0 / 2.2);
+
+    // Composite: clouds over background, using cloud alpha ≈ (1 - transmittance)
+    float cloudAlpha = 1.0 - march.transmittance;
+    // Apply a power curve to make small alphas vanish faster so there are less dark edge artifacts 
+    cloudAlpha = saturate(pow(cloudAlpha, 2.0)); 
+
+    float3 outColor = lerp(bgColorDisplay, cloudMapped, cloudAlpha);
+    return outColor;
 #endif
 }
 
+float GetMaxRayDist(float depth, float3 eyePos, int3 dispatchThreadID)
+{ 
+    uint width, height;
+    gOutput.GetDimensions(width, height);
+    
+    int2 pixelCoord = dispatchThreadID.xy;
+    
+    // NDC coordinates (already computed)
+    float2 uv = (float2(pixelCoord) + 0.5) / float2(width, height);
+    uv = uv * 2.0 - 1.0;
+    uv.y = -uv.y;
 
-[numthreads(16, 16, 1)]
+    // Reconstruct clip-space position
+    float4 clipPos = float4(uv.x, uv.y, depth * 2.0f - 1.0f, 1.0f);
+
+    // To view space
+    float4 viewPos = mul(invProj, clipPos);
+    viewPos.xyz /= viewPos.w;
+
+    // To world space
+    float3 worldPosAtDepth = mul(invView, float4(viewPos.xyz, 1.0f)).xyz;
+
+    // Distance from eye along the view ray
+    float maxRayDist = length(worldPosAtDepth - eyePos);
+    return maxRayDist;
+}
+
+ 
+[numthreads(8, 8, 1)]
 void main(int3 dispatchThreadID : SV_DispatchThreadID)
 {
     int2 pixelCoord = dispatchThreadID.xy;
@@ -420,14 +506,10 @@ void main(int3 dispatchThreadID : SV_DispatchThreadID)
     float3 eyePos = float3(invView[0][3], invView[1][3], invView[2][3]); // from the 4th column instead of row..
     
     float3 bgColor = gInput[pixelCoord].rgb;
-
-    // Volume composite against NVDF dimensional profile (green channel)
-    float3 finalColor = VolumeRaymarchNvdf(eyePos, worldDir, bgColor, dispatchThreadID);
-
     float depth = depthStencilBuffer[dispatchThreadID.xy].r;
-    
-    // Example: Visulize depth
-    // finalColor = depth.rrr;
+    float maxRayDist = GetMaxRayDist(depth, eyePos, dispatchThreadID);
+
+    float3 finalColor = VolumeRaymarchNvdf(eyePos, worldDir, bgColor, maxRayDist, dispatchThreadID);
     
     gOutput[dispatchThreadID.xy] = float4(finalColor, 1.0);
 }
