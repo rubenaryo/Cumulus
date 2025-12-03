@@ -174,24 +174,27 @@ void UpdateAtmosphere(cbAtmosphere& constants,
     // -0.935575f, 0.230531f, 0.267499f -> preset 1
     if (input.isSunDynamic)
     {
-        XMVECTOR axis = { -sqrt(3) * 0.5, 0.0, 0.5 };
+        XMFLOAT3 axis = { -sqrt(3.f) * 0.5f, 0.0f, 0.5f};
 
-        XMVECTOR rotation = XMQuaternionRotationAxis(XMVector3Normalize(axis), 0.01 * input.timeScale);
+        XMVECTOR rotation = XMQuaternionRotationAxis(XMVector3Normalize(XMLoadFloat3(&axis)), 0.01 * input.timeScale);
         // NOTE: z and y need to be flipped here because the atmosphere code expects Y up........
-        XMVECTOR currVec = { input.sunDir.x, input.sunDir.z, input.sunDir.y };
-        currVec = XMVector3Rotate(currVec, rotation);
+        XMFLOAT3 flipped = { input.sunDir.x, input.sunDir.z, input.sunDir.y };
+        XMVECTOR currVec = XMLoadFloat3(&flipped);
+        currVec = XMVector3Normalize(XMVector3Rotate(currVec, rotation));
 
         XMStoreFloat3(&constants.sun_direction, currVec);
     }
     else
     {
         // NOTE: this is explicit to switch Y and Z due to different coordinate systems at play
-        constants.sun_direction = { input.sunDir.x, input.sunDir.z, input.sunDir.y };
+        XMFLOAT3 flipped = { input.sunDir.x, input.sunDir.z, input.sunDir.y };
+        // Normalize sun direction
+        XMVECTOR sun_dir = XMLoadFloat3(&flipped);
+        sun_dir = XMVector3Normalize(sun_dir);
+
+        XMStoreFloat3(&constants.sun_direction, sun_dir);
     }
-    // Normalize sun direction
-    XMVECTOR sun_dir = XMLoadFloat3(&constants.sun_direction);
-    sun_dir = XMVector3Normalize(sun_dir);
-    XMStoreFloat3(&constants.sun_direction, sun_dir);
+
 
     constants.sun_size = XMFLOAT2(0.004675f * input.sunSize, cos(0.004675f * input.sunSize));
 
