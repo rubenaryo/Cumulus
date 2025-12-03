@@ -181,6 +181,7 @@ bool Game::InitFrameResources(UINT width, UINT height)
         
         frameResource.UpdateAtmosphere(atmosphereParams);
         frameResource.UpdateCloudData(mCloudData);
+        frameResource.UpdateCloudLighting(settings.lighting);
         frameResource.UpdateAABB(intersections);
         frameResource.UpdateHullFaces(faces);
     }
@@ -259,6 +260,18 @@ void Game::Update(Muon::StepTimer const& timer)
         settings.updateClouds = false;
     }
 
+    if (settings.updateLighting)
+    {
+        // Mark the update on each frame resource. They will consume it when they next run. 
+        for (size_t i = 0; i != NUM_FRAMES_IN_FLIGHT; ++i)
+        {
+            Muon::FrameResources& frameResource = mFrameResources.at(i);
+            frameResource.mNeedsCloudLightingUpdate = true;
+        }
+
+        settings.updateLighting = false;
+    }
+
     Muon::FrameResources& currFrameResources = mFrameResources.at(mCurrFrameResourceIdx);
     
     // Updating Lights
@@ -286,6 +299,13 @@ void Game::Update(Muon::StepTimer const& timer)
     {
         currFrameResources.UpdateCloudData(mCloudData);
         currFrameResources.mNeedsCloudUpdate = false;
+    }
+
+    // Updating Cloud Lighting
+    if (currFrameResources.mNeedsCloudLightingUpdate)
+    {
+        currFrameResources.UpdateCloudLighting(settings.lighting);
+        currFrameResources.mNeedsCloudLightingUpdate = false;
     }
 
     // Updating Entities
@@ -598,6 +618,12 @@ void Game::Render()
         if (hullFaceIdx != ROOTIDX_INVALID)
         {
             pCommandList->SetComputeRootConstantBufferView(hullFaceIdx, currFrameResources.mHullFaceBuffer.GetGPUVirtualAddress());
+        }
+
+        int32_t cloudLightingIdx = mRaymarchPass.GetResourceRootIndex("CloudLightingBuffer");
+        if (cloudLightingIdx != ROOTIDX_INVALID)
+        {
+            pCommandList->SetComputeRootConstantBufferView(cloudLightingIdx, currFrameResources.mCloudLightingBuffer.GetGPUVirtualAddress());
         }
 
         int32_t inIdx = mRaymarchPass.GetResourceRootIndex("gInput");

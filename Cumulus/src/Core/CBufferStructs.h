@@ -118,6 +118,11 @@ struct alignas(16) cbCloudGenData
     float pad[3];
 };
 
+struct alignas(16) cbCloudLighting
+{
+    int maxSteps = 256;
+};
+
 struct EntityData {
     cbPerEntity entityMatrices;
     cbConvexHull hull;
