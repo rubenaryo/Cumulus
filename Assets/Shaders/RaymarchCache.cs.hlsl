@@ -31,7 +31,7 @@ float GetOpticalDepthToSun(float3 samplePos, float3 sunDir)
     const float depthThreshold = 5.0; // Appr 99% extinction)
 
     [loop]
-    for (int i = 0; i < 16; ++i)
+    for (int i = 0; i < 128; ++i)
     {
         float3 lightPos = samplePos + sunDir * t;
 
@@ -84,23 +84,24 @@ float GetOpticalDepthToSun(float3 samplePos, float3 sunDir)
 #endif
 }
 
-float3 UVToWorld(float3 uv)
+float3 UVToWorld(float3 uvw)
 {
-    float3 diff = VOLUME_MAX_WS - VOLUME_MIN_WS; 
-    return float3(
-        uv.x * diff.x + VOLUME_MIN_WS.x,
-        uv.y * diff.y + VOLUME_MIN_WS.y,
-        uv.z * diff.z + VOLUME_MIN_WS.z
-    );
+    float3 diff = VOLUME_MAX_WS - VOLUME_MIN_WS;
+
+    float worldX = uvw.x * diff.x + VOLUME_MIN_WS.x;
+    float worldY = uvw.z * diff.y + VOLUME_MIN_WS.y;
+    float worldZ = uvw.y * diff.z + VOLUME_MIN_WS.z;
+
+    return float3(worldX, worldY, worldZ);
 }
 
-float3 VoxelIndexToCenterUV(uint3 voxelIndex, uint3 texDim)
+float3 VoxelIndexToNvdfUV(uint3 idx, uint3 dim)
 {
-    // Guard against invalid dimensions
-    float3 dim = max(float3(texDim), float3(1.0, 1.0, 1.0));
+    float3 dimF = max(float3(dim), 1.0.xxx);
+    float3 uvw = (float3(idx) + 0.5f) / dimF;
 
-    // (i + 0.5) / dim -> center of the voxel in each axis
-    return (float3(voxelIndex) + 0.5f) / dim;
+    // This assumes the cache texture was created with same layout as NVDF
+    return uvw; // tex.x->world.x, tex.y->world.z, tex.z->world.y
 }
 
 [numthreads(8, 8, 4)]
@@ -115,11 +116,11 @@ void main(uint3 dispatchThreadID : SV_DispatchThreadID)
     {
         return;
     }
-
+    
     uint3 texDim = uint3(width, height, depth);
 
     // Convert dispatch index -> UV at voxel center
-    float3 sampleUV = VoxelIndexToCenterUV(dispatchThreadID, texDim);
+    float3 sampleUV = VoxelIndexToNvdfUV(dispatchThreadID, texDim);
     float3 sampleWS = UVToWorld(sampleUV);
 
     float tau = GetOpticalDepthToSun(sampleWS, DIR_SUN);

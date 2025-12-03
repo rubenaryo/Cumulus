@@ -20,7 +20,7 @@ static const float MIN_TRANSMITTANCE = 0.01; // Early-out when mostly opaque
 // Lighting Settings 
 static const float3 DIR_SUN = normalize(float3(0.0, 1.0, 0.0)); // Temporary hardcoded light dir
 static const float3 LIGHT_SUN = float3(220, 240, 250);; // sun color/brightness
-static const float DIRECT_LIGHTING_SCALE = 0.975;
+static const float DIRECT_LIGHTING_SCALE = 0.99;
 
 // Volume bounds in world space
 static const float SIDE_LENGTH = 4000.0; 
@@ -119,18 +119,18 @@ cbuffer HullFacesBuffer : register(b5)
 };
 
 
-float3 WorldToNvdfUV(float3 worldPos)
-{
-    float3 local = (worldPos - VOLUME_MIN_WS) / (VOLUME_MAX_WS - VOLUME_MIN_WS);
+    float3 WorldToNvdfUV(float3 worldPos)
+    {
+        float3 local = (worldPos - VOLUME_MIN_WS) / (VOLUME_MAX_WS - VOLUME_MIN_WS);
 
-    // local: (X, Y, Z) normalized into [0,1]
+        // local: (X, Y, Z) normalized into [0,1]
 
-    float u = local.x; // world X -> texture X
-    float v = local.z; // world Z -> texture Y (so each slice is an XZ plane)
-    float w = local.y; // world Y -> texture Z (stacking along Y)
+        float u = local.x; // world X -> texture X
+        float v = local.z; // world Z -> texture Y (so each slice is an XZ plane)
+        float w = local.y; // world Y -> texture Z (stacking along Y)
 
-    return float3(u, v, w);
-}
+        return float3(u, v, w);
+    }
 
 float3 NvdfUVToWorld(float3 uvw)
 {

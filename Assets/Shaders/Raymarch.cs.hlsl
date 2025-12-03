@@ -142,6 +142,8 @@ float GetApproxOpticalDepthToSun(float3 samplePos, float3 sunDir)
         // Ray from samplePos in sunDir never enters volume
         return 0.0;
     }
+    
+    //return lightCacheTex.SampleLevel(linearClamp, WorldToNvdfUV(samplePos), 0.0f).r;
 
     // Start inside the box at the sample position
     float t = 0.0; // we are already at samplePos, so relative distance along sunDir
@@ -151,7 +153,7 @@ float GetApproxOpticalDepthToSun(float3 samplePos, float3 sunDir)
 
     // Ray march for the first two steps 
     [loop]
-    for (int i = 0; i < 128; ++i)
+    for (int i = 0; i < 2; ++i)
     {
         float3 lightPos = samplePos + sunDir * t;
 
@@ -201,9 +203,8 @@ float GetApproxOpticalDepthToSun(float3 samplePos, float3 sunDir)
     }
     
     // Use cached values to approximate remaining light ray march
-    
-    
-    return depth;
+    float cachedOpticalDepth = lightCacheTex.SampleLevel(linearClamp, WorldToNvdfUV(samplePos + sunDir * t), 0.0f).r;
+    return depth + cachedOpticalDepth;
 #endif
 }
 
