@@ -138,19 +138,23 @@ cbuffer HullFacesBuffer : register(b5)
 	float4 hullFaces[1024];
 };
 
+cbuffer CloudLightingBuffer : register(b7)
+{
+    int maxSteps;
+}
 
-    float3 WorldToNvdfUV(float3 worldPos)
-    {
-        float3 local = (worldPos - VOLUME_MIN_WS) / (VOLUME_MAX_WS - VOLUME_MIN_WS);
+float3 WorldToNvdfUV(float3 worldPos)
+{
+    float3 local = (worldPos - VOLUME_MIN_WS) / (VOLUME_MAX_WS - VOLUME_MIN_WS);
 
-        // local: (X, Y, Z) normalized into [0,1]
+    // local: (X, Y, Z) normalized into [0,1]
 
-        float u = local.x; // world X -> texture X
-        float v = local.z; // world Z -> texture Y (so each slice is an XZ plane)
-        float w = local.y; // world Y -> texture Z (stacking along Y)
+    float u = local.x; // world X -> texture X
+    float v = local.z; // world Z -> texture Y (so each slice is an XZ plane)
+    float w = local.y; // world Y -> texture Z (stacking along Y)
 
-        return float3(u, v, w);
-    }
+    return float3(u, v, w);
+}
 
 float3 NvdfUVToWorld(float3 uvw)
 {

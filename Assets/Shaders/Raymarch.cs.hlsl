@@ -325,7 +325,7 @@ float3 VolumeRaymarchNvdf(float3 eyePos, float3 dir, float3 bgColor, float maxRa
 
     // Ray march until the ray exits the volume or max steps are reached
     [loop]
-    for (int i = 0; i < MAX_STEPS && march.distance < march.tExit; ++i)
+    for (int i = 0; i < maxSteps && march.distance < march.tExit; ++i)
     {
         march.stepIndex = i;
 
