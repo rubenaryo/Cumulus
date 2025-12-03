@@ -10,7 +10,7 @@ RWTexture3D<float4> gCache : register(u0);
 
 // Returns tau; transmittance is exp(-tau)
 // Returns tau along 'dir' starting at samplePos
-float GetOpticalDepthAlongDirection(float3 samplePos, float3 dir)
+float GetOpticalDepthAlongDirection(float3 samplePos, float3 dir, float extinctionScale)
 {
 #if GPU_CLOUD
     return 0.0;
@@ -54,7 +54,7 @@ float GetOpticalDepthAlongDirection(float3 samplePos, float3 dir)
                 linearWrap
             );
 
-            float sigma = dimensionalProfile * (1.0 - DIRECT_LIGHTING_SCALE);
+            float sigma = dimensionalProfile * extinctionScale;
 
             float stepSizeInside = minStepSize;
             tau += sigma * stepSizeInside;
@@ -113,8 +113,8 @@ void main(uint3 dispatchThreadID : SV_DispatchThreadID)
     float3 sampleUV = VoxelIndexToNvdfUV(dispatchThreadID, texDim);
     float3 sampleWS = UVToWorld(sampleUV);
 
-    float tauSun = GetOpticalDepthAlongDirection(sampleWS, DIR_SUN);
-    float tauVert = GetOpticalDepthAlongDirection(sampleWS, normalize(float3(0, 1, 0)));
+    float tauSun = GetOpticalDepthAlongDirection(sampleWS, DIR_SUN, DIRECT_EXTINCTION_SCALE);
+    float tauVert = GetOpticalDepthAlongDirection(sampleWS, normalize(float3(0, 1, 0)), AMBIENT_EXTINCTION_SCALE);
 
     gCache[dispatchThreadID] = float4(tauSun, tauVert, 0.0f, 0.0f);
 }

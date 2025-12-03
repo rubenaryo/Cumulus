@@ -20,9 +20,12 @@ static const float MIN_TRANSMITTANCE = 0.01; // Early-out when mostly opaque
 // Lighting Settings 
 static const float3 DIR_SUN = normalize(float3(0.0, 1.0, 0.0)); // Temporary hardcoded light dir
 static const float3 LIGHT_SUN = float3(220, 240, 250);; // sun color/brightness
-static const float DIRECT_LIGHTING_SCALE = 0.95;
+static const float DIRECT_EXTINCTION_SCALE = 0.02;
 static const float3 SECONDARY_COLOR = float3(1.0, 0.96, 0.9);
 static const float SECONDARY_STRENGTH = 2;
+static const float3 AMBIENT_COLOR = float3(1.0, 0.96, 0.9);
+static const float AMBIENT_STRENGTH = 1;
+static const float AMBIENT_EXTINCTION_SCALE = 0.05; 
 
 // Volume bounds in world space
 static const float SIDE_LENGTH = 4000.0; 
@@ -83,6 +86,21 @@ NoiseSample MakeNoiseSample(float4 sample)
     ns.lowFreqBillow = sample.z;
     ns.highFreqBillow = sample.w;
     return ns;
+}
+
+struct LightCacheSample
+{
+    // Tau is optical depth to X 
+    float tauSun;  
+    float tauVertical; 
+};
+
+LightCacheSample MakeLightCacheSample(float2 sample)
+{
+    LightCacheSample lcs;
+    lcs.tauSun = sample.r; 
+    lcs.tauVertical = sample.g; 
+    return lcs; 
 }
 
 struct AABB

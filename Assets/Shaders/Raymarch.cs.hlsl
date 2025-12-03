@@ -11,7 +11,7 @@
 // Preset: "Density only"  -> all USE_*_LIGHTING = 0
 // Preset: "Lit clouds"    -> enable desired USE_*_LIGHTING = 1
 #define USE_DIRECT_LIGHTING      1   // Sun / directional lighting
-#define USE_AMBIENT_LIGHTING     0   // Sky / ambient term
+#define USE_AMBIENT_LIGHTING     1   // Sky / ambient term
 #define USE_MULTIPLE_SCATTERING  1   // Approx. multiple scattering
 
 // === Debug / Visualization ===
@@ -184,7 +184,7 @@ float GetApproxOpticalDepthToSun(float3 samplePos, float3 sunDir)
                 linearWrap
             );
 
-            float sigma = dimensionalProfile * (1 - DIRECT_LIGHTING_SCALE);
+            float sigma = dimensionalProfile * (1 - DIRECT_EXTINCTION_SCALE);
 
             float stepSizeInside = minStepSize; // or a tuned fixed step
             depth += sigma * stepSizeInside;
@@ -279,10 +279,11 @@ float3 ComputeMultipleScattering(
 }
 
 float3 ComputeAmbientLighting(
-    float3 samplePos,
-    float density)
+    float dimensionalProfile,
+    float opticalDepthVertical)
 {
-    return float3(0.0, 0.0, 0.0);
+    float ambient_scattering = pow(1.0 - dimensionalProfile, 0.5) * exp(-opticalDepthVertical);
+    return AMBIENT_COLOR * exp(-opticalDepthVertical) * AMBIENT_STRENGTH; 
 }
 
 
@@ -398,8 +399,9 @@ float3 VolumeRaymarchNvdf(float3 eyePos, float3 dir, float3 bgColor, float maxRa
 
             // Lighting 
             #if (USE_DIRECT_LIGHTING || USE_AMBIENT_LIGHTING || USE_MULTIPLE_SCATTERING)
-                        float3 lighting = 0.0.xxx;
-
+                float3 lighting = 0.0.xxx;
+                LightCacheSample lightCacheSample = MakeLightCacheSample(GetApproxOpticalDepthToSun(samplePos, DIR_SUN));
+                
                 #if USE_DIRECT_LIGHTING
                         float3 directL = ComputeDirectLighting(
                             march,
@@ -413,18 +415,18 @@ float3 VolumeRaymarchNvdf(float3 eyePos, float3 dir, float3 bgColor, float maxRa
                 #endif
 
                 #if USE_AMBIENT_LIGHTING
-                        float3 ambientL = ComputeAmbientLighting(samplePos, density);
+                        float3 ambientL = ComputeAmbientLighting(dimensionalProfile, lightCacheSample.tauVertical);
                         lighting += ambientL;
                 #endif
 
                 #if USE_MULTIPLE_SCATTERING
-                        float opticalDepthToSun = GetApproxOpticalDepthToSun(samplePos, DIR_SUN);
+                        
                         
                         float sunDot = dot(normalize(DIR_SUN), normalize(dir));
 
                         float3 msL = ComputeMultipleScattering(
                             dimensionalProfile,        // or density
-                            opticalDepthToSun,         // inSunLightSummedDensitySamples analog
+                            lightCacheSample.tauSun, // inSunLightSummedDensitySamples analog
                             sunDot,
                             sdfDistance                // cloud_distance analog
                         );
