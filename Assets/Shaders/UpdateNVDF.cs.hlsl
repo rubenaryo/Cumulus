@@ -120,13 +120,27 @@ void main(int3 dispatchThreadID : SV_DispatchThreadID)
     float d = 999999999.f;
 
     float scale = 0;
-    for (uint i = 0; i < numSeeds; ++i)
+    if (demoMode == 0)
     {
-        float4 curr = seeds[i];
-        scale += curr.a;
-        d = smooth_min(d, SDF_Cloud(worldPos, i % 4 + 3, curr.xyz, curr.a), 0.8);
+        for (uint i = 0; i < numSeeds; ++i)
+        {
+            float4 curr = seeds[i];
+            scale += curr.a;
+            d = smooth_min(d, SDF_Cloud(worldPos, i % 4 + 3, curr.xyz, curr.a), 0.8);
+        }
+        scale /= numSeeds;  // scale is an average of all scales
     }
-    scale /= numSeeds;  // scale is an average of all scales
+    else if (demoMode == 1)
+    {
+        uint numTrails = 1;
+        for (uint i = 0; i < numTrails; ++i)
+        {
+            float curr = SDF_RoundCone(worldPos, positions[2 * i].xyz, positions[2 * i + 1].xyz, positions[2 * i].a, positions[2 * i + 1].a);
+            d = smooth_min(d, curr, 0.8);
+            scale += (positions[2 * i].a + positions[2 * i + 1].a) * 0.5f;
+        }
+        scale /= numTrails;
+    }
     // We then encode SDF into the range [0, 1] from [-256, 4096], as this is what Nubis expects
     const float sdfMin = -256.0;
     const float sdfMax = 4096.0;
