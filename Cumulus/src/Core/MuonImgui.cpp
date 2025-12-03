@@ -8,6 +8,7 @@ Description : Helpers for initializing/using ImGui
 #include <Core/DXCore.h>
 #include <Core/DescriptorHeap.h>
 #include <Utils/Utils.h>
+#include <algorithm>
 
 #include <imgui.h>
 #include <imgui_impl_win32.h>
@@ -106,24 +107,24 @@ void ImguiNewFrame(float gameTime, const Camera& cam, SceneSettings& settings)
         }
         if (ImGui::BeginTabItem("Atmosphere"))
         {
-            ImGui::Text("Sun Direction: %f, %f, %f", settings.sunDir.x, settings.sunDir.y, settings.sunDir.z);
-            ImGui::Checkbox("Toggle Dynamic Sun", &settings.isSunDynamic);
-            if (!settings.isSunDynamic)
+            ImGui::SliderFloat("Sun Size", &settings.atmosphere.sunSize, 0.5, 5.0, "%.1f");
+            ImGui::Checkbox("Toggle Dynamic Sun", &settings.atmosphere.isSunDynamic);
+            if (!settings.atmosphere.isSunDynamic)
             {
-                ImGui::SliderInt("Time Of Day", &settings.timeOfDay, 0, 2400);
+                ImGui::SliderFloat3("Sun Direction", &settings.atmosphere.sunDir.x, -1.0, 1.0, "%.1f");
             }
             else
             {
-                // NOTE: this is the same code as in AtmosphereUtils, so if that changes then this gets out of sync
-                float mapped_time = fmodf(gameTime * 60.f, 2400.f);
-                ImGui::Text("Current Time: %.0f", mapped_time);
+                ImGui::SliderFloat("Time Scale:", &settings.atmosphere.timeScale, 0.0f, 5.f, "%.1f");
+                ImGui::Text("Sun Direction: %f, %f, %f", settings.atmosphere.sunDir.x, settings.atmosphere.sunDir.y, settings.atmosphere.sunDir.z);
             }
+
 
             ImGui::EndTabItem();
         }
         if (ImGui::BeginTabItem("Interactables"))
         {
-            ImGui::Checkbox("Visualize Convex Hull", &settings.isSunDynamic);
+            ImGui::Checkbox("Visualize Convex Hull", &settings.drawObjects);
             ImGui::Checkbox("Draw Objects", &settings.drawObjects);
             ImGui::EndTabItem();
         }
