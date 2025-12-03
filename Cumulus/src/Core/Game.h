@@ -79,6 +79,9 @@ private:
     Muon::UploadBuffer mCloudGenStagingBuffer;
     Muon::DefaultBuffer mCloudGenBuffer;
 
+    Muon::UploadBuffer mHullFacesStagingBuffer;
+    Muon::DefaultBuffer mHullFacesBuffer;
+
     // Timer for the main game loop
     Muon::StepTimer mTimer;
 };

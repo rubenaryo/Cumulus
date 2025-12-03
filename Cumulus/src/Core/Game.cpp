@@ -116,9 +116,29 @@ bool Game::Init(HWND window, int width, int height)
     mCloudGenStagingBuffer.Create(L"CloudGen Staging Buffer", AlignToBoundary(sizeof(cbCloudGenData), 512));
     mCloudGenBuffer.Create(L"CloudGen Buffer", AlignToBoundary(sizeof(cbCloudGenData), 512));
 
+    mHullFacesStagingBuffer.Create(L"Hull Faces Staging Buffer", AlignToBoundary(sizeof(cbHullFaces), 512));
+    mHullFacesBuffer.Create(L"Hull Faces Buffer", AlignToBoundary(sizeof(cbHullFaces), 512));
+
     InitFrameResources(width, height);
 
     mCloudGenStagingBuffer.UploadToDefaultBuffer(mCloudGenBuffer, &mCloudData, sizeof(cbCloudGenData), Muon::GetCommandList());
+    
+    ID3D12GraphicsCommandList* pCommandList = Muon::GetCommandList();
+    pCommandList->ResourceBarrier(1,
+        &CD3DX12_RESOURCE_BARRIER::Transition(mHullFacesBuffer.GetResource(),
+            D3D12_RESOURCE_STATE_COMMON, D3D12_RESOURCE_STATE_COPY_DEST));
+
+    // Schedule a copy from our upload heap to the default heap
+    pCommandList->CopyBufferRegion(
+        mHullFacesBuffer.GetResource(), 0,
+        mHullFacesStagingBuffer.GetResource(), 0,
+        mHullFacesStagingBuffer.GetBufferSize());
+
+    // Mark ready for use
+    pCommandList->ResourceBarrier(1,
+        &CD3DX12_RESOURCE_BARRIER::Transition(mHullFacesBuffer.GetResource(),
+            D3D12_RESOURCE_STATE_COPY_DEST, D3D12_RESOURCE_STATE_GENERIC_READ));
+
 
     Muon::CloseCommandList();
     Muon::ExecuteCommandList();
@@ -159,6 +179,9 @@ bool Game::InitFrameResources(UINT width, UINT height)
             h.faces[i].distance
         );
     }
+
+    UINT8* pHullFacesStagingBuffer = mHullFacesStagingBuffer.GetMappedPtr();
+    memcpy(pHullFacesStagingBuffer, &faces, AlignToBoundary(sizeof(cbHullFaces), 512));
 
     // Initialize teapot's hull
     cbConvexHull cHull = {};
@@ -346,7 +369,7 @@ void Game::UpdateProceduralNVDF()
     int32_t hullFaceIdx = mProcNVDFPass.GetResourceRootIndex("HullFacesBuffer");
     if (hullFaceIdx != ROOTIDX_INVALID)
     {
-        pCommandList->SetComputeRootConstantBufferView(hullFaceIdx, currFrameResources.mHullFaceBuffer.GetGPUVirtualAddress());
+        pCommandList->SetComputeRootConstantBufferView(hullFaceIdx, mHullFacesBuffer.GetGPUVirtualAddress());
     }
 
     int32_t cloudIdx = mProcNVDFPass.GetResourceRootIndex("cbCloudGenBuffer");
