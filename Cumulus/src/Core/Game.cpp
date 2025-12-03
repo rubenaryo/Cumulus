@@ -257,8 +257,9 @@ void Game::Update(Muon::StepTimer const& timer)
 
     // Updating Atmosphere
     Muon::cbAtmosphere atmosphere;
-    Muon::UpdateAtmosphere(atmosphere, mCamera, settings.isSunDynamic, settings.timeOfDay, time.totalTime);
-    settings.sunDir = atmosphere.sun_direction;
+    Muon::UpdateAtmosphere(atmosphere, mCamera, settings.atmosphere);
+    // NOTE: this is explicit to switch Y and Z due to different coordinate systems at play
+    settings.atmosphere.sunDir = { atmosphere.sun_direction.x,atmosphere.sun_direction.z,atmosphere.sun_direction.y };
     currFrameResources.UpdateAtmosphere(atmosphere);
 
     // Updating Cloud Data

@@ -8,6 +8,7 @@ Description : Useful functions for atmospheric rendering calculations
 #define ATMOSPHEREUTILS_H
 
 #include <Core/Camera.h>
+#include <Core/MuonImgui.h>
 #include <Core/CBufferStructs.h>
 #include <DirectXMath.h>
 
@@ -132,48 +133,20 @@ void InitializeAtmosphereConstants(
     constants.white_point = XMFLOAT3(1.082414f, 0.967556f, 0.950030f);
 }
 
-DirectX::XMFLOAT3 GetSunDirection(int time)
-{
-    using namespace DirectX;
-
-    // mapping time to [0, 2PI]
-    float t = static_cast<float>(time) / 2400.f * kPi * 2.f;
-
-    // { -0.03931, 0.25845, -0.36024 }; I got this from crossing the first 2 presets, but it makes the sun never come up...
-    XMVECTOR axis = { 1.0, 0.0, 0.0 };
-
-    XMVECTOR rotation = XMQuaternionRotationAxis(axis, t);
-
-    XMVECTOR midnight = { 0.0, 0.0, -1.0 };
-
-    XMVECTOR currVec = XMVector3Rotate(midnight, rotation);
-
-    XMFLOAT3 curr;
-    XMStoreFloat3(&curr, currVec);
-
-    return curr;
-}
-
 void UpdateAtmosphere(cbAtmosphere& constants,
     Camera& camera,
-    bool isSunDynamic,
-    int timeOfDay,
-    float gameTime,
-    float viewport_width = 1280,
-    float viewport_height = 800,
-    float view_zenith_angle_radians = 1.47f,
-    float view_azimuth_angle_radians = -0.1f)
+    AtmosphereInput& input)
 {
     using namespace DirectX;
 
     // Calculate aspect ratio
-    float aspect_ratio = static_cast<float>(viewport_width) / static_cast<float>(viewport_height);
+    float aspect_ratio = static_cast<float>(input.viewport_width) / static_cast<float>(input.viewport_height);
 
     // FOV setup (50 degrees as in original)
     const float kFovY = 50.0f / 180.0f * static_cast<float>(kPi);
 
-    view_zenith_angle_radians = camera.GetZenith();
-    view_azimuth_angle_radians = camera.GetAzimuth();
+    input.view_zenith_angle_radians = camera.GetZenith();
+    input.view_azimuth_angle_radians = camera.GetAzimuth();
     // Distance calculation is either based on simply height or distance from target
     XMVECTOR target = camera.GetTarget();
     XMVECTOR at = XMVectorSet(XMVectorGetX(target), XMVectorGetZ(target), XMVectorGetY(target), 0.0f);
@@ -183,8 +156,8 @@ void UpdateAtmosphere(cbAtmosphere& constants,
     // NOTE: Ideally we woudln't want to recalculate view from clip every time
     XMMATRIX view_from_clip = CreateViewFromClipMatrix(kFovY, aspect_ratio);
     XMMATRIX model_from_view = CreateModelFromViewMatrix(
-        view_zenith_angle_radians,
-        view_azimuth_angle_radians,
+        input.view_zenith_angle_radians,
+        input.view_azimuth_angle_radians,
         dist * 100
     );
 
@@ -194,29 +167,33 @@ void UpdateAtmosphere(cbAtmosphere& constants,
 
     // camera pos is grabbed from the calculation we already did for model matrix
     constants.camera_position = XMFLOAT3(constants.model_from_view._41, constants.model_from_view._42, constants.model_from_view._43);
-    constants.isCamUp = view_zenith_angle_radians > XM_PIDIV2 ? 1 : 0;
+    constants.isCamUp = input.view_zenith_angle_radians > XM_PIDIV2 ? 1 : 0;
     // Earth center (at origin in world space, but offset down in "length units")
     constants.earth_center = XMFLOAT3(0.0f, 0.0f, -6360.0f); // Earth radius in km
     // -0.989970, -0.141117, 0.006796 -> preset 2
     // -0.935575f, 0.230531f, 0.267499f -> preset 1
-    // -0.03931, 0.25845, -0.36024 is the resulting axis, but it sucks aaaaahhhhh why doesn't the sun rise??
-    //constants.sun_direction = XMFLOAT3(-0.935575f, 0.230531f, 0.267499f);
-    if (isSunDynamic)
+    if (input.isSunDynamic)
     {
-        // current game time is an hour per second
-        float mapped_time = fmodf(gameTime * 60.f, 2400.f);
-        constants.sun_direction = GetSunDirection(mapped_time);
+        XMVECTOR axis = { -sqrt(3) * 0.5, 0.0, 0.5 };
+
+        XMVECTOR rotation = XMQuaternionRotationAxis(XMVector3Normalize(axis), 0.01 * input.timeScale);
+        // NOTE: z and y need to be flipped here because the atmosphere code expects Y up........
+        XMVECTOR currVec = { input.sunDir.x, input.sunDir.z, input.sunDir.y };
+        currVec = XMVector3Rotate(currVec, rotation);
+
+        XMStoreFloat3(&constants.sun_direction, currVec);
     }
     else
     {
-        constants.sun_direction = GetSunDirection(timeOfDay);
+        // NOTE: this is explicit to switch Y and Z due to different coordinate systems at play
+        constants.sun_direction = { input.sunDir.x, input.sunDir.z, input.sunDir.y };
     }
     // Normalize sun direction
     XMVECTOR sun_dir = XMLoadFloat3(&constants.sun_direction);
     sun_dir = XMVector3Normalize(sun_dir);
     XMStoreFloat3(&constants.sun_direction, sun_dir);
 
-    constants.sun_size = XMFLOAT2(0.004675f, 0.999989f);
+    constants.sun_size = XMFLOAT2(0.004675f * input.sunSize, cos(0.004675f * input.sunSize));
 
     // Exposure and white point for tone mapping
     // NOTE: Maybe move some of this for post-process, so that clouds can use full color data
