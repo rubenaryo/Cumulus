@@ -34,6 +34,7 @@ struct FrameResources
     bool UpdateCloudData(cbCloudGenData& data);
     bool UpdateHulls(cbHulls& data);
     bool UpdateHullFaces(cbHullFaces& data);
+    bool UpdateJetTrail(cbJetTrailPositions& jetTrailPositions);
 
     void Destroy();
 
@@ -47,6 +48,7 @@ struct FrameResources
     UploadBuffer mCloudGenBuffer;
     UploadBuffer mHullBuffer;
     UploadBuffer mHullFaceBuffer;
+    UploadBuffer mJetTrailBuffer;
 
     UINT64 mFence = 0;
 

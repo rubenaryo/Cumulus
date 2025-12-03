@@ -5,8 +5,14 @@ cbuffer cbCloudGenBuffer : register(b6)
     float4 seeds[32];
     
     int numSeeds;
-    float pad[3];
+    int demoMode;
+    float pad[2];
 };
+
+cbuffer cbJetBuffer : register(b7)
+{
+    float4 positions[4];
+}
 
 // Texture output: 
 // r - sdf distance - how far we are from the cloud

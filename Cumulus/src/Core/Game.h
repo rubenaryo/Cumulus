@@ -44,7 +44,7 @@ public:
 
 private:
     void InitEntities();
-    void UpdateEntities(const Muon::cbTime& time);
+    void UpdateEntities(Muon::FrameResources& currFrameResources, const Muon::cbTime& time);
 
     void Update(Muon::StepTimer const& timer);
     void UpdateProceduralNVDF();
@@ -74,11 +74,13 @@ private:
     // TEMP: For testing
     Muon::Mesh mCube;
 
-    static const size_t NUM_FRAMES_IN_FLIGHT = 2;
+    static const size_t NUM_FRAMES_IN_FLIGHT = 10;
     std::array<Muon::FrameResources, NUM_FRAMES_IN_FLIGHT> mFrameResources;
     size_t mCurrFrameResourceIdx = 0;
 
     int jetIdx = -1;
+    Muon::cbJetTrailPositions jetTrailPos;
+
     static const DirectX::XMFLOAT3 flightDir;
     std::vector<Muon::EntityData> mEntityCBData;
 

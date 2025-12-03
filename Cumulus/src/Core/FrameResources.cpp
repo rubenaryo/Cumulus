@@ -47,7 +47,7 @@ bool FrameResources::Create(UINT width, UINT height)
     mHullBuffer.Create(L"Hull Buffer", sizeof(cbHulls));
     mHullFaceBuffer.Create(L"Hull Faces Buffer", sizeof(cbHullFaces));
     mTimeBuffer.Create(L"Time", sizeof(cbTime));
-
+    mJetTrailBuffer.Create(L"Jet Trail", sizeof(cbJetTrailPositions));
 	return true;
 }
 
@@ -99,6 +99,12 @@ bool FrameResources::UpdateHullFaces(cbHullFaces& data)
     return true;
 }
 
+bool FrameResources::UpdateJetTrail(cbJetTrailPositions& data)
+{
+    memcpy(mJetTrailBuffer.GetMappedPtr(), &data, sizeof(cbJetTrailPositions));
+    return false;
+}
+
 void FrameResources::Destroy()
 {
     mCmdAllocator.Reset();
@@ -110,6 +116,7 @@ void FrameResources::Destroy()
     mCloudGenBuffer.Destroy();
     mHullBuffer.Destroy();
     mHullFaceBuffer.Destroy();
+    mJetTrailBuffer.Destroy();
 }
 
 

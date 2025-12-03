@@ -125,6 +125,10 @@ struct EntityData {
     Muon::ResourceID resourceID;
 };
 
+struct alignas(16) cbJetTrailPositions {
+    DirectX::XMFLOAT4 positions[4];
+};
+
 }
 
 #endif

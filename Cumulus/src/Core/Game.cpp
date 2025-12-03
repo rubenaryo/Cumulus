@@ -262,7 +262,7 @@ void Game::InitEntities()
 
     // ---- 1b. Set initial world position -----------------------------------
     XMVECTOR jetStartPos = XMVectorSet(0.f - flightDir.x * 200.f, 1000.f, -flightDir.z * 200.f, 1.f); // <-- your initial position
-
+    XMStoreFloat4(&jetTrailPos.positions[0], jetStartPos);
 
     // Build world matrix correctly
     XMMATRIX world = XMMatrixIdentity();
@@ -295,11 +295,11 @@ void Game::InitEntities()
 
 
 
-void Game::UpdateEntities(const Muon::cbTime& time)
+void Game::UpdateEntities(Muon::FrameResources& currFrameResources, const Muon::cbTime& time)
 {
     using namespace Muon;
     if (jetIdx >= 0) {
-        float jetSpeed = 55.f;
+        float jetSpeed = 555.f * time.deltaTime;
 
         Muon::EntityData& jet = mEntityCBData[jetIdx];   
 
@@ -316,6 +316,11 @@ void Game::UpdateEntities(const Muon::cbTime& time)
 
         XMStoreFloat4x4(&jet.entityMatrices.world, world);
         XMStoreFloat4x4(&jet.entityMatrices.invWorld, DirectX::XMMatrixInverse(nullptr, world));
+
+        DirectX::XMVECTOR jetPos = world.r[3];
+        DirectX::XMStoreFloat4(&jetTrailPos.positions[1], jetPos);
+
+        currFrameResources.UpdateJetTrail(jetTrailPos);
     }
 
 
@@ -373,7 +378,7 @@ void Game::Update(Muon::StepTimer const& timer)
     }
 
     // Updating Entities
-    UpdateEntities(time);
+    UpdateEntities(currFrameResources, time);
 }
 
 void Game::UpdateProceduralNVDF()
@@ -424,6 +429,11 @@ void Game::UpdateProceduralNVDF()
         pCommandList->SetComputeRootConstantBufferView(cloudIdx, currFrameResources.mCloudGenBuffer.GetGPUVirtualAddress());
     }
 
+    int32_t jetTrailIdx = mProcNVDFPass.GetResourceRootIndex("cbJetBuffer");
+    if (jetTrailIdx != ROOTIDX_INVALID)
+    {
+        pCommandList->SetComputeRootConstantBufferView(jetTrailIdx, currFrameResources.mJetTrailBuffer.GetGPUVirtualAddress());
+    }
 
     pCommandList->ResourceBarrier(1, &CD3DX12_RESOURCE_BARRIER::Transition(pProcNVDFTex->GetResource(),
         D3D12_RESOURCE_STATE_GENERIC_READ, D3D12_RESOURCE_STATE_UNORDERED_ACCESS));
