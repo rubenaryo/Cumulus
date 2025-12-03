@@ -43,6 +43,9 @@ public:
     void OnMouseMove(short newX, short newY);
 
 private:
+    void InitEntities();
+    void UpdateEntities(const Muon::cbTime& time);
+
     void Update(Muon::StepTimer const& timer);
     void UpdateProceduralNVDF();
     void UpdateRaymarchCache();
@@ -75,7 +78,9 @@ private:
     std::array<Muon::FrameResources, NUM_FRAMES_IN_FLIGHT> mFrameResources;
     size_t mCurrFrameResourceIdx = 0;
 
-    std::unordered_map<int32_t, Muon::EntityData> mEntityCBData;
+    int jetIdx = -1;
+    static const DirectX::XMFLOAT3 flightDir;
+    std::vector<Muon::EntityData> mEntityCBData;
 
     Muon::cbCloudGenData mCloudData;
 

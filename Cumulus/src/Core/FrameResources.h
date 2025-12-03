@@ -26,7 +26,7 @@ struct FrameResources
     
     bool Create(UINT width, UINT height);
 
-    bool UpdateEntities(cbPerEntity& data);
+    bool UpdateWorldMatrix(cbPerEntity& data);
     bool UpdateLights(cbLights& data);
     bool UpdateTime(cbTime& data);
     bool UpdateAABB(cbIntersections& data);

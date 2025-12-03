@@ -51,7 +51,7 @@ bool FrameResources::Create(UINT width, UINT height)
 	return true;
 }
 
-bool FrameResources::UpdateEntities(cbPerEntity& data)
+bool FrameResources::UpdateWorldMatrix(cbPerEntity& data)
 {
     memcpy(mWorldMatrixBuffer.GetMappedPtr(), &data, sizeof(cbPerEntity));
     return true;

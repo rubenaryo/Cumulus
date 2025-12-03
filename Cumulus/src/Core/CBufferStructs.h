@@ -115,12 +115,14 @@ struct alignas(16) cbCloudGenData
     DirectX::XMFLOAT4 seeds[32];
     
     int numSeeds;
-    float pad[3];
+    int demoMode;
+    float pad[2];
 };
 
 struct EntityData {
     cbPerEntity entityMatrices;
     cbConvexHull hull;
+    Muon::ResourceID resourceID;
 };
 
 }

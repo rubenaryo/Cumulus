@@ -37,6 +37,8 @@ Game::Game() :
     mTimer.SetFixedTimeStep(false);
 }
 
+const DirectX::XMFLOAT3 Game::flightDir = { -5.f, 0.f, 2.f };
+
 bool Game::Init(HWND window, int width, int height)
 {
     using namespace Muon;
@@ -58,7 +60,7 @@ bool Game::Init(HWND window, int width, int height)
 
     ResourceCodex& codex = ResourceCodex::GetSingleton();
 
-    mCamera.Init(DirectX::XMFLOAT3(500.0, 300.0, 100.0), width / (float)height, 0.1f, 1000.0f);
+    mCamera.Init(DirectX::XMFLOAT3(500.0, 300.0, 100.0), width / (float)height, 0.1f, 10000.0f);
 
     // Assemble opaque render pass
     {
@@ -122,6 +124,7 @@ bool Game::Init(HWND window, int width, int height)
             Printf(L"Warning: %s failed to generate!\n", mPostProcessPass.GetName());
     }
 
+    InitEntities();
     InitFrameResources(width, height);
 
     Muon::CloseCommandList();
@@ -167,11 +170,7 @@ bool Game::InitFrameResources(UINT width, UINT height)
     // Initialize teapot's hull
     cbConvexHull cHull = {};
     cHull.faceCount = (uint32_t)h.faces.size();
-    cHull.faceOffset = 0;
-
-    mEntityCBData[0].hull = cHull;
-    mEntityCBData[0].entityMatrices.world = DirectX::XMFLOAT4X4(); // These get updated every frame anyway
-    mEntityCBData[0].entityMatrices.invWorld = DirectX::XMFLOAT4X4();
+    cHull.faceOffset = 0;;
 
     // Create each frame resource and fill it with static data.
     for (size_t i = 0; i != NUM_FRAMES_IN_FLIGHT; ++i)
@@ -186,6 +185,8 @@ bool Game::InitFrameResources(UINT width, UINT height)
     }
 
     return true;
+
+    
 }
 
 // On Timer tick, run Update() on the game, then Render()
@@ -236,6 +237,89 @@ void Game::AdvanceFence()
 
     // Advance the fence value to mark commands up to this fence point.
     currFrameResources.mFence = Muon::AdvanceFence();
+}
+
+void Game::InitEntities()
+{
+    using namespace Muon;
+    using namespace DirectX;
+
+    ResourceCodex& codex = ResourceCodex::GetSingleton();
+
+    EntityData jetEntity;
+
+    // ---- 1. Setup initial orientation using flightDir ----------------------
+
+    XMVECTOR forward = XMVector3Normalize(XMLoadFloat3(&flightDir));
+    XMVECTOR up = XMVectorSet(0.f, 1.f, 0.f, 0.f);
+
+    // If forward is nearly parallel to up, pick a different up
+    if (fabs(XMVectorGetX(XMVector3Dot(forward, up))) > 0.99f)
+        up = XMVectorSet(1.f, 0.f, 0.f, 0.f);
+
+    XMVECTOR right = XMVector3Normalize(XMVector3Cross(up, forward));
+    up = XMVector3Normalize(XMVector3Cross(forward, right));
+
+    // ---- 1b. Set initial world position -----------------------------------
+    XMVECTOR jetStartPos = XMVectorSet(0.f - flightDir.x * 200.f, 1000.f, -flightDir.z * 200.f, 1.f); // <-- your initial position
+
+
+    // Build world matrix correctly
+    XMMATRIX world = XMMatrixIdentity();
+
+    world.r[0] = XMVectorSetW(right, 0.f);     // X basis
+    world.r[1] = XMVectorSetW(up, 0.f);        // Y basis
+    world.r[2] = XMVectorSetW(forward, 0.f);   // Z basis
+    world.r[3] = jetStartPos;                   // position
+
+    XMStoreFloat4x4(&jetEntity.entityMatrices.world, world);
+    XMStoreFloat4x4(&jetEntity.entityMatrices.invWorld,
+        XMMatrixInverse(nullptr, world));
+
+    // ---- 2. Resource + hull ------------------------------------------------
+
+    jetEntity.resourceID = Muon::GetResourceID(L"jet.obj");
+
+    Hull hull = codex.GetMesh(jetEntity.resourceID)->GetHull();
+    cbConvexHull cHull = {};
+    cHull.faceCount = (uint32_t)hull.faces.size();
+    cHull.faceOffset = 0;
+
+    jetEntity.hull = cHull;
+
+    // ---- 3. Store ----------------------------------------------------------
+
+    jetIdx = 0;
+    mEntityCBData.push_back(jetEntity);
+}
+
+
+
+void Game::UpdateEntities(const Muon::cbTime& time)
+{
+    using namespace Muon;
+    if (jetIdx >= 0) {
+        float jetSpeed = 55.f;
+
+        Muon::EntityData& jet = mEntityCBData[jetIdx];   
+
+        DirectX::XMMATRIX world = XMLoadFloat4x4(&jet.entityMatrices.world);
+
+        DirectX::XMVECTOR forward = world.r[2];  
+        forward = DirectX::XMVector3Normalize(forward);
+
+        DirectX::XMVECTOR translation =
+            DirectX::XMVectorScale(forward, jetSpeed);
+
+        world = DirectX::XMMatrixMultiply(world,
+            DirectX::XMMatrixTranslationFromVector(translation));
+
+        XMStoreFloat4x4(&jet.entityMatrices.world, world);
+        XMStoreFloat4x4(&jet.entityMatrices.invWorld, DirectX::XMMatrixInverse(nullptr, world));
+    }
+
+
+    //determine new size of entity matrix buffer, update that
 }
 
 void Game::Update(Muon::StepTimer const& timer)
@@ -289,28 +373,7 @@ void Game::Update(Muon::StepTimer const& timer)
     }
 
     // Updating Entities
-    const float PI = 3.14159f;
-    DirectX::XMMATRIX debugEntityWorld = DirectX::XMMatrixIdentity();
-    debugEntityWorld = XMMatrixMultiply(debugEntityWorld, DirectX::XMMatrixRotationRollPitchYaw(0, 0, PI / 2.0f));
-    debugEntityWorld = XMMatrixMultiply(debugEntityWorld, DirectX::XMMatrixRotationRollPitchYaw(-PI / 2.0f, 0, 0));
-    debugEntityWorld = XMMatrixMultiply(debugEntityWorld, DirectX::XMMatrixScaling(10.f, 10.f, 10.f));
-    float yPos = 1000 * (sin(time.totalTime * .5f));
-    debugEntityWorld = XMMatrixMultiply(debugEntityWorld, DirectX::XMMatrixTranslation(0, yPos, 0));
-
-    Muon::cbPerEntity& entity = mEntityCBData[0].entityMatrices;
-    XMStoreFloat4x4(&entity.world, debugEntityWorld);
-    XMStoreFloat4x4(&entity.invWorld, DirectX::XMMatrixInverse(nullptr, debugEntityWorld));
-    currFrameResources.UpdateEntities(entity);
-
-    // Updating Hulls
-    Muon::cbConvexHull cHull = mEntityCBData[0].hull;
-    cHull.world = entity.world;
-    cHull.invWorld = entity.invWorld;
-
-    Muon::cbHulls hulls = {};
-    hulls.hulls[0] = cHull;
-    hulls.hullCount = 1;
-    currFrameResources.UpdateHulls(hulls);
+    UpdateEntities(time);
 }
 
 void Game::UpdateProceduralNVDF()
@@ -553,9 +616,10 @@ void Game::Render()
             pCommandList->SetGraphicsRootConstantBufferView(timeRootIdx, currFrameResources.mTimeBuffer.GetGPUVirtualAddress());
         }
 
-        const Mesh* pMesh = codex.GetMesh(GetResourceID(L"teapot.obj"));
+        const Mesh* pMesh = codex.GetMesh(GetResourceID(L"jet.obj"));
         if (pMesh && settings.drawObjects)
         {
+            currFrameResources.UpdateWorldMatrix(mEntityCBData[jetIdx].entityMatrices);
             pMesh->DrawIndexed(pCommandList);
         }
     }
