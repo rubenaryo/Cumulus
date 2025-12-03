@@ -14,6 +14,7 @@ Description : Interface for GPU  Buffers
 namespace Muon
 {
 struct Mesh;
+struct DefaultBuffer;
 }
 
 namespace Muon
@@ -60,6 +61,7 @@ struct UploadBuffer : Buffer
 
     bool UploadToTexture(Texture& dstTexture, void* data, ID3D12GraphicsCommandList* pCommandList);
     bool UploadToMesh(ID3D12GraphicsCommandList* pCommandList, Mesh& dstMesh, void* vtxData, UINT vtxDataSize, void* idxData = nullptr, UINT idxDataSize = 0);
+    bool UploadToDefaultBuffer(DefaultBuffer& dstBuffer, void* data, size_t dataSize, ID3D12GraphicsCommandList* pCommandList);
 
 private:
     UINT8* mMappedPtr = nullptr;
@@ -73,6 +75,7 @@ struct DefaultBuffer : Buffer
 
     void Create(const wchar_t* name, size_t size);
     bool Populate(void* data, size_t dataSize, UploadBuffer& stagingBuffer, ID3D12GraphicsCommandList* pCommandList);
+    bool Populate(UploadBuffer& stagingBuffer, ID3D12GraphicsCommandList* pCommandList);
     void Destroy();
 };
 

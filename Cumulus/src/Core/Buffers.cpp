@@ -269,6 +269,53 @@ bool UploadBuffer::UploadToMesh(ID3D12GraphicsCommandList* pCommandList, Mesh& d
     return true;
 }
 
+bool UploadBuffer::UploadToDefaultBuffer(DefaultBuffer& dstBuffer, void* data, size_t dataSize, ID3D12GraphicsCommandList* pCommandList)
+{
+    // DX12 needs 512-byte aligned insertions
+    const UINT necessaryAlignment = D3D12_TEXTURE_DATA_PLACEMENT_ALIGNMENT;
+
+    // Calculate aligned size
+    UINT alignedVtxSize = Muon::AlignToBoundary(dataSize, necessaryAlignment);
+
+    // Check if we have enough space
+    UINT totalSize = alignedVtxSize;
+    if (totalSize > this->GetBufferSize())
+    {
+        Muon::Printf(L"Error: UploadBuffer %s insufficient size for default buffer: %s\n",
+            GetName(), dstBuffer.GetName());
+        return false;
+    }
+
+    // Allocate space for data
+    void* mappedPtr = nullptr;
+    D3D12_GPU_VIRTUAL_ADDRESS gpuAddr = 0;
+    UINT offset = 0;
+
+    if (!Allocate(dataSize, necessaryAlignment,
+        mappedPtr, gpuAddr, offset))
+    {
+        Muon::Printf(L"Error: Failed to allocate vertex data in upload buffer\n");
+        return false;
+    }
+
+    // Copy to mapped ptr in upload heap
+    memcpy(mappedPtr, data, dataSize);
+
+    pCommandList->ResourceBarrier(1,
+        &CD3DX12_RESOURCE_BARRIER::Transition(dstBuffer.GetResource(),
+            D3D12_RESOURCE_STATE_COMMON, D3D12_RESOURCE_STATE_COPY_DEST));
+
+    // Schedule a copy from our upload heap to the default heap
+    pCommandList->CopyBufferRegion(
+        dstBuffer.GetResource(), 0,
+        GetResource(), offset,
+        dataSize);
+
+    // Mark ready for use
+    pCommandList->ResourceBarrier(1,
+        &CD3DX12_RESOURCE_BARRIER::Transition(dstBuffer.GetResource(),
+            D3D12_RESOURCE_STATE_COPY_DEST, D3D12_RESOURCE_STATE_GENERIC_READ));
+}
 
 ////////////////////////////////////////////////////////////////
 
@@ -293,6 +340,11 @@ bool DefaultBuffer::Populate(void* data, size_t dataSize, UploadBuffer& stagingB
 
     memcpy(mapped, data, mBufferSize);
 
+    return Populate(stagingBuffer, pCommandList);
+}
+
+bool DefaultBuffer::Populate(UploadBuffer& stagingBuffer, ID3D12GraphicsCommandList* pCommandList)
+{
     pCommandList->CopyBufferRegion(mpResource.Get(), 0, stagingBuffer.GetResource(), 0, mBufferSize);
 
     CD3DX12_RESOURCE_BARRIER barrier = CD3DX12_RESOURCE_BARRIER::Transition(

@@ -113,7 +113,12 @@ bool Game::Init(HWND window, int width, int height)
             Printf(L"Warning: %s failed to generate!\n", mPostProcessPass.GetName());
     }
 
+    mCloudGenStagingBuffer.Create(L"CloudGen Staging Buffer", AlignToBoundary(sizeof(cbCloudGenData), 512));
+    mCloudGenBuffer.Create(L"CloudGen Buffer", AlignToBoundary(sizeof(cbCloudGenData), 512));
+
     InitFrameResources(width, height);
+
+    mCloudGenStagingBuffer.UploadToDefaultBuffer(mCloudGenBuffer, &mCloudData, sizeof(cbCloudGenData), Muon::GetCommandList());
 
     Muon::CloseCommandList();
     Muon::ExecuteCommandList();
@@ -310,6 +315,14 @@ void Game::UpdateProceduralNVDF()
         return;
     }
 
+    // The UI has flagged for a cloud update
+    if (settings.updateClouds)
+    {
+        Muon::GenerateCloudGenConstants(mCloudData, settings.numClouds, settings.cloudScale);
+
+        settings.updateClouds = false;
+    }
+
     ResourceCodex& codex = ResourceCodex::GetSingleton();
     Texture* pProcNVDFTex = codex.GetTexture(GetResourceID(L"ProceduralNVDF"));
     if (!pProcNVDFTex)
@@ -339,9 +352,8 @@ void Game::UpdateProceduralNVDF()
     int32_t cloudIdx = mProcNVDFPass.GetResourceRootIndex("cbCloudGenBuffer");
     if (cloudIdx != ROOTIDX_INVALID)
     {
-        pCommandList->SetComputeRootConstantBufferView(cloudIdx, currFrameResources.mCloudGenBuffer.GetGPUVirtualAddress());
+        pCommandList->SetComputeRootConstantBufferView(cloudIdx, mCloudGenBuffer.GetGPUVirtualAddress());
     }
-
 
     pCommandList->ResourceBarrier(1, &CD3DX12_RESOURCE_BARRIER::Transition(pProcNVDFTex->GetResource(),
         D3D12_RESOURCE_STATE_GENERIC_READ, D3D12_RESOURCE_STATE_UNORDERED_ACCESS));
@@ -627,6 +639,9 @@ Game::~Game()
     mRaymarchPass.Destroy();
     mProcNVDFPass.Destroy();
     mPostProcessPass.Destroy();
+
+    mCloudGenBuffer.Destroy();
+    mCloudGenStagingBuffer.Destroy();
 
     Muon::ImguiShutdown();
     Muon::ResourceCodex::Destroy();

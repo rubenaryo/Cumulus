@@ -76,6 +76,8 @@ private:
     std::unordered_map<int32_t, Muon::EntityData> mEntityCBData;
 
     Muon::cbCloudGenData mCloudData;
+    Muon::UploadBuffer mCloudGenStagingBuffer;
+    Muon::DefaultBuffer mCloudGenBuffer;
 
     // Timer for the main game loop
     Muon::StepTimer mTimer;

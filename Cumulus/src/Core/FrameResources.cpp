@@ -46,7 +46,6 @@ bool FrameResources::Create(UINT width, UINT height)
     mAABBBuffer.Create(L"AABB Buffer", sizeof(cbIntersections));
     mHullBuffer.Create(L"Hull Buffer", sizeof(cbHulls));
     mHullFaceBuffer.Create(L"Hull Faces Buffer", sizeof(cbHullFaces));
-    mTimeBuffer.Create(L"Time", sizeof(cbTime));
 
 	return true;
 }
