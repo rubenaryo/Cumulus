@@ -8,53 +8,45 @@ Texture3D nvdfTex : register(t2); // Model textures combined [sdf.r, model.r, mo
 Texture3D noiseTex : register(t3); // Low frequency, high frequency noises for wispy and billowy clouds 
 RWTexture3D<float4> gCache : register(u0);
 
-// Compute optical depth from samplePos toward sunDir
 // Returns tau; transmittance is exp(-tau)
-float GetOpticalDepthToSun(float3 samplePos, float3 sunDir)
+// Returns tau along 'dir' starting at samplePos
+float GetOpticalDepthAlongDirection(float3 samplePos, float3 dir, float extinctionScale)
 {
 #if GPU_CLOUD
-    // TODO: Implement optical depth calculation to the sun using procedural NVDF 
     return 0.0;
 #else
-    // Intersect light ray with cloud volume
     float tEnter, tExit;
-    if (!RayBoxIntersect(samplePos, sunDir, VOLUME_MIN_WS, VOLUME_MAX_WS, tEnter, tExit))
+    if (!RayBoxIntersect(samplePos, dir, VOLUME_MIN_WS, VOLUME_MAX_WS, tEnter, tExit))
     {
-        // Ray from samplePos in sunDir never enters volume
         return 0.0;
     }
 
-    // Start inside the box at the sample position
-    float t = 0.0; // we are already at samplePos, so relative distance along sunDir
-    float depth = 0.0; // optical depth tau
-    const float minStepSize = AUTHORING_TO_WORLD_SCALE; // ~1 NVDF voxel
-    const float depthThreshold = 5.0; // Appr 99% extinction)
+    float t = 0.0;
+    float tau = 0.0;
+    const float minStepSize = AUTHORING_TO_WORLD_SCALE;
+    const float depthThreshold = 5.0;
 
     [loop]
-    for (int i = 0; i < 128; ++i)
+    for (int i = 0; i < 32; ++i)
     {
-        float3 lightPos = samplePos + sunDir * t;
+        float3 pos = samplePos + dir * t;
 
-        // Exit if beyond volume intersection
         if (t > tExit)
             break;
 
-        // Sample SDF
-        float sdfEncoded = sdfTex.SampleLevel(linearClamp, WorldToNvdfUV(lightPos), 0.0f).r;
+        float sdfEncoded = sdfTex.SampleLevel(linearClamp, WorldToNvdfUV(pos), 0.0f).r;
         float sdfDistance = DecodeSdf(sdfEncoded) * AUTHORING_TO_WORLD_SCALE;
 
         if (sdfDistance < 0.0)
         {
-            // Inside cloud: approximate density similar to view ray
-            float4 nvdfSample = nvdfTex.SampleLevel(linearClamp, WorldToNvdfUV(lightPos), 0.0f);
+            float4 nvdfSample = nvdfTex.SampleLevel(linearClamp, WorldToNvdfUV(pos), 0.0f);
             float dimensionalProfile = nvdfSample.g;
             float detailType = nvdfSample.b;
             float densityScale = nvdfSample.a;
 
-            // Ideally reuse GetUprezzedVoxelCloudDensity here
             float density = GetUprezzedVoxelCloudDensity(
-                /*dummy*/ (RayMarchInfo) 0,
-                lightPos,
+                (RayMarchInfo) 0,
+                pos,
                 dimensionalProfile,
                 detailType,
                 densityScale,
@@ -62,25 +54,23 @@ float GetOpticalDepthToSun(float3 samplePos, float3 sunDir)
                 linearWrap
             );
 
-            float sigma = dimensionalProfile * (1 - DIRECT_LIGHTING_SCALE);
+            float sigma = dimensionalProfile * extinctionScale;
 
-            float stepSizeInside = minStepSize; // or a tuned fixed step
-            depth += sigma * stepSizeInside;
-
+            float stepSizeInside = minStepSize;
+            tau += sigma * stepSizeInside;
             t += stepSizeInside;
 
-            if (depth >= depthThreshold)
-                return depth; // early-out: almost fully shadowed
+            if (tau >= depthThreshold)
+                return tau;
         }
         else
         {
-            // Outside cloud: advance by SDF distance, at least minStepSize
             float stepSize = max(sdfDistance, minStepSize);
             t += stepSize;
         }
     }
 
-    return depth;
+    return tau;
 #endif
 }
 
@@ -123,6 +113,8 @@ void main(uint3 dispatchThreadID : SV_DispatchThreadID)
     float3 sampleUV = VoxelIndexToNvdfUV(dispatchThreadID, texDim);
     float3 sampleWS = UVToWorld(sampleUV);
 
-    float tau = GetOpticalDepthToSun(sampleWS, DIR_SUN);
-    gCache[dispatchThreadID] = float4(tau, 0.0f, 0.0f, 0.0f);
+    float tauSun = GetOpticalDepthAlongDirection(sampleWS, DIR_SUN, DIRECT_EXTINCTION_SCALE);
+    float tauVert = GetOpticalDepthAlongDirection(sampleWS, normalize(float3(0, 1, 0)), AMBIENT_EXTINCTION_SCALE);
+
+    gCache[dispatchThreadID] = float4(tauSun, tauVert, 0.0f, 0.0f);
 }

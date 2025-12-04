@@ -32,6 +32,7 @@ struct FrameResources
     bool UpdateAABB(cbIntersections& data);
     bool UpdateAtmosphere(cbAtmosphere& data);
     bool UpdateCloudData(cbCloudGenData& data);
+    bool UpdateCloudLighting(cbCloudLighting& data);
     bool UpdateHulls(cbHulls& data);
     bool UpdateHullFaces(cbHullFaces& data);
 
@@ -45,12 +46,14 @@ struct FrameResources
     UploadBuffer mAABBBuffer;
     UploadBuffer mAtmosphereBuffer;
     UploadBuffer mCloudGenBuffer;
+    UploadBuffer mCloudLightingBuffer;
     UploadBuffer mHullBuffer;
     UploadBuffer mHullFaceBuffer;
 
     UINT64 mFence = 0;
 
     bool mNeedsCloudUpdate = false;
+    bool mNeedsCloudLightingUpdate = false;
 };
 
 }

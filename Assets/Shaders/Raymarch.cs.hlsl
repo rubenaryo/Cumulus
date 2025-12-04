@@ -11,8 +11,8 @@
 // Preset: "Density only"  -> all USE_*_LIGHTING = 0
 // Preset: "Lit clouds"    -> enable desired USE_*_LIGHTING = 1
 #define USE_DIRECT_LIGHTING      1   // Sun / directional lighting
-#define USE_AMBIENT_LIGHTING     0   // Sky / ambient term
-#define USE_MULTIPLE_SCATTERING  0   // Approx. multiple scattering
+#define USE_AMBIENT_LIGHTING     1   // Sky / ambient term
+#define USE_MULTIPLE_SCATTERING  1   // Approx. multiple scattering
 
 // === Debug / Visualization ===
 #define DEBUG_AABB_INTERSECT     0   // Visualize volume/hull hits
@@ -184,7 +184,7 @@ float GetApproxOpticalDepthToSun(float3 samplePos, float3 sunDir)
                 linearWrap
             );
 
-            float sigma = dimensionalProfile * (1 - DIRECT_LIGHTING_SCALE);
+            float sigma = dimensionalProfile * (1 - DIRECT_EXTINCTION_SCALE);
 
             float stepSizeInside = minStepSize; // or a tuned fixed step
             depth += sigma * stepSizeInside;
@@ -217,6 +217,23 @@ float HenyeyGreenstein(float cosAngle, float eccentricity)
 }
 
 
+float CloudPhase(float cosTheta)
+{
+    // Very forward lobe for silver lining
+    float g1 = 0.9;
+    float w1 = 0.8;
+
+    // Softer lobe for general fill
+    float g2 = 0.5;
+    float w2 = 0.2;
+
+    float p = w1 * HenyeyGreenstein(cosTheta, g1) + w2 * HenyeyGreenstein(cosTheta, g2);
+
+    // Scale to a reasonable range
+    return p * 4.0;
+}
+
+
 float3 ComputeDirectLighting(
     RayMarchInfo rayMarchInfo,
     float3 samplePos,
@@ -244,18 +261,29 @@ float3 ComputeDirectLighting(
     return L_step;
 }
 
-float3 ComputeAmbientLighting(
-    float3 samplePos,
-    float density)
+float3 ComputeMultipleScattering(
+    float dimensionalProfile,
+    float opticalDepthToSun,
+    float sunDot,
+    float sdfDistance)
 {
-    return float3(0.0, 0.0, 0.0);
+    float ms_volume = dimensionalProfile;
+    float cloud_distance = sdfDistance;
+    float depthTerm = ValueRemap(cloud_distance, -128.0, 0.0, 0.05, 0.25);
+    float factor = ValueRemap(sunDot, 0.0, 0.9, 0.25, depthTerm);
+
+    // Exponential shaping based on summed density / tau to sun
+    ms_volume *= exp(-opticalDepthToSun * factor);
+
+    return SECONDARY_COLOR * ms_volume * SECONDARY_STRENGTH;
 }
 
-float3 ComputeMultipleScattering(
-    float3 samplePos,
-    float density)
+float3 ComputeAmbientLighting(
+    float dimensionalProfile,
+    float opticalDepthVertical)
 {
-    return float3(0.0, 0.0, 0.0);
+    float ambient_scattering = pow(1.0 - dimensionalProfile, 0.5) * exp(-opticalDepthVertical);
+    return AMBIENT_COLOR * exp(-opticalDepthVertical) * AMBIENT_STRENGTH; 
 }
 
 
@@ -297,7 +325,7 @@ float3 VolumeRaymarchNvdf(float3 eyePos, float3 dir, float3 bgColor, float maxRa
 
     // Ray march until the ray exits the volume or max steps are reached
     [loop]
-    for (int i = 0; i < MAX_STEPS && march.distance < march.tExit; ++i)
+    for (int i = 0; i < maxSteps && march.distance < march.tExit; ++i)
     {
         march.stepIndex = i;
 
@@ -371,8 +399,9 @@ float3 VolumeRaymarchNvdf(float3 eyePos, float3 dir, float3 bgColor, float maxRa
 
             // Lighting 
             #if (USE_DIRECT_LIGHTING || USE_AMBIENT_LIGHTING || USE_MULTIPLE_SCATTERING)
-                        float3 lighting = 0.0.xxx;
-
+                float3 lighting = 0.0.xxx;
+                LightCacheSample lightCacheSample = MakeLightCacheSample(GetApproxOpticalDepthToSun(samplePos, DIR_SUN));
+                
                 #if USE_DIRECT_LIGHTING
                         float3 directL = ComputeDirectLighting(
                             march,
@@ -386,12 +415,21 @@ float3 VolumeRaymarchNvdf(float3 eyePos, float3 dir, float3 bgColor, float maxRa
                 #endif
 
                 #if USE_AMBIENT_LIGHTING
-                        float3 ambientL = ComputeAmbientLighting(samplePos, density);
+                        float3 ambientL = ComputeAmbientLighting(dimensionalProfile, lightCacheSample.tauVertical);
                         lighting += ambientL;
                 #endif
 
                 #if USE_MULTIPLE_SCATTERING
-                        float3 msL = ComputeMultipleScattering(samplePos, density);
+                        
+                        
+                        float sunDot = dot(normalize(DIR_SUN), normalize(dir));
+
+                        float3 msL = ComputeMultipleScattering(
+                            dimensionalProfile,        // or density
+                            lightCacheSample.tauSun, // inSunLightSummedDensitySamples analog
+                            sunDot,
+                            sdfDistance                // cloud_distance analog
+                        );
                         lighting += msL;
                 #endif
 
@@ -504,7 +542,6 @@ void main(int3 dispatchThreadID : SV_DispatchThreadID)
     // Transform to world space
     float3 worldDir = normalize(mul(invView, float4(viewDir, 0.0)).xyz);
     float3 eyePos = float3(invView[0][3], invView[1][3], invView[2][3]); // from the 4th column instead of row..
-    
     float3 bgColor = gInput[pixelCoord].rgb;
     float depth = depthStencilBuffer[dispatchThreadID.xy].r;
     float maxRayDist = GetMaxRayDist(depth, eyePos, dispatchThreadID);
