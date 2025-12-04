@@ -145,6 +145,12 @@ void Camera::GetAxes(DirectX::XMVECTOR& forward, DirectX::XMVECTOR& right, Direc
     up = mUp;
 }
 
+
+void Camera::GetForward(DirectX::XMVECTOR& forward) const
+{
+    forward = mForward;
+}
+
 void Camera::SetTarget(DirectX::XMVECTOR target)
 {
     mTarget = target;
@@ -158,7 +164,7 @@ void Camera::MoveForward(float dist)
 void Camera::MoveRight(float dist)
 {
     MoveAlongAxis(dist, mRight);
-    mTarget = XMVectorAdd(mTarget, XMVectorScale(mRight, dist));
+    //mTarget = XMVectorAdd(mTarget, XMVectorScale(mRight, dist));
 }
 
 void Camera::MoveUp(float dist)
@@ -182,7 +188,7 @@ void Camera::Rotate(XMVECTOR quatRotation)
 
     // Recalculate target, zenith, and azimuth
     float dist = XMVectorGetX(XMVector3Length(XMVectorSubtract(mPosition, mTarget)));
-    mTarget = XMVectorAdd(XMVectorScale(mForward, dist), mPosition);
+    //mTarget = XMVectorAdd(XMVectorScale(mForward, dist), mPosition);
     UpdateAzimuthZenith();
 }
 
