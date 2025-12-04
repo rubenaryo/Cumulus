@@ -2,7 +2,7 @@ RWTexture3D<float4> gOutput : register(u0);
 
 cbuffer cbCloudGenBuffer : register(b6)
 {
-    float4 seeds[32];
+    float4 seeds[16];
     
     int numSeeds;
     float pad[3];
@@ -29,7 +29,6 @@ float SDF_Sphere(float3 query, float3 center, float radius)
 
 // p is query
 // a is left point, b is right
-// I removed thickness (w) to be dependent on length now
 float SDF_VesicaSegment(float3 p,float3 a,float3 b, float w)
 {
     float3 c = (a + b) * 0.5;
@@ -72,22 +71,28 @@ float SDF_RoundCone(float3 p, float3 a, float3 b, float r1, float r2)
 float SDF_Cloud(float3 query, int numSeed, float3 origin, float scale)
 {
     float d = 9999999.f;
-    float3 cone_a = float3(origin.x - 2 * hash(origin) * scale, origin.y, origin.z + hash(origin) * scale);
-    float3 cone_b = float3(origin.x + 3 * (1.0 - hash(origin)) * scale, origin.y, origin.z - hash(origin) * scale);
+    float h = hash(origin);
+    float3 cone_a = float3(origin.x - 2 * h * scale, origin.y, origin.z + h * scale);
+    float3 cone_b = float3(origin.x + 3 * (1.0 - h) * scale, origin.y, origin.z - h * scale);
     float cone = SDF_RoundCone(query, cone_a, cone_b,
-                             max(WorleyNoise3D(cone_a, 12) * scale, 0.3), max(WorleyNoise3D(cone_b, 16) * scale, 0.3));
+                               hash(cone_a) * scale + 0.2, hash(cone_b) * scale + 0.2);
+                             //max(WorleyNoise3D(cone_a, 12) * scale, 0.3), max(WorleyNoise3D(cone_b, 16) * scale, 0.3));
     d = smooth_min(d, cone, 0.8);
     float3 midpoint = (cone_a + cone_b) * 0.5;
     for (int i = 0; i < numSeed; ++i)
     {
-        float3 offset_a = hash3(float3(i * 4.12, random(numSeed), i * numSeed * 0.77) * 3.1415) * 2.4 - 1.2;
-        float3 offset_b = hash3(float3(random(i * 4.12), 1.0 - random(numSeed), i * numSeed * 347.77) * 42.1415) * 2.4 - 1.2;
-        //float sphere = SDF_Sphere(query, midpoint + offset * scale * 0.8, (WorleyNoise3D(midpoint + offset, 12) * 0.9 + 0.2) * scale);
+        float ran = random(i * 17);
+        float3 offset_a = random3(float3(i * 4.12, ran, i * numSeed * 0.77) * 3.1415) * 3.4 - 1.7;
+        float3 offset_b = random3(float3(random(i * 4), 1.0 - ran, i * numSeed * 347.77) * 42.1415) * 2.4 - 1.2;
+        // NOTE: Sphere sdf is faster, but idk by how much.
+        // To switch, uncomment this, and comment out offset_b, and the abw and sphere lines below
+        //float sphere = SDF_Sphere(query, midpoint + offset_a * scale, ran * scale);
         
         float3 a = midpoint + offset_a * scale;
         float3 b = midpoint + offset_b * scale;
         float w = scale * 0.5f;
         float sphere = SDF_VesicaSegment(query, a, b, w);
+        
         d = smooth_min(d, sphere, 0.7);
     }
     return d;
@@ -118,7 +123,7 @@ void main(int3 dispatchThreadID : SV_DispatchThreadID)
     {
         float4 curr = seeds[i];
         scale += curr.a;
-        d = smooth_min(d, SDF_Cloud(worldPos, i % 4 + 3, curr.xyz, curr.a), 0.8);
+        d = smooth_min(d, SDF_Cloud(worldPos, i % 3 + 2, curr.xyz, curr.a), 0.8);
     }
     scale /= numSeeds;  // scale is an average of all scales
     // We then encode SDF into the range [0, 1] from [-256, 4096], as this is what Nubis expects
@@ -135,11 +140,11 @@ void main(int3 dispatchThreadID : SV_DispatchThreadID)
     float norm_scale = d / scale;
     // fade out as we get closer to the edge
     //float norm_edge_dist = DistToEdge(worldPos) / scale;
-    float billow = d > scale ? 0.0 : fbm_3D_BillowNoise(worldPos * 0.009 * (scale / 250.f), float3(6.0, 6.0, 6.0), 12);
+    float billow = d > scale ? 0.0 : fbm_3D_BillowNoise(worldPos * 0.008, float3(6.0, 6.0, 6.0), 12);
     gOutput[coord].g = billow < norm_scale ? 0.0 : billow * (1.0 - norm_scale);
     // b is detail type, which is a bit larger billows that get attenuated by height, as higher parts are more whispy
     float normalized_height = (worldPos.y - VOLUME_MIN_WS.y) / (VOLUME_MAX_WS.y - VOLUME_MIN_WS.y) + 0.3;
-    gOutput[coord].b = d > scale * 1.5 ? 0.0 : fbm_3D_BillowNoise(worldPos * 0.007 * (scale / 250.f), float3(6.0, 6.0, 6.0), 3) * normalized_height;
+    gOutput[coord].b = d > scale * 1.5 ? 0.0 : fbm_3D_BillowNoise(worldPos * 0.006, float3(6.0, 6.0, 6.0), 3) * normalized_height;
     
     //---------------------------
     // COLLISION CODE
