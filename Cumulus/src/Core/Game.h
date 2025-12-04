@@ -81,7 +81,7 @@ private:
     int jetIdx = -1;
     Muon::cbJetTrailPositions jetTrailPos;
 
-    static const DirectX::XMFLOAT3 flightDir;
+    static const DirectX::XMFLOAT3 jetDir;
     std::vector<Muon::EntityData> mEntityCBData;
 
     Muon::cbCloudGenData mCloudData;

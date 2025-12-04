@@ -14,6 +14,12 @@ cbuffer cbJetBuffer : register(b7)
     float4 positions[4];
 }
 
+cbuffer Time : register(b8)
+{
+    float totalTime;
+    float deltaTime;
+}
+
 // Texture output: 
 // r - sdf distance - how far we are from the cloud
 // g - dimensionalProfile - this is what eli's writing to? Need to merge these well
@@ -117,10 +123,13 @@ void main(int3 dispatchThreadID : SV_DispatchThreadID)
     // CLOUD GEN
     //------------------------------
     // SDF is getting clouds around the given seeds
-    float d = 999999999.f;
 
+
+    float d = 999999999.f;
+    float gMultiplier = 1.0;
     float scale = 0;
-    if (demoMode == 0)
+    float jetSpeed = 0;
+    if (false)
     {
         for (uint i = 0; i < numSeeds; ++i)
         {
@@ -130,14 +139,38 @@ void main(int3 dispatchThreadID : SV_DispatchThreadID)
         }
         scale /= numSeeds;  // scale is an average of all scales
     }
-    else if (demoMode == 1)
+
+    
+    else if (true)
     {
         uint numTrails = 1;
+
+        float3 jetStartOffset1 = float3(15.0, -5.0, 14.0);
+        float3 jetStartOffset2 = float3(15.0, -5.0, -14.0);
+
         for (uint i = 0; i < numTrails; ++i)
         {
-            float curr = SDF_RoundCone(worldPos, positions[2 * i].xyz, positions[2 * i + 1].xyz, positions[2 * i].a, positions[2 * i + 1].a);
+            float rightLine = SDF_RoundCone(worldPos, positions[2 * i].xyz + jetStartOffset1, positions[2 * i + 1].xyz + jetStartOffset1, positions[2 * i].w, positions[2 * i + 1].w);
+            float leftLine = SDF_RoundCone(worldPos, positions[2 * i].xyz + jetStartOffset2, positions[2 * i + 1].xyz + jetStartOffset2, positions[2 * i].w, positions[2 * i + 1].w);
+            float curr = min(rightLine, leftLine);
+
             d = smooth_min(d, curr, 0.8);
+
+            float jetTravelDistance = length(positions[2 * i + 1].xyz - positions[2 * i].xyz);
+            jetSpeed = jetTravelDistance / totalTime;
+            float distanceFromJet = length(worldPos - positions[2 * i + 1].xyz);
+            float timeAlive = distanceFromJet / max(jetSpeed, 0.0001);
+            float lifeTime = 25.0;
+
+
+            float currentDensityMultiplier = (1.0 - saturate(timeAlive / lifeTime));
+
             scale += (positions[2 * i].a + positions[2 * i + 1].a) * 0.5f;
+
+            float disStart = length(worldPos - positions[2 * i].xyz);
+            float disEnd = length(worldPos - positions[2 * i + 1].xyz);
+
+            gMultiplier = lerp(0.15, 1.0, currentDensityMultiplier);
         }
         scale /= numTrails;
     }
@@ -160,27 +193,33 @@ void main(int3 dispatchThreadID : SV_DispatchThreadID)
     // b is detail type, which is a bit larger billows that get attenuated by height, as higher parts are more whispy
     float normalized_height = (worldPos.y - VOLUME_MIN_WS.y) / (VOLUME_MAX_WS.y - VOLUME_MIN_WS.y) + 0.3;
     gOutput[coord].b = d > scale * 1.5 ? 0.0 : fbm_3D_BillowNoise(worldPos * 0.007 * (scale / 250.f), float3(6.0, 6.0, 6.0), 3) * normalized_height;
-    
+    gOutput[coord].g *= gMultiplier;
     //---------------------------
     // COLLISION CODE
     //---------------------------
     // collision gets put into the density scale part for now, which gets calculated in raymarch for now
-    bool collision = false;
-    for (uint i = 0; i < hullCount; ++i)
-    {
-        float hullEnter, hullExit;
-        ConvexHull ch = hulls[i];
-        float3 dir = float3(1.0, 1.0, 1.0);
-        if (PointInsideConvexHull(worldPos, ch))
-        {
-            gOutput[coord].a = 1.0f;
-            collision = true;
-            break;
-        }
-    }
+    // bool collision = false;
+    // for (uint i = 0; i < hullCount; ++i)
+    // {
+    //     float hullEnter, hullExit;
+    //     ConvexHull ch = hulls[i];
+    //     float3 dir = float3(1.0, 1.0, 1.0);
+    //     if (PointInsideConvexHull(worldPos, ch))
+    //     {
+    //         gOutput[coord].a = 1.0f;
+    //         collision = true;
+    //         break;
+    //     }
+    // }
 
-    if (!collision)
-    {
-        gOutput[coord].a = max(gOutput[coord].a - 0.01, 0.0);
-    }
+    // if (!collision)
+    // {
+    //     gOutput[coord].a = max(gOutput[coord].a - 0.01 * deltaTime, 0.0);
+    // }
+
+    // if(positions[0].x > 500 && positions[0].y == 1000 && positions[1].x < 1000 && positions[0].x > 0){
+    //     gOutput[coord].a = 0.f;
+    // }else{
+    //     gOutput[coord].a = 1.f;
+    // }
 }

@@ -37,7 +37,7 @@ Game::Game() :
     mTimer.SetFixedTimeStep(false);
 }
 
-const DirectX::XMFLOAT3 Game::flightDir = { -5.f, 0.f, 2.f };
+const DirectX::XMFLOAT3 Game::jetDir = { -5.f, 0.f, 0.f };
 
 bool Game::Init(HWND window, int width, int height)
 {
@@ -60,7 +60,7 @@ bool Game::Init(HWND window, int width, int height)
 
     ResourceCodex& codex = ResourceCodex::GetSingleton();
 
-    mCamera.Init(DirectX::XMFLOAT3(500.0, 300.0, 100.0), width / (float)height, 0.1f, 10000.0f);
+    mCamera.Init(DirectX::XMFLOAT3(500.0, -50.0, 0.0), width / (float)height, 0.1f, 10000.0f);
 
     // Assemble opaque render pass
     {
@@ -250,7 +250,7 @@ void Game::InitEntities()
 
     // ---- 1. Setup initial orientation using flightDir ----------------------
 
-    XMVECTOR forward = XMVector3Normalize(XMLoadFloat3(&flightDir));
+    XMVECTOR forward = XMVector3Normalize(XMLoadFloat3(&jetDir));
     XMVECTOR up = XMVectorSet(0.f, 1.f, 0.f, 0.f);
 
     // If forward is nearly parallel to up, pick a different up
@@ -261,7 +261,7 @@ void Game::InitEntities()
     up = XMVector3Normalize(XMVector3Cross(forward, right));
 
     // ---- 1b. Set initial world position -----------------------------------
-    XMVECTOR jetStartPos = XMVectorSet(0.f - flightDir.x * 200.f, 1000.f, -flightDir.z * 200.f, 1.f); // <-- your initial position
+    XMVECTOR jetStartPos = XMVectorSet(500.0, 500, 0, 1.f);//0.f - flightDir.x * 200.f, 1000.f, -flightDir.z * 200.f, 1.f); // <-- your initial position
     XMStoreFloat4(&jetTrailPos.positions[0], jetStartPos);
 
     // Build world matrix correctly
@@ -299,7 +299,7 @@ void Game::UpdateEntities(Muon::FrameResources& currFrameResources, const Muon::
 {
     using namespace Muon;
     if (jetIdx >= 0) {
-        float jetSpeed = 555.f * time.deltaTime;
+        float jetSpeed = 5555.f * time.deltaTime;
 
         Muon::EntityData& jet = mEntityCBData[jetIdx];   
 
@@ -319,6 +319,17 @@ void Game::UpdateEntities(Muon::FrameResources& currFrameResources, const Muon::
 
         DirectX::XMVECTOR jetPos = world.r[3];
         DirectX::XMStoreFloat4(&jetTrailPos.positions[1], jetPos);
+
+        float initialScale = 10.f;
+        float finalScale = 80.f;
+        float radGrowthTime = 100.f;
+        float t = std::clamp(time.totalTime / radGrowthTime, 0.f, 1.f);
+        float currScale = finalScale * t + (1.f - t) * initialScale;
+
+
+        jetTrailPos.positions[0].w = currScale;
+        jetTrailPos.positions[1].w = initialScale;
+
 
         currFrameResources.UpdateJetTrail(jetTrailPos);
     }
@@ -433,6 +444,13 @@ void Game::UpdateProceduralNVDF()
     if (jetTrailIdx != ROOTIDX_INVALID)
     {
         pCommandList->SetComputeRootConstantBufferView(jetTrailIdx, currFrameResources.mJetTrailBuffer.GetGPUVirtualAddress());
+    }
+
+
+    int32_t timeRootIdx = mProcNVDFPass.GetResourceRootIndex("Time");
+    if (timeRootIdx != ROOTIDX_INVALID)
+    {
+        pCommandList->SetComputeRootConstantBufferView(timeRootIdx, currFrameResources.mTimeBuffer.GetGPUVirtualAddress());
     }
 
     pCommandList->ResourceBarrier(1, &CD3DX12_RESOURCE_BARRIER::Transition(pProcNVDFTex->GetResource(),

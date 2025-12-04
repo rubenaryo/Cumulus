@@ -13,7 +13,7 @@ static const float PI = 3.14159265359;
 // Raymarch settings
 static const int MAX_STEPS = 256; // Max steps per ray
 static const float MIN_DIST = 0.001; // Global near distance
-static const float MAX_DIST = 1000.0; // Global far distance
+static const float MAX_DIST = 50000.0; // Global far distance
 static const float EPSILON = 0.001; // Small epsilon for safety
 static const float MIN_TRANSMITTANCE = 0.01; // Early-out when mostly opaque
 
@@ -23,12 +23,12 @@ static const float3 LIGHT_SUN = float3(220, 240, 250);; // sun color/brightness
 static const float DIRECT_LIGHTING_SCALE = 0.99;
 
 // Volume bounds in world space
-static const float SIDE_LENGTH = 4000.0; 
+static const float SIDE_LENGTH = 5000.0; 
 static const float3 VOLUME_MIN_WS = float3(-SIDE_LENGTH / 2, 0.0, -SIDE_LENGTH / 2);
 static const float3 VOLUME_MAX_WS = float3(SIDE_LENGTH / 2, SIDE_LENGTH / 8, SIDE_LENGTH / 2);
 
 // Mapping from NVDF authoring space to world 
-static const float NVDF_DOMAIN_SIDE_LENGTH = 4000.0; // NVDF authoring domain: 4km x 4km x 0.5km (matches the world volume).
+static const float NVDF_DOMAIN_SIDE_LENGTH = 5000.0; // NVDF authoring domain: 4km x 4km x 0.5km (matches the world volume).
 static const float NOISE_DOMAIN_SIDE_LENGTH = 100.0; // Noise domain: 3D noise pattern repeats every 100m in X/Y/Z.
 static const float AUTHORING_TO_WORLD_SCALE = SIDE_LENGTH / NVDF_DOMAIN_SIDE_LENGTH;
 
