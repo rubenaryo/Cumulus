@@ -15,7 +15,7 @@ using namespace DirectX;
 Camera::Camera() :
     mNear(0.1f),
     mFar(100.0f),
-    mSensitivity(1.0f),
+    mSensitivity(0.001f),
     mForward(DirectX::XMVectorSet(1.f, 0.f, 0.f, 0.f)),
     mUp(DirectX::XMVectorSet(0.f, 1.f, 0.f, 0.f)),
     mRight(DirectX::XMVectorSet(1.f, 0.f, 0.f, 0.f)),
@@ -53,15 +53,12 @@ void Camera::Init(DirectX::XMFLOAT3& pos, float aspectRatio, float nearPlane, fl
 
     UpdateAzimuthZenith();
 
-    mConstantBuffer.Create(L"CameraConstantBuffer", Muon::GetConstantBufferSize(sizeof(cbCamera)));
-
     UpdateView();
     UpdateProjection(aspectRatio);
 }
 
 void Camera::Destroy()
 {
-    mConstantBuffer.Destroy();
 }
 
 void Camera::UpdateView()
@@ -71,8 +68,6 @@ void Camera::UpdateView()
         mPosition,
         mForward,
         mUp);
-
-    UpdateConstantBuffer();
 }
 
 void Camera::UpdateProjection(float aspectRatio)
@@ -106,11 +101,6 @@ void Camera::UpdateProjection(float aspectRatio)
         break;
     }
     }
-}
-
-void Camera::Bind(int32_t rootParamIndex, ID3D12GraphicsCommandList* pCommandList) const
-{
-    pCommandList->SetGraphicsRootConstantBufferView((UINT)rootParamIndex, mConstantBuffer.GetGPUVirtualAddress());
 }
 
 void Camera::GetPosition3A(XMFLOAT3A* out_pos) const
@@ -228,7 +218,7 @@ void Camera::UpdateAzimuthZenith()
     mAzimuth = newAzimuth;
 }
 
-void Camera::UpdateConstantBuffer()
+cbCamera Camera::GetAsCB() const
 {
     DirectX::XMMATRIX viewProj = XMMatrixMultiply(mView, mProjection);
 
@@ -239,14 +229,7 @@ void Camera::UpdateConstantBuffer()
     XMStoreFloat4x4(&cb.invView, DirectX::XMMatrixInverse(nullptr, mView));
     XMStoreFloat4x4(&cb.invProj, DirectX::XMMatrixInverse(nullptr, mProjection));
 
-    UINT8* pMappedMemory = mConstantBuffer.GetMappedPtr();
-    if (!pMappedMemory)
-    {
-        Muon::Printf(L"Error: Failed to set camera constant buffer because it was unmapped!: %s\n", mConstantBuffer.GetName());
-        return;
-    }
-    
-    memcpy(pMappedMemory, &cb, mConstantBuffer.GetBufferSize());
+    return cb;
 }
 
 }

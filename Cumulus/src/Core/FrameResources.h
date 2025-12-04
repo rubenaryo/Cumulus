@@ -27,11 +27,13 @@ struct FrameResources
     bool Create(UINT width, UINT height);
 
     bool UpdateWorldMatrix(cbPerEntity& data);
+    bool UpdateCamera(cbCamera& data);
     bool UpdateLights(cbLights& data);
     bool UpdateTime(cbTime& data);
     bool UpdateAABB(cbIntersections& data);
     bool UpdateAtmosphere(cbAtmosphere& data);
     bool UpdateCloudData(cbCloudGenData& data);
+    bool UpdateCloudLighting(cbCloudLighting& data);
     bool UpdateHulls(cbHulls& data);
     bool UpdateHullFaces(cbHullFaces& data);
     bool UpdateJetTrail(cbJetTrailPositions& jetTrailPositions);
@@ -41,11 +43,13 @@ struct FrameResources
     Microsoft::WRL::ComPtr<ID3D12CommandAllocator> mCmdAllocator;
 
     UploadBuffer mWorldMatrixBuffer;
+    UploadBuffer mCameraBuffer;
     UploadBuffer mLightBuffer;
     UploadBuffer mTimeBuffer;
     UploadBuffer mAABBBuffer;
     UploadBuffer mAtmosphereBuffer;
     UploadBuffer mCloudGenBuffer;
+    UploadBuffer mCloudLightingBuffer;
     UploadBuffer mHullBuffer;
     UploadBuffer mHullFaceBuffer;
     UploadBuffer mJetTrailBuffer;
@@ -53,6 +57,7 @@ struct FrameResources
     UINT64 mFence = 0;
 
     bool mNeedsCloudUpdate = false;
+    bool mNeedsCloudLightingUpdate = false;
 };
 
 }

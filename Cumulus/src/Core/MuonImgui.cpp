@@ -143,6 +143,21 @@ void ImguiNewFrame(float gameTime, const Camera& cam, SceneSettings& settings)
             ImGui::EndTabItem();
         }
 
+        if (ImGui::BeginTabItem("Lighting"))
+        {
+            int maxSteps = settings.lighting.maxSteps;
+            ImGui::SliderInt("Max Steps", &maxSteps, 0, 512);
+            bool dataChanged = maxSteps != settings.lighting.maxSteps;
+
+            if (ImGui::Button("Update Lighting") || dataChanged)
+            {
+                settings.lighting.maxSteps = maxSteps;
+                settings.updateLighting = true;
+            }
+            ImGui::EndTabItem();
+        }
+
+
         ImGui::EndTabBar();
     }
     ImGui::End();

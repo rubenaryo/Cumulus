@@ -71,10 +71,7 @@ private:
     Muon::ComputePass mProcNVDFPass;
     Muon::GraphicsPass mPostProcessPass;
 
-    // TEMP: For testing
-    Muon::Mesh mCube;
-
-    static const size_t NUM_FRAMES_IN_FLIGHT = 10;
+    static const size_t NUM_FRAMES_IN_FLIGHT = 2;
     std::array<Muon::FrameResources, NUM_FRAMES_IN_FLIGHT> mFrameResources;
     size_t mCurrFrameResourceIdx = 0;
 

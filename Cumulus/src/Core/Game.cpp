@@ -180,6 +180,7 @@ bool Game::InitFrameResources(UINT width, UINT height)
         
         frameResource.UpdateAtmosphere(atmosphereParams);
         frameResource.UpdateCloudData(mCloudData);
+        frameResource.UpdateCloudLighting(settings.lighting);
         frameResource.UpdateAABB(intersections);
         frameResource.UpdateHullFaces(faces);
     }
@@ -343,7 +344,6 @@ void Game::Update(Muon::StepTimer const& timer)
     float elapsedTime = float(timer.GetElapsedSeconds());
     float totalTime = float(timer.GetTotalSeconds());
     mInput.Frame(elapsedTime, &mCamera);
-    mCamera.UpdateView();    
 
     // The UI has flagged for a cloud update
     if (settings.updateClouds)
@@ -359,7 +359,24 @@ void Game::Update(Muon::StepTimer const& timer)
         settings.updateClouds = false;
     }
 
+    if (settings.updateLighting)
+    {
+        // Mark the update on each frame resource. They will consume it when they next run. 
+        for (size_t i = 0; i != NUM_FRAMES_IN_FLIGHT; ++i)
+        {
+            Muon::FrameResources& frameResource = mFrameResources.at(i);
+            frameResource.mNeedsCloudLightingUpdate = true;
+        }
+
+        settings.updateLighting = false;
+    }
+
     Muon::FrameResources& currFrameResources = mFrameResources.at(mCurrFrameResourceIdx);
+
+    // Updating Camera
+    mCamera.UpdateView();    
+    Muon::cbCamera camera = mCamera.GetAsCB();
+    currFrameResources.UpdateCamera(camera);
     
     // Updating Lights
     Muon::cbLights lights;
@@ -386,6 +403,13 @@ void Game::Update(Muon::StepTimer const& timer)
     {
         currFrameResources.UpdateCloudData(mCloudData);
         currFrameResources.mNeedsCloudUpdate = false;
+    }
+
+    // Updating Cloud Lighting
+    if (currFrameResources.mNeedsCloudLightingUpdate)
+    {
+        currFrameResources.UpdateCloudLighting(settings.lighting);
+        currFrameResources.mNeedsCloudLightingUpdate = false;
     }
 
     // Updating Entities
@@ -578,7 +602,7 @@ void Game::Render()
         int32_t cameraRootIdx = mAtmospherePass.GetResourceRootIndex("VSCamera");
         if (cameraRootIdx != ROOTIDX_INVALID)
         {
-            mCamera.Bind(cameraRootIdx, pCommandList);
+            pCommandList->SetGraphicsRootConstantBufferView(cameraRootIdx, currFrameResources.mCameraBuffer.GetGPUVirtualAddress());
         }
 
         int32_t atmosphereRootIdx = mAtmospherePass.GetResourceRootIndex("cbAtmosphere");
@@ -622,7 +646,7 @@ void Game::Render()
         int32_t cameraRootIdx = mOpaquePass.GetResourceRootIndex("VSCamera");
         if (cameraRootIdx != ROOTIDX_INVALID)
         {
-            mCamera.Bind(cameraRootIdx, pCommandList);
+            pCommandList->SetGraphicsRootConstantBufferView(cameraRootIdx, currFrameResources.mCameraBuffer.GetGPUVirtualAddress());
         }
 
         // Bind the world matrix Upload Buffer to the root index known by the material
@@ -671,7 +695,7 @@ void Game::Render()
         int32_t cameraRootIdx = mRaymarchPass.GetResourceRootIndex("VSCamera");
         if (cameraRootIdx != ROOTIDX_INVALID)
         {
-            pCommandList->SetComputeRootConstantBufferView(cameraRootIdx, mCamera.GetGPUVirtualAddress());
+            pCommandList->SetComputeRootConstantBufferView(cameraRootIdx, currFrameResources.mCameraBuffer.GetGPUVirtualAddress());
         }
 
         int32_t aabbIdx = mRaymarchPass.GetResourceRootIndex("AABBBuffer");
@@ -690,6 +714,12 @@ void Game::Render()
         if (hullFaceIdx != ROOTIDX_INVALID)
         {
             pCommandList->SetComputeRootConstantBufferView(hullFaceIdx, currFrameResources.mHullFaceBuffer.GetGPUVirtualAddress());
+        }
+
+        int32_t cloudLightingIdx = mRaymarchPass.GetResourceRootIndex("CloudLightingBuffer");
+        if (cloudLightingIdx != ROOTIDX_INVALID)
+        {
+            pCommandList->SetComputeRootConstantBufferView(cloudLightingIdx, currFrameResources.mCloudLightingBuffer.GetGPUVirtualAddress());
         }
 
         int32_t inIdx = mRaymarchPass.GetResourceRootIndex("gInput");
@@ -798,12 +828,13 @@ void Game::CreateWindowSizeDependentResources(int newWidth, int newHeight)
 
 Game::~Game()
 { 
+    Muon::FlushCommandQueue();
+
     for (size_t i = 0; i != NUM_FRAMES_IN_FLIGHT; ++i)
     {
         mFrameResources.at(i).Destroy();
     }
 
-    mCube.Destroy();
     mCamera.Destroy();
     mInput.Destroy();
     mOpaquePass.Destroy();

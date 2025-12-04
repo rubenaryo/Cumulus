@@ -39,10 +39,12 @@ bool FrameResources::Create(UINT width, UINT height)
 	}
 
     mWorldMatrixBuffer.Create(L"world matrix buffer", sizeof(cbPerEntity));
+    mCameraBuffer.Create(L"Camera CB", sizeof(cbCamera));
     mLightBuffer.Create(L"Light Buffer", sizeof(cbLights));
     mTimeBuffer.Create(L"Time", sizeof(cbTime));
     mAtmosphereBuffer.Create(L"Atmosphere CB", sizeof(cbAtmosphere));
     mCloudGenBuffer.Create(L"CloudGen CG", sizeof(cbCloudGenData));
+    mCloudLightingBuffer.Create(L"CloudLighting CB", sizeof(cbCloudLighting));
     mAABBBuffer.Create(L"AABB Buffer", sizeof(cbIntersections));
     mHullBuffer.Create(L"Hull Buffer", sizeof(cbHulls));
     mHullFaceBuffer.Create(L"Hull Faces Buffer", sizeof(cbHullFaces));
@@ -54,6 +56,12 @@ bool FrameResources::Create(UINT width, UINT height)
 bool FrameResources::UpdateWorldMatrix(cbPerEntity& data)
 {
     memcpy(mWorldMatrixBuffer.GetMappedPtr(), &data, sizeof(cbPerEntity));
+    return true;
+}
+
+bool FrameResources::UpdateCamera(cbCamera& data)
+{
+    memcpy(mCameraBuffer.GetMappedPtr(), &data, sizeof(cbCamera));
     return true;
 }
 
@@ -87,6 +95,12 @@ bool FrameResources::UpdateCloudData(cbCloudGenData& data)
     return true;
 }
 
+bool FrameResources::UpdateCloudLighting(cbCloudLighting& data)
+{
+    memcpy(mCloudLightingBuffer.GetMappedPtr(), &data, sizeof(cbCloudLighting));
+    return true;
+}
+
 bool FrameResources::UpdateHulls(cbHulls& data)
 {
     memcpy(mHullBuffer.GetMappedPtr(), &data, sizeof(cbHulls));
@@ -109,11 +123,13 @@ void FrameResources::Destroy()
 {
     mCmdAllocator.Reset();
     mWorldMatrixBuffer.Destroy();
+    mCameraBuffer.Destroy();
     mLightBuffer.Destroy();
     mTimeBuffer.Destroy();
     mAABBBuffer.Destroy();
     mAtmosphereBuffer.Destroy();
     mCloudGenBuffer.Destroy();
+    mCloudLightingBuffer.Destroy();
     mHullBuffer.Destroy();
     mHullFaceBuffer.Destroy();
     mJetTrailBuffer.Destroy();
