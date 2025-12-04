@@ -143,11 +143,8 @@ cbuffer CloudLightingBuffer : register(b6)
     // === Raymarch settings ===
     int maxSteps; // Maximum number of raymarch steps per view ray
     float densityScale; // Global scale converting cloud density to extinction 
-    float minDist; // Minimum ray distance for marching
-    float maxDist; // Maximum ray distance for marching
-
     float minTransmittance; // Early-out threshold for view-ray transmittance
-    float3 pad0; // Padding to align next float3 to 16 bytes
+    float pad0; // Padding to align next float3 to 16 bytes
 
     // === Sun / primary lighting ===
     float3 dirSun; // Unit vector: direction from world toward the sun
