@@ -160,6 +160,10 @@ void ImguiNewFrame(float gameTime, const Camera& cam, SceneSettings& settings)
             ImGui::SliderFloat("Direct / Secondary Extinction",
                 &directExtinctionScale, 0.0f, 5.0f);
 
+            float directStrength = settings.lighting.directStrength;
+            ImGui::SliderFloat("Direct Strength",
+                &directStrength, 0.0f, 5.0f);
+
             // === Sun light color & direction ===
             float lightSun[3] =
             {
@@ -218,6 +222,7 @@ void ImguiNewFrame(float gameTime, const Camera& cam, SceneSettings& settings)
                 densityScale != settings.lighting.densityScale ||
                 minTransmittance != settings.lighting.minTransmittance ||
                 directExtinctionScale != settings.lighting.directExtinctionScale ||
+                directStrength != settings.lighting.directStrength ||
                 lightSun[0] != settings.lighting.lightSun.x ||
                 lightSun[1] != settings.lighting.lightSun.y ||
                 lightSun[2] != settings.lighting.lightSun.z ||
@@ -242,6 +247,7 @@ void ImguiNewFrame(float gameTime, const Camera& cam, SceneSettings& settings)
 
                 // Direct is the master extinction scale
                 settings.lighting.directExtinctionScale = directExtinctionScale;
+                settings.lighting.directStrength = directStrength;
 
                 // Normalize sun direction before using it in the engine
                 DirectX::XMVECTOR dir = DirectX::XMVectorSet(dirSun[0], dirSun[1], dirSun[2], 0.0f);

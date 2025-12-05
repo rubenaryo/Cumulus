@@ -134,8 +134,8 @@ struct alignas(16) cbCloudLighting
     DirectX::XMFLOAT3 dirSun = { 0.0f, 1.0f, 0.0f };
     float             directExtinctionScale = 0.02f;
 
+    float             directStrength = 1.0f; 
     DirectX::XMFLOAT3 lightSun = { 220.0f, 240.0f, 250.0f };
-    float             pad1 = 0.0f;
 
     // === Secondary ===
     DirectX::XMFLOAT3 secondaryColor = { 1.0f, 0.96f, 0.9f };

@@ -130,8 +130,8 @@ struct CloudLightingParams
     float3 dirSun;
     float directExtinctionScale;
 
+    float directStrength;
     float3 lightSun;
-    float pad1;
 
     // Secondary (multiple scattering)
     float3 secondaryColor;
