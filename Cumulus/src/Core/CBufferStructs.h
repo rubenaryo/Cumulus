@@ -9,6 +9,7 @@ Description : Declation of structs used as constant buffers by various shaders
 #include <DirectXMath.h>
 #include <DirectXColors.h>
 #include <Core/CommonTypes.h>
+#include <Utils/Utils.h>
 
 namespace Muon
 {
@@ -138,14 +139,14 @@ struct alignas(16) cbCloudLighting
     DirectX::XMFLOAT3 lightSun = { 220.0f, 240.0f, 250.0f };
 
     // === Secondary ===
-    DirectX::XMFLOAT3 secondaryColor = { 1.0f, 0.96f, 0.9f };
+    DirectX::XMFLOAT3 secondaryColor = SrgbToLinear3( 1.0f, 0.96f, 0.9f );
     float             secondaryStrength = 2.0f;
 
     float secondaryExtinctionScale = 0.02f;
     float pad2[3] = { 0.0f, 0.0f, 0.0f };
 
     // === Ambient ===
-    DirectX::XMFLOAT3 ambientColor = { 1.0f, 0.96f, 0.9f };
+    DirectX::XMFLOAT3 ambientColor = SrgbToLinear3( 1.0f, 0.96f, 0.9f );
     float             ambientExtinctionScale = 0.05f;
 
     float ambientStrength = 1.0f;
