@@ -138,34 +138,39 @@ cbuffer HullFacesBuffer : register(b5)
 	float4 hullFaces[1024];
 };
 
+struct CloudLightingParams
+{
+    // Raymarch settings
+    int maxSteps;
+    float densityScale;
+    float minTransmittance;
+    float pad0;
+
+    // Sun / primary lighting
+    float3 dirSun;
+    float directExtinctionScale;
+
+    float3 lightSun;
+    float pad1;
+
+    // Secondary (multiple scattering)
+    float3 secondaryColor;
+    float secondaryStrength;
+
+    float secondaryExtinctionScale;
+    float3 pad2;
+
+    // Ambient / sky lighting
+    float3 ambientColor;
+    float ambientExtinctionScale;
+
+    float ambientStrength;
+    float3 pad3;
+};
+
 cbuffer CloudLightingBuffer : register(b6)
 {
-    // === Raymarch settings ===
-    int maxSteps; // Maximum number of raymarch steps per view ray
-    float densityScale; // Global scale converting cloud density to extinction 
-    float minTransmittance; // Early-out threshold for view-ray transmittance
-    float pad0; // Padding to align next float3 to 16 bytes
-
-    // === Sun / primary lighting ===
-    float3 dirSun; // Unit vector: direction from world toward the sun
-    float directExtinctionScale; // How strongly density attenuates direct sunlight
-
-    float3 lightSun; // Sun color and intensity (RGB, linear HDR)
-    float pad1; // Padding 
-
-    // === Secondary (multiple scattering) ===
-    float3 secondaryColor; // Color tint for secondary / inner-cloud glow
-    float secondaryStrength; // Overall strength multiplier for secondary lighting
-    
-    float secondaryExtinctionScale; // How strongly density attenuates secondary light, same value as directExtinctionScale
-    float3 pad2; // Padding
-
-    // === Ambient / sky lighting ===
-    float3 ambientColor; // Color of ambient sky light filling cloud shadows
-    float ambientExtinctionScale; // How strongly density attenuates ambient light
-
-    float ambientStrength; // Strength of large-scale ambient sky contribution
-    float3 pad3; // Padding
+    CloudLightingParams gCloudLighting;
 };
 
 float3 WorldToNvdfUV(float3 worldPos)

@@ -171,7 +171,7 @@ float GetApproxOpticalDepthToSun(float3 samplePos, float3 sunDir)
             float4 nvdfSample = nvdfTex.SampleLevel(linearClamp, WorldToNvdfUV(lightPos), 0.0f);
             float dimensionalProfile = nvdfSample.g;
             float detailType = nvdfSample.b;
-            float densityScale = nvdfSample.a;
+            float nvdfDensityScale = nvdfSample.a;
 
             // Ideally reuse GetUprezzedVoxelCloudDensity here
             float density = GetUprezzedVoxelCloudDensity(
@@ -179,7 +179,7 @@ float GetApproxOpticalDepthToSun(float3 samplePos, float3 sunDir)
                 lightPos,
                 dimensionalProfile,
                 detailType,
-                densityScale,
+                nvdfDensityScale,
                 noiseTex,
                 linearWrap
             );
@@ -323,13 +323,18 @@ float3 VolumeRaymarchNvdf(float3 eyePos, float3 dir, float3 bgColor, float maxRa
     RayMarchInfo march;
     InitRayMarchInfo(march, tEnter, tExit);
 
+    CloudLightingParams lightingParams = gCloudLighting; // Load lighting params once
+    float3 sunDirN = normalize(lightingParams.dirSun);
+    float3 viewDirN = normalize(dir);
+    
+
     // Ray march until the ray exits the volume or max steps are reached
     [loop]
-    for (int i = 0; i < maxSteps && march.distance < march.tExit; ++i)
+    for (int i = 0; i < lightingParams.maxSteps && march.distance < march.tExit; ++i)
     {
         march.stepIndex = i;
 
-        float3 samplePos = eyePos + march.distance * dir;
+        float3 samplePos = eyePos + march.distance * viewDirN;
 #if GPU_CLOUD
         float4 sdfSample = proceduralNvdfTex.SampleLevel(linearClamp, WorldToNvdfUV(samplePos), 0.0f);
         float collisionValue = sdfSample.a;
@@ -362,7 +367,7 @@ float3 VolumeRaymarchNvdf(float3 eyePos, float3 dir, float3 bgColor, float maxRa
 #if USE_JITTERED_STEP
             float jitter = StaticStepJitter(dispatchThreadID.xy, march.stepIndex); // [-0.5, 0.5]
             float jitterDistance = jitter * march.stepSize;
-            samplePos += dir * jitterDistance;
+            samplePos += viewDirN * jitterDistance;
 #endif
             
 #if GPU_CLOUD
@@ -379,7 +384,7 @@ float3 VolumeRaymarchNvdf(float3 eyePos, float3 dir, float3 bgColor, float maxRa
             float4 nvdfSample = nvdfTex.SampleLevel(linearClamp, WorldToNvdfUV(samplePos), 0.0f);
             float dimensionalProfile = nvdfSample.g;
             float detailType = nvdfSample.b;
-            float densityScale = nvdfSample.a;
+            float nvdfDensityScale = nvdfSample.a;
             float collisionValue = proceduralNvdfTex.SampleLevel(linearClamp, WorldToNvdfUV(samplePos), 0.0f).a;
             dimensionalProfile *= (1.0 - collisionValue);
 #endif
@@ -389,18 +394,18 @@ float3 VolumeRaymarchNvdf(float3 eyePos, float3 dir, float3 bgColor, float maxRa
                 samplePos,
                 dimensionalProfile,
                 detailType,
-                densityScale,
+                nvdfDensityScale,
                 noiseTex,
                 linearWrap
                 );
 
-            float sigma = density * DENSITY_SCALE;
+            float sigma = density * lightingParams.densityScale;
             float alpha = 1.0 - exp(-sigma * march.stepSize);
 
             // Lighting 
             #if (USE_DIRECT_LIGHTING || USE_AMBIENT_LIGHTING || USE_MULTIPLE_SCATTERING)
                 float3 lighting = 0.0.xxx;
-                LightCacheSample lightCacheSample = MakeLightCacheSample(GetApproxOpticalDepthToSun(samplePos, DIR_SUN));
+                LightCacheSample lightCacheSample = MakeLightCacheSample(GetApproxOpticalDepthToSun(samplePos, sunDirN));
                 
                 #if USE_DIRECT_LIGHTING
                         float3 directL = ComputeDirectLighting(
@@ -422,7 +427,7 @@ float3 VolumeRaymarchNvdf(float3 eyePos, float3 dir, float3 bgColor, float maxRa
                 #if USE_MULTIPLE_SCATTERING
                         
                         
-                        float sunDot = dot(normalize(DIR_SUN), normalize(dir));
+                        float sunDot = dot(sunDirN, viewDirN);
 
                         float3 msL = ComputeMultipleScattering(
                             dimensionalProfile,        // or density
@@ -439,7 +444,7 @@ float3 VolumeRaymarchNvdf(float3 eyePos, float3 dir, float3 bgColor, float maxRa
 
                 // Update camera transmittance using alpha
                         march.transmittance *= (1.0 - alpha);
-                        if (march.transmittance < MIN_TRANSMITTANCE)
+                        if (march.transmittance < lightingParams.minTransmittance)
                             break;
             #else
                 // Pure density-based fallback (your current behavior)
