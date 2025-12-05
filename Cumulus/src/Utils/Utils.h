@@ -24,6 +24,17 @@ namespace Muon
 
 	// Aligns a size or memory offset to be a multiple of alignment
 	UINT AlignToBoundary(UINT size, UINT alignment);
+
+	float SrgbChannelToLinear(float c); 
+	DirectX::XMFLOAT3 SrgbToLinear3(const DirectX::XMFLOAT3 c);
+	DirectX::XMFLOAT3 SrgbToLinear3(const float c[3]);
+	DirectX::XMFLOAT3 SrgbToLinear3(float r, float g, float b); 
+
+	float LinearChannelToSrgb(float c);
+
+	DirectX::XMFLOAT3 LinearToSrgb3(const DirectX::XMFLOAT3 c);
+	DirectX::XMFLOAT3 LinearToSrgb3(const float c[3]);
+	DirectX::XMFLOAT3 LinearToSrgb3(float r, float g, float b);
 }
 
 #endif

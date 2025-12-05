@@ -186,27 +186,60 @@ void ImguiNewFrame(float gameTime, const Camera& cam, SceneSettings& settings)
             ImGui::SliderFloat3("Sun Direction", dirSun, -1.0f, 1.0f, "%.2f");
 
             // === Secondary lighting ===
-            float secondaryColor[3] =
+            // Engine stores linear:
+            float secondaryColorLinear[3] =
             {
                 settings.lighting.secondaryColor.x,
                 settings.lighting.secondaryColor.y,
                 settings.lighting.secondaryColor.z
             };
+
+            // Convert linear -> sRGB for UI
+            DirectX::XMFLOAT3 secondarySrgb = LinearToSrgb3(
+                secondaryColorLinear[0],
+                secondaryColorLinear[1],
+                secondaryColorLinear[2]
+            );
+
+            float secondaryColor[3] =
+            {
+                secondarySrgb.x,
+                secondarySrgb.y,
+                secondarySrgb.z
+            };
+
             float secondaryStrength = settings.lighting.secondaryStrength;
 
             ImGui::Text("Secondary Color");
             ImGui::ColorEdit3("##SecondaryColor", secondaryColor);
             ImGui::SliderFloat("Secondary Strength", &secondaryStrength, 0.0f, 5.0f);
 
+
             // Secondary extinction is implicitly tied to directExtinctionScale
 
             // === Ambient lighting (independent extinction) ===
-            float ambientColor[3] =
+            // Engine stores linear
+            float ambientColorLinear[3] =
             {
                 settings.lighting.ambientColor.x,
                 settings.lighting.ambientColor.y,
                 settings.lighting.ambientColor.z
             };
+
+            // Convert linear -> sRGB for the UI
+            DirectX::XMFLOAT3 ambientSrgb = LinearToSrgb3(
+                ambientColorLinear[0],
+                ambientColorLinear[1],
+                ambientColorLinear[2]
+            );
+
+            float ambientColor[3] =
+            {
+                ambientSrgb.x,
+                ambientSrgb.y,
+                ambientSrgb.z
+            };
+
             float ambientStrength = settings.lighting.ambientStrength;
             float ambientExtinctionScale = settings.lighting.ambientExtinctionScale;
 
@@ -258,14 +291,13 @@ void ImguiNewFrame(float gameTime, const Camera& cam, SceneSettings& settings)
 
                 settings.lighting.dirSun = { dirNorm.x, dirNorm.y, dirNorm.z };
                 settings.lighting.lightSun = { lightSun[0], lightSun[1], lightSun[2] };
-
-                settings.lighting.secondaryColor = { secondaryColor[0], secondaryColor[1], secondaryColor[2] };
+                settings.lighting.secondaryColor = SrgbToLinear3(secondaryColor); 
                 settings.lighting.secondaryStrength = secondaryStrength;
 
                 // Tie secondary extinction to direct
                 settings.lighting.secondaryExtinctionScale = directExtinctionScale;
 
-                settings.lighting.ambientColor = { ambientColor[0], ambientColor[1], ambientColor[2] };
+                settings.lighting.ambientColor = SrgbToLinear3(ambientColor);
                 settings.lighting.ambientExtinctionScale = ambientExtinctionScale;
                 settings.lighting.ambientStrength = ambientStrength;
 
