@@ -147,18 +147,127 @@ void ImguiNewFrame(float gameTime, const Camera& cam, SceneSettings& settings)
 
         if (ImGui::BeginTabItem("Lighting"))
         {
-            int maxSteps = settings.lighting.maxSteps;
+            // === Raymarch settings ===
+            int   maxSteps = settings.lighting.maxSteps;
+            float densityScale = settings.lighting.densityScale;
+            float minTransmittance = settings.lighting.minTransmittance;
+
             ImGui::SliderInt("Max Steps", &maxSteps, 0, 512);
-            bool dataChanged = maxSteps != settings.lighting.maxSteps;
+            ImGui::SliderFloat("Density Scale", &densityScale, 0.0f, 3.0f);
+            ImGui::SliderFloat("Min Transmittance", &minTransmittance, 0.0f, 0.1f);
+
+            float directExtinctionScale = settings.lighting.directExtinctionScale;
+            ImGui::SliderFloat("Direct / Secondary Extinction",
+                &directExtinctionScale, 0.0f, 5.0f);
+
+            // === Sun light color & direction ===
+            float lightSun[3] =
+            {
+                settings.lighting.lightSun.x,
+                settings.lighting.lightSun.y,
+                settings.lighting.lightSun.z
+            };
+
+            ImGui::Text("Sun Light");
+            ImGui::ColorEdit3("##LightSun", lightSun);
+
+            // Direction (editable, then normalized)
+            float dirSun[3] =
+            {
+                settings.lighting.dirSun.x,
+                settings.lighting.dirSun.y,
+                settings.lighting.dirSun.z
+            };
+
+            ImGui::SliderFloat3("Sun Direction", dirSun, -1.0f, 1.0f, "%.2f");
+
+            // === Secondary lighting ===
+            float secondaryColor[3] =
+            {
+                settings.lighting.secondaryColor.x,
+                settings.lighting.secondaryColor.y,
+                settings.lighting.secondaryColor.z
+            };
+            float secondaryStrength = settings.lighting.secondaryStrength;
+
+            ImGui::Text("Secondary Color");
+            ImGui::ColorEdit3("##SecondaryColor", secondaryColor);
+            ImGui::SliderFloat("Secondary Strength", &secondaryStrength, 0.0f, 5.0f);
+
+            // Secondary extinction is implicitly tied to directExtinctionScale
+
+            // === Ambient lighting (independent extinction) ===
+            float ambientColor[3] =
+            {
+                settings.lighting.ambientColor.x,
+                settings.lighting.ambientColor.y,
+                settings.lighting.ambientColor.z
+            };
+            float ambientStrength = settings.lighting.ambientStrength;
+            float ambientExtinctionScale = settings.lighting.ambientExtinctionScale;
+
+            ImGui::Text("Ambient Color");
+            ImGui::ColorEdit3("##AmbientColor", ambientColor);
+            ImGui::SliderFloat("Ambient Extinction",
+                &ambientExtinctionScale, 0.0f, 10.0f, "%.3f");
+            ImGui::SliderFloat("Ambient Strength", &ambientStrength, 0.0f, 5.0f);
+
+            // === Detect changes ===
+            bool dataChanged =
+                maxSteps != settings.lighting.maxSteps ||
+                densityScale != settings.lighting.densityScale ||
+                minTransmittance != settings.lighting.minTransmittance ||
+                directExtinctionScale != settings.lighting.directExtinctionScale ||
+                lightSun[0] != settings.lighting.lightSun.x ||
+                lightSun[1] != settings.lighting.lightSun.y ||
+                lightSun[2] != settings.lighting.lightSun.z ||
+                dirSun[0] != settings.lighting.dirSun.x ||
+                dirSun[1] != settings.lighting.dirSun.y ||
+                dirSun[2] != settings.lighting.dirSun.z ||
+                secondaryColor[0] != settings.lighting.secondaryColor.x ||
+                secondaryColor[1] != settings.lighting.secondaryColor.y ||
+                secondaryColor[2] != settings.lighting.secondaryColor.z ||
+                secondaryStrength != settings.lighting.secondaryStrength ||
+                ambientColor[0] != settings.lighting.ambientColor.x ||
+                ambientColor[1] != settings.lighting.ambientColor.y ||
+                ambientColor[2] != settings.lighting.ambientColor.z ||
+                ambientStrength != settings.lighting.ambientStrength ||
+                ambientExtinctionScale != settings.lighting.ambientExtinctionScale;
 
             if (ImGui::Button("Update Lighting") || dataChanged)
             {
                 settings.lighting.maxSteps = maxSteps;
+                settings.lighting.densityScale = densityScale;
+                settings.lighting.minTransmittance = minTransmittance;
+
+                // Direct is the master extinction scale
+                settings.lighting.directExtinctionScale = directExtinctionScale;
+
+                // Normalize sun direction before using it in the engine
+                DirectX::XMVECTOR dir = DirectX::XMVectorSet(dirSun[0], dirSun[1], dirSun[2], 0.0f);
+                //dir = DirectX::XMVector3Normalize(dir);
+
+                DirectX::XMFLOAT3 dirNorm;
+                DirectX::XMStoreFloat3(&dirNorm, dir);
+
+                settings.lighting.dirSun = { dirNorm.x, dirNorm.y, dirNorm.z };
+                settings.lighting.lightSun = { lightSun[0], lightSun[1], lightSun[2] };
+
+                settings.lighting.secondaryColor = { secondaryColor[0], secondaryColor[1], secondaryColor[2] };
+                settings.lighting.secondaryStrength = secondaryStrength;
+
+                // Tie secondary extinction to direct
+                settings.lighting.secondaryExtinctionScale = directExtinctionScale;
+
+                settings.lighting.ambientColor = { ambientColor[0], ambientColor[1], ambientColor[2] };
+                settings.lighting.ambientExtinctionScale = ambientExtinctionScale;
+                settings.lighting.ambientStrength = ambientStrength;
+
                 settings.updateLighting = true;
             }
+
             ImGui::EndTabItem();
         }
-
 
         ImGui::EndTabBar();
     }

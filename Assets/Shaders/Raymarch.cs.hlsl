@@ -10,9 +10,9 @@
 // === Lighting ===
 // Preset: "Density only"  -> all USE_*_LIGHTING = 0
 // Preset: "Lit clouds"    -> enable desired USE_*_LIGHTING = 1
-#define USE_DIRECT_LIGHTING      1   // Sun / directional lighting
-#define USE_AMBIENT_LIGHTING     1   // Sky / ambient term
-#define USE_MULTIPLE_SCATTERING  1   // Approx. multiple scattering
+#define USE_DIRECT_LIGHTING      1  // Sun / directional lighting
+#define USE_AMBIENT_LIGHTING     0   // Sky / ambient term
+#define USE_MULTIPLE_SCATTERING  0  // Approx. multiple scattering
 
 // === Debug / Visualization ===
 #define DEBUG_AABB_INTERSECT     0   // Visualize volume/hull hits
@@ -185,7 +185,7 @@ float GetApproxOpticalDepthToSun(float3 samplePos, float3 sunDir, float directEx
                 linearWrap
             );
 
-            float sigma = dimensionalProfile * (1 - directExtinctionScale);
+            float sigma = dimensionalProfile * directExtinctionScale;
 
             float stepSizeInside = minStepSize; // or a tuned fixed step
             depth += sigma * stepSizeInside;
@@ -280,7 +280,7 @@ float3 ComputeMultipleScattering(
     // Exponential shaping based on summed density / tau to sun
     ms_volume *= exp(-opticalDepthToSun * factor);
 
-    return secondaryColor * ms_volume * secondaryColor;
+    return secondaryColor * ms_volume * secondaryStrength;
 }
 
 float3 ComputeAmbientLighting(
