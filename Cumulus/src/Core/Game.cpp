@@ -244,7 +244,6 @@ void Game::Update(Muon::StepTimer const& timer)
     float elapsedTime = float(timer.GetElapsedSeconds());
     float totalTime = float(timer.GetTotalSeconds());
     mInput.Frame(elapsedTime, &mCamera);
-    mCamera.UpdateView();    
 
     // The UI has flagged for a cloud update
     if (settings.updateClouds)
@@ -273,6 +272,11 @@ void Game::Update(Muon::StepTimer const& timer)
     }
 
     Muon::FrameResources& currFrameResources = mFrameResources.at(mCurrFrameResourceIdx);
+
+    // Updating Camera
+    mCamera.UpdateView();    
+    Muon::cbCamera camera = mCamera.GetAsCB();
+    currFrameResources.UpdateCamera(camera);
     
     // Updating Lights
     Muon::cbLights lights;
@@ -507,7 +511,7 @@ void Game::Render()
         int32_t cameraRootIdx = mAtmospherePass.GetResourceRootIndex("VSCamera");
         if (cameraRootIdx != ROOTIDX_INVALID)
         {
-            mCamera.Bind(cameraRootIdx, pCommandList);
+            pCommandList->SetGraphicsRootConstantBufferView(cameraRootIdx, currFrameResources.mCameraBuffer.GetGPUVirtualAddress());
         }
 
         int32_t atmosphereRootIdx = mAtmospherePass.GetResourceRootIndex("cbAtmosphere");
@@ -551,7 +555,7 @@ void Game::Render()
         int32_t cameraRootIdx = mOpaquePass.GetResourceRootIndex("VSCamera");
         if (cameraRootIdx != ROOTIDX_INVALID)
         {
-            mCamera.Bind(cameraRootIdx, pCommandList);
+            pCommandList->SetGraphicsRootConstantBufferView(cameraRootIdx, currFrameResources.mCameraBuffer.GetGPUVirtualAddress());
         }
 
         // Bind the world matrix Upload Buffer to the root index known by the material
@@ -599,7 +603,7 @@ void Game::Render()
         int32_t cameraRootIdx = mRaymarchPass.GetResourceRootIndex("VSCamera");
         if (cameraRootIdx != ROOTIDX_INVALID)
         {
-            pCommandList->SetComputeRootConstantBufferView(cameraRootIdx, mCamera.GetGPUVirtualAddress());
+            pCommandList->SetComputeRootConstantBufferView(cameraRootIdx, currFrameResources.mCameraBuffer.GetGPUVirtualAddress());
         }
 
         int32_t aabbIdx = mRaymarchPass.GetResourceRootIndex("AABBBuffer");
@@ -732,12 +736,13 @@ void Game::CreateWindowSizeDependentResources(int newWidth, int newHeight)
 
 Game::~Game()
 { 
+    Muon::FlushCommandQueue();
+
     for (size_t i = 0; i != NUM_FRAMES_IN_FLIGHT; ++i)
     {
         mFrameResources.at(i).Destroy();
     }
 
-    mCube.Destroy();
     mCamera.Destroy();
     mInput.Destroy();
     mOpaquePass.Destroy();

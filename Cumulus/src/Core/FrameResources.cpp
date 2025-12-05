@@ -39,6 +39,7 @@ bool FrameResources::Create(UINT width, UINT height)
 	}
 
     mWorldMatrixBuffer.Create(L"world matrix buffer", sizeof(cbPerEntity));
+    mCameraBuffer.Create(L"Camera CB", sizeof(cbCamera));
     mLightBuffer.Create(L"Light Buffer", sizeof(cbLights));
     mTimeBuffer.Create(L"Time", sizeof(cbTime));
     mAtmosphereBuffer.Create(L"Atmosphere CB", sizeof(cbAtmosphere));
@@ -54,6 +55,12 @@ bool FrameResources::Create(UINT width, UINT height)
 bool FrameResources::UpdateEntities(cbPerEntity& data)
 {
     memcpy(mWorldMatrixBuffer.GetMappedPtr(), &data, sizeof(cbPerEntity));
+    return true;
+}
+
+bool FrameResources::UpdateCamera(cbCamera& data)
+{
+    memcpy(mCameraBuffer.GetMappedPtr(), &data, sizeof(cbCamera));
     return true;
 }
 
@@ -109,6 +116,7 @@ void FrameResources::Destroy()
 {
     mCmdAllocator.Reset();
     mWorldMatrixBuffer.Destroy();
+    mCameraBuffer.Destroy();
     mLightBuffer.Destroy();
     mTimeBuffer.Destroy();
     mAABBBuffer.Destroy();

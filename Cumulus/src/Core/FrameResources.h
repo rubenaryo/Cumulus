@@ -27,6 +27,7 @@ struct FrameResources
     bool Create(UINT width, UINT height);
 
     bool UpdateEntities(cbPerEntity& data);
+    bool UpdateCamera(cbCamera& data);
     bool UpdateLights(cbLights& data);
     bool UpdateTime(cbTime& data);
     bool UpdateAABB(cbIntersections& data);
@@ -41,6 +42,7 @@ struct FrameResources
     Microsoft::WRL::ComPtr<ID3D12CommandAllocator> mCmdAllocator;
 
     UploadBuffer mWorldMatrixBuffer;
+    UploadBuffer mCameraBuffer;
     UploadBuffer mLightBuffer;
     UploadBuffer mTimeBuffer;
     UploadBuffer mAABBBuffer;
