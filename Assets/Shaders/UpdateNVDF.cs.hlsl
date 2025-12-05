@@ -1,5 +1,5 @@
 RWTexture3D<float4> nvdfTex : register(u0);
-RWTexture3D<float4> sdfTex : register(u1);
+RWTexture3D<float2> sdfTex : register(u1);
 
 cbuffer cbCloudGenBuffer : register(b6)
 {

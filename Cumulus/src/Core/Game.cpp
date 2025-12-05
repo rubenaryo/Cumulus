@@ -355,16 +355,23 @@ void Game::UpdateProceduralNVDF()
 
     ResourceCodex& codex = ResourceCodex::GetSingleton();
     Texture* pProcNVDFTex = codex.GetTexture(GetResourceID(L"ProceduralNVDF"));
-    if (!pProcNVDFTex)
+    Texture* pProcSDFTex = codex.GetTexture(GetResourceID(L"ProceduralSDF"));
+    if (!pProcNVDFTex || !pProcSDFTex)
     {
-        Muon::Printf("Error: Failed to get procedural nvdf texture!\n");
+        Muon::Printf("Error: Failed to get procedural nvdf/sdf texture!\n");
         return;
     }
 
-    int32_t outputIdx = mProcNVDFPass.GetResourceRootIndex("nvdfTex");
-    if (outputIdx != ROOTIDX_INVALID)
+    int32_t nvdfIdx = mProcNVDFPass.GetResourceRootIndex("nvdfTex");
+    if (nvdfIdx != ROOTIDX_INVALID)
     {
-        pCommandList->SetComputeRootDescriptorTable(outputIdx, pProcNVDFTex->GetUAVHandleGPU());
+        pCommandList->SetComputeRootDescriptorTable(nvdfIdx, pProcNVDFTex->GetUAVHandleGPU());
+    }
+
+    int32_t sdfIdx = mProcNVDFPass.GetResourceRootIndex("sdfTex");
+    if (sdfIdx != ROOTIDX_INVALID)
+    {
+        pCommandList->SetComputeRootDescriptorTable(sdfIdx, pProcSDFTex->GetUAVHandleGPU());
     }
 
     int32_t hullIdx = mProcNVDFPass.GetResourceRootIndex("HullsBuffer");
