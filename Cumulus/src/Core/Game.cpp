@@ -361,7 +361,7 @@ void Game::UpdateProceduralNVDF()
         return;
     }
 
-    int32_t outputIdx = mProcNVDFPass.GetResourceRootIndex("gOutput");
+    int32_t outputIdx = mProcNVDFPass.GetResourceRootIndex("nvdfTex");
     if (outputIdx != ROOTIDX_INVALID)
     {
         pCommandList->SetComputeRootDescriptorTable(outputIdx, pProcNVDFTex->GetUAVHandleGPU());

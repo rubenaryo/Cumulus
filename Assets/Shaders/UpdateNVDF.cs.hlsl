@@ -1,4 +1,5 @@
-RWTexture3D<float4> gOutput : register(u0);
+RWTexture3D<float4> nvdfTex : register(u0);
+RWTexture3D<float4> sdfTex : register(u1);
 
 cbuffer cbCloudGenBuffer : register(b6)
 {
@@ -106,8 +107,9 @@ void main(int3 dispatchThreadID : SV_DispatchThreadID)
     int3 coord = dispatchThreadID.xyz;
 
     uint width, height, depth;
-    gOutput.GetDimensions(width, height, depth);
+    nvdfTex.GetDimensions(width, height, depth);
     
+    // nvdfTex/sdfTex dims assumed to be equal
     if (coord.x >= width || coord.y >= height || coord.z >= depth)
         return;
     
@@ -134,7 +136,7 @@ void main(int3 dispatchThreadID : SV_DispatchThreadID)
     // We offset d by scale so we can add a bit more  detail around the harsh sdf edges
     float encodedSdf = ((d - scale) - sdfMin) / (sdfMax - sdfMin);
     encodedSdf = saturate(encodedSdf);
-    gOutput[coord].r = encodedSdf; // r is sdf output
+    nvdfTex[coord].r = encodedSdf; // r is sdf output
     
     // g is the cloud's detail - aka its actual form and outline
     // to get it, we calculate billowy noise with 12 iterations of fbm
@@ -143,10 +145,10 @@ void main(int3 dispatchThreadID : SV_DispatchThreadID)
     // fade out as we get closer to the edge
     //float norm_edge_dist = DistToEdge(worldPos) / scale;
     float billow = d > scale ? 0.0 : fbm_3D_BillowNoise(worldPos * 0.008, float3(6.0, 6.0, 6.0), 12);
-    gOutput[coord].g = billow < norm_scale ? 0.0 : billow * (1.0 - norm_scale);
+    nvdfTex[coord].g = billow < norm_scale ? 0.0 : billow * (1.0 - norm_scale);
     // b is detail type, which is a bit larger billows that get attenuated by height, as higher parts are more whispy
     float normalized_height = (worldPos.y - VOLUME_MIN_WS.y) / (VOLUME_MAX_WS.y - VOLUME_MIN_WS.y) + 0.3;
-    gOutput[coord].b = d > scale * 1.5 ? 0.0 : fbm_3D_BillowNoise(worldPos * 0.006, float3(6.0, 6.0, 6.0), 3) * normalized_height;
+    nvdfTex[coord].b = d > scale * 1.5 ? 0.0 : fbm_3D_BillowNoise(worldPos * 0.006, float3(6.0, 6.0, 6.0), 3) * normalized_height;
     
     //---------------------------
     // COLLISION CODE
@@ -156,17 +158,17 @@ void main(int3 dispatchThreadID : SV_DispatchThreadID)
     bool collision = false;
     if (d > scale * 1.6)
     {
-        gOutput[coord].a = max(gOutput[coord].a - 0.01, 0.0);
+        nvdfTex[coord].a = max(nvdfTex[coord].a - 0.01, 0.0);
         return;
     }
-    for (uint i = 0; i < hullCount; ++i)
+    for (uint j = 0; j < hullCount; ++j)
     {
         float hullEnter, hullExit;
-        ConvexHull ch = hulls[i];
+        ConvexHull ch = hulls[j];
         float3 dir = float3(1.0, 1.0, 1.0);
         if (PointInsideConvexHull(worldPos, ch))
         {
-            gOutput[coord].a = 1.0f;
+            nvdfTex[coord].a = 1.0f;
             collision = true;
             break;
         }
@@ -174,6 +176,6 @@ void main(int3 dispatchThreadID : SV_DispatchThreadID)
 
     if (!collision)
     {
-        gOutput[coord].a = max(gOutput[coord].a - 0.01, 0.0);
+        nvdfTex[coord].a = max(nvdfTex[coord].a - 0.01, 0.0);
     }
 }
