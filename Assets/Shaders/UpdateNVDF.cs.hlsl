@@ -16,6 +16,8 @@ cbuffer cbCloudGenBuffer : register(b6)
 
 #include "Raymarch_Common.hlsli"
 
+#define USE_SPHERE 0
+
 float smooth_min(float a, float b, float k)
 {
     float h = max(k - abs(a - b), 0.0) / k;
@@ -76,24 +78,24 @@ float SDF_Cloud(float3 query, int numSeed, float3 origin, float scale)
     float3 cone_b = float3(origin.x + 3 * (1.0 - h) * scale, origin.y, origin.z - h * scale);
     float cone = SDF_RoundCone(query, cone_a, cone_b,
                                hash(cone_a) * scale + 0.2, hash(cone_b) * scale + 0.2);
-                             //max(WorleyNoise3D(cone_a, 12) * scale, 0.3), max(WorleyNoise3D(cone_b, 16) * scale, 0.3));
     d = smooth_min(d, cone, 0.8);
     float3 midpoint = (cone_a + cone_b) * 0.5;
     for (int i = 0; i < numSeed; ++i)
     {
         float ran = random(i * 17);
         float3 offset_a = random3(float3(i * 4.12, ran, i * numSeed * 0.77) * 3.1415) * 3.4 - 1.7;
+#if USE_SPHERE
+        float sphere = SDF_Sphere(query, midpoint + offset_a * scale, ran * scale);
+#else
         float3 offset_b = random3(float3(random(i * 4), 1.0 - ran, i * numSeed * 347.77) * 42.1415) * 2.4 - 1.2;
-        // NOTE: Sphere sdf is faster, but idk by how much.
-        // To switch, uncomment this, and comment out offset_b, and the abw and sphere lines below
-        //float sphere = SDF_Sphere(query, midpoint + offset_a * scale, ran * scale);
-        
+
         float3 a = midpoint + offset_a * scale;
         float3 b = midpoint + offset_b * scale;
         float w = scale * 0.5f;
         float sphere = SDF_VesicaSegment(query, a, b, w);
+#endif
         
-        d = smooth_min(d, sphere, 0.7);
+       d = smooth_min(d, sphere, 0.7);
     }
     return d;
 }
@@ -149,8 +151,14 @@ void main(int3 dispatchThreadID : SV_DispatchThreadID)
     //---------------------------
     // COLLISION CODE
     //---------------------------
-    // collision gets put into the density scale part for now, which gets calculated in raymarch for now
+    // collision gets put into the density scale part, which gets calculated in raymarch for now
+    
     bool collision = false;
+    if (d > scale * 1.6)
+    {
+        gOutput[coord].a = max(gOutput[coord].a - 0.01, 0.0);
+        return;
+    }
     for (uint i = 0; i < hullCount; ++i)
     {
         float hullEnter, hullExit;
