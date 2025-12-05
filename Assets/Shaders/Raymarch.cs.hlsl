@@ -2,7 +2,7 @@
 #include "Raymarch_Common.hlsli"
 
 // === Raymarch / Quality ===
-#define GPU_CLOUD 0
+#define GPU_CLOUD 1
 #define USE_ADAPTIVE_STEP        1   // Adaptive step size along ray
 #define USE_JITTERED_STEP        1   // Stochastic jitter per step
 #define USE_HIGH_HIGH_FREQUENCY  1   // Extra near-camera detail
@@ -335,7 +335,7 @@ float3 VolumeRaymarchNvdf(float3 eyePos, float3 dir, float3 bgColor, float maxRa
         float collisionValue = sdfSample.a;
         float sdfDistance =  DecodeSdf(sdfSample.r) * AUTHORING_TO_WORLD_SCALE * (1.0 - collisionValue);
         // NVDF range for a is [0.2, 0.6] -> mapping smoothstep [0, 1] to it
-        sdfSample.a = smoothstep(-4.0, -12.0, sdfDistance) * 0.4 + 0.2;
+        sdfSample.a = clamp(sdfSample.b - 0.3f, 0.2f, 0.6f); //smoothstep(-4.0, -12.0, sdfDistance) * 0.4 + 0.2;
         sdfSample.g *= 1.0 - collisionValue;
 #else
         float4 sdfSample = sdfTex.SampleLevel(linearClamp, WorldToNvdfUV(samplePos), 0.0f);
@@ -372,7 +372,7 @@ float3 VolumeRaymarchNvdf(float3 eyePos, float3 dir, float3 bgColor, float maxRa
             float dimensionalProfile = nvdfSample.g;
             float detailType = nvdfSample.b;
             // NVDF range for density scale is [0.2, 0.6] -> mapping smoothstep [0, 1] to it
-            float densityScale = smoothstep(-4.0, -12.0, sdfDistance) * 0.4 + 0.2;
+            float densityScale = clamp(detailType - 0.3f, 0.2f, 0.6f); //smoothstep(-4.0, -12.0, sdfDistance) * 0.4 + 0.2;
             dimensionalProfile *= (1.0 - collisionValue);
 #else
 
