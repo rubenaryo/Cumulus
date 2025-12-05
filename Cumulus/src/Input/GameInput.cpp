@@ -68,8 +68,8 @@ namespace Input {
 
                 const float mouseSensitivity = pCamera->GetSensitivity();
 
-                const float yaw  = delta.first * mouseSensitivity * dt;
-                const float pitch = delta.second * mouseSensitivity * dt;
+                const float yaw  = delta.first * mouseSensitivity;
+                const float pitch = delta.second * mouseSensitivity;
 
                 // Always yaw around the WORLD UP (not the camera’s current up)
                 XMVECTOR worldUp = XMVectorSet(0.0f, 1.0f, 0.0f, 0.0f);

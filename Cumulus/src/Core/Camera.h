@@ -10,11 +10,6 @@ Description : Interface for Quaternion-Based Camera functionality
 #include "DXCore.h"
 #include <Core/Buffers.h>
 
-//namespace DirectX
-//{
-//    struct XMFLOAT3;
-//}
-
 namespace Input
 {
     class GameInput;
@@ -43,9 +38,7 @@ public:
 
     void UpdateView();
     void UpdateProjection(float aspectRatio);
-
-    void Bind(int32_t rootParamIndex, ID3D12GraphicsCommandList* pCommandList) const;
-    D3D12_GPU_VIRTUAL_ADDRESS GetGPUVirtualAddress() const { return mConstantBuffer.GetGPUVirtualAddress(); }
+    cbCamera GetAsCB() const;
 
     DirectX::XMMATRIX   GetView()           const  { return mView;         }
     DirectX::XMMATRIX   GetProjection()     const  { return mProjection;   }
@@ -73,6 +66,7 @@ private:
     DirectX::XMVECTOR   mUp;
     DirectX::XMVECTOR   mPosition;
     DirectX::XMVECTOR   mTarget;
+
     // Camera's polar locations
     float   mZenith;
     float   mAzimuth;
@@ -84,8 +78,6 @@ private:
     // Look Sensitivity
     float mSensitivity;
 
-    Muon::UploadBuffer mConstantBuffer;
-
     CameraMode mCameraMode;
 
 private: // For GameInput only
@@ -94,8 +86,6 @@ private: // For GameInput only
     void MoveUp(float dist);
     void MoveAlongAxis(float dist, DirectX::XMVECTOR axis); // Assumes normalized axis
     void Rotate(DirectX::XMVECTOR quatRotation);
-    
-    void UpdateConstantBuffer();
 };
 }
 
