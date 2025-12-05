@@ -27,7 +27,7 @@ float GetOpticalDepthAlongDirection(float3 samplePos, float3 dir, float extincti
     const float depthThreshold = 5.0;
 
     [loop]
-    for (int i = 0; i < 32; ++i)
+    for (int i = 0; i < 128; ++i)
     {
         float3 pos = samplePos + dir * t;
 
