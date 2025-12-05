@@ -26,7 +26,7 @@ namespace Input {
         virtual void SetDefaultKeyMap() override;
         // multiplier for motions
         bool mIsSprint = false;
-        float mSprintVal = 30.f;
+        float mSprintVal = 100.f;
     };
 }
 #endif

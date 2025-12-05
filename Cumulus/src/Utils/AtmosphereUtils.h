@@ -15,12 +15,6 @@ Description : Useful functions for atmospheric rendering calculations
 namespace Muon
 {
 
-// Constants from the original code
-constexpr double kPi = 3.1415926;
-constexpr double kSunAngularRadius = 0.00935 * 0.5f;
-constexpr double kSunSolidAngle = kPi * kSunAngularRadius * kSunAngularRadius;
-constexpr double kLengthUnitInMeters = 1000.0;
-
 // Function to create the view_from_clip matrix (inverse projection)
 DirectX::XMMATRIX CreateViewFromClipMatrix(float fovY_radians, float aspect_ratio)
 {
@@ -63,7 +57,7 @@ DirectX::XMMATRIX CreateModelFromViewMatrix(
     float c_z = cosf(view_zenith_angle_radians);
     float s_a = sinf(view_azimuth_angle_radians);
     float c_a = cosf(view_azimuth_angle_radians);
-    float l = view_distance_meters / kLengthUnitInMeters;
+    float l = view_distance_meters / 1000.f;
 
     // This follows the method from Bruneton's code,
     // for a generic one, please look at older commits
@@ -91,7 +85,7 @@ void InitializeAtmosphereConstants(
     float aspect_ratio = static_cast<float>(viewport_width) / static_cast<float>(viewport_height);
 
     // FOV setup (50 degrees as in original)
-    const float kFovY = 50.0f / 180.0f * static_cast<float>(kPi);
+    const float kFovY = 50.0f / 180.0f * XM_PI;
 
     // Create matrices
     XMMATRIX view_from_clip = CreateViewFromClipMatrix(kFovY, aspect_ratio);
@@ -143,7 +137,7 @@ void UpdateAtmosphere(cbAtmosphere& constants,
     float aspect_ratio = static_cast<float>(input.viewport_width) / static_cast<float>(input.viewport_height);
 
     // FOV setup (50 degrees as in original)
-    const float kFovY = 50.0f / 180.0f * static_cast<float>(kPi);
+    const float kFovY = 50.0f / 180.0f * XM_PI;
 
     input.view_zenith_angle_radians = camera.GetZenith();
     input.view_azimuth_angle_radians = camera.GetAzimuth();
@@ -151,14 +145,14 @@ void UpdateAtmosphere(cbAtmosphere& constants,
     XMVECTOR target = camera.GetTarget();
     XMVECTOR at = XMVectorSet(XMVectorGetX(target), XMVectorGetZ(target), XMVectorGetY(target), 0.0f);
     //float dist = max(XMVectorGetY(camera.GetPosition()), 0.f);
-    float dist = XMVectorGetX(XMVector3Length(at));
+    float dist = XMVectorGetX(XMVector3Length(XMVectorSubtract(at, camera.GetPosition())));
     // Create matrices
     // NOTE: Ideally we woudln't want to recalculate view from clip every time
     XMMATRIX view_from_clip = CreateViewFromClipMatrix(kFovY, aspect_ratio);
     XMMATRIX model_from_view = CreateModelFromViewMatrix(
         input.view_zenith_angle_radians,
         input.view_azimuth_angle_radians,
-        dist * 100
+        dist * 50
     );
 
     // Store matrices (DirectX math uses row-major in memory, but these will actually still be like OpenGL column-major)
@@ -167,7 +161,7 @@ void UpdateAtmosphere(cbAtmosphere& constants,
 
     // camera pos is grabbed from the calculation we already did for model matrix
     constants.camera_position = XMFLOAT3(constants.model_from_view._41, constants.model_from_view._42, constants.model_from_view._43);
-    constants.isCamUp = input.view_zenith_angle_radians > XM_PIDIV2 ? 1 : 0;
+    constants.isCamUp = input.view_zenith_angle_radians > XM_PIDIV2 - 0.1 ? 1 : 0;
     // Earth center (at origin in world space, but offset down in "length units")
     constants.earth_center = XMFLOAT3(0.0f, 0.0f, -6360.0f); // Earth radius in km
     // -0.989970, -0.141117, 0.006796 -> preset 2

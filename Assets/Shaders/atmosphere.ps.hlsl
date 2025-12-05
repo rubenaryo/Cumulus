@@ -846,7 +846,7 @@ float4 main(PSInput input) : SV_TARGET
     float4 color;
 
     float3 view_direction = normalize(input.view_ray);
-    
+    bool isFlipped = false;
 #if RENDERSPHERE
     float fragment_angular_size =
         length(abs(ddx(input.view_ray)) + abs(ddy(input.view_ray))) / length(input.view_ray);
@@ -895,6 +895,15 @@ float4 main(PSInput input) : SV_TARGET
     }
     p = camera - earth_center;
     p_dot_v = dot(p, view_direction);
+    if (p_dot_v < 0.12 && isCamUp > 0.1)
+    {
+        view_direction = -view_direction;
+        p_dot_v = dot(p, view_direction);
+        isFlipped = true;
+        //float3 ground_blu = float3(0.05, 0.05, 0.2);
+        //float3 ground_col = lerp(ground_blu, ground_blu * 0.1f, moon_visibility);
+        //return float4(ground_col.xyz, 1.0);
+    }
     p_dot_p = dot(p, p);
     float ray_earth_center_squared_distance = p_dot_p - p_dot_v * p_dot_v;
     discriminant =
@@ -905,6 +914,15 @@ float4 main(PSInput input) : SV_TARGET
     // Test planet sphere P intersection
     float3 p = camera - earth_center;
     float p_dot_v = dot(p, view_direction);
+    if (p_dot_v < 0.12 && isCamUp > 0.1)
+    {
+        view_direction = -view_direction;
+        p_dot_v = dot(p, view_direction);
+        isFlipped = true;
+        //float3 ground_blu = float3(0.05, 0.05, 0.2);
+        //float3 ground_col = lerp(ground_blu, ground_blu * 0.1f, moon_visibility);
+        //return float4(ground_col.xyz, 1.0);
+    }
     float p_dot_p = dot(p, p);
     float ray_earth_center_squared_distance = p_dot_p - p_dot_v * p_dot_v;
     float discriminant =
@@ -993,11 +1011,11 @@ float4 main(PSInput input) : SV_TARGET
         camera - earth_center, view_direction, 0.0, -sun_direction,
         night_transmittance) * 0.05;
     // Sun and Moon disc
-    if (dot(view_direction, sun_direction) > sun_size.y)
+    if (dot(view_direction, sun_direction) > sun_size.y && !isFlipped)
     {
         radiance += transmittance * GetSolarLuminance();
     }
-    else if (dot(view_direction, -sun_direction) > sun_size.y)
+    else if (dot(view_direction, -sun_direction) > sun_size.y && !isFlipped)
     {
         night_radiance += night_transmittance * GetLunarLuminance();
     }
@@ -1005,12 +1023,6 @@ float4 main(PSInput input) : SV_TARGET
     radiance = lerp(radiance, night_radiance, moon_visibility);
     transmittance = lerp(transmittance, night_transmittance * 0.05, moon_visibility);
     ground_radiance = lerp(ground_radiance, night_ground_radiance * 0.05, moon_visibility);
-    if (p_dot_v < 0.0 && isCamUp > 0.1)
-    {
-        float3 ground_blu = float3(0.05, 0.05, 0.2);
-        float3 ground_col = lerp(ground_blu, ground_blu * 0.1f, moon_visibility);
-        return float4(ground_col.xyz, 1.0);
-    }
     
     radiance = lerp(radiance, ground_radiance, ground_alpha);
 #if RENDERSPHERE
