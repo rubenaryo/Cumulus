@@ -201,16 +201,6 @@ void Game::Frame()
 
     UpdateProceduralNVDF();
 
-    if (mTimer.GetTotalTicks() % 16 == 0)
-    {
-        UpdateRaymarchCache();
-    }
-
-    if (mTimer.GetTotalTicks() % 16 == 0)
-    {
-        UpdateRaymarchCache();
-    }
-
     Render();
     AdvanceFence();
 
@@ -402,15 +392,16 @@ void Game::UpdateProceduralNVDF()
     FlushCommandQueue(); // TODO: Give this process its own cmd allocator so we don't stall everything here
 }
 
-void Game::UpdateRaymarchCache()
+void Game::UpdateRaymarchCache(Muon::FrameResources& currFrameResources)
 {
     using namespace Muon;
+
+    // Note: Assumes command list is open
 
     ID3D12GraphicsCommandList* pCommandList = Muon::GetCommandList();
     if (!pCommandList)
         return;
 
-    ResetCommandList(nullptr);
     if (!mRaymarchCachePass.Bind(pCommandList))
     {
         Muon::Print("Error: Failed to bind raymarch caching pass.\n");
@@ -425,6 +416,12 @@ void Game::UpdateRaymarchCache()
     Texture* pSdf = codex.GetTexture(GetResourceID(L"StormbirdCloudSDF_3D")); // TODO: Ensure same resource IDs are used in main raymarch pass. These MUST match.
     Texture* pNVDF = codex.GetTexture(GetResourceID(L"StormbirdCloud_NVDF"));
     Texture* pNoise = codex.GetTexture(GetResourceID(L"Noise_3D"));
+
+    int32_t cloudLightingIdx = mRaymarchCachePass.GetResourceRootIndex("CloudLightingBuffer");
+    if (cloudLightingIdx != ROOTIDX_INVALID)
+    {
+        pCommandList->SetComputeRootConstantBufferView(cloudLightingIdx, currFrameResources.mCloudLightingBuffer.GetGPUVirtualAddress());
+    }
 
     int32_t sdfIndex = mRaymarchCachePass.GetResourceRootIndex("sdfTex");
     if (sdfIndex != ROOTIDX_INVALID)
@@ -464,9 +461,6 @@ void Game::UpdateRaymarchCache()
     pCommandList->ResourceBarrier(1, &CD3DX12_RESOURCE_BARRIER::Transition(pLightingCache->GetResource(),
         D3D12_RESOURCE_STATE_UNORDERED_ACCESS, D3D12_RESOURCE_STATE_GENERIC_READ));
         
-    CloseCommandList();
-    ExecuteCommandList();
-    FlushCommandQueue(); // TODO: Give this process its own cmd allocator so we don't stall everything here
 }
 
 void Game::Render()
@@ -582,6 +576,11 @@ void Game::Render()
         {
             pMesh->DrawIndexed(pCommandList);
         }
+    }
+
+    if (mTimer.GetTotalTicks() % 16 == 0)
+    {
+        UpdateRaymarchCache(currFrameResources);
     }
 
     // After opaque pass, transition depth buffer to be bindable as a regular texture by other passes
