@@ -20,6 +20,10 @@ struct alignas(16) cbCamera
     DirectX::XMFLOAT4X4 viewProj;
     DirectX::XMFLOAT4X4 invView;
     DirectX::XMFLOAT4X4 invProj;
+
+    float minDist = 0.001f; 
+    float maxDist = 4000.0f; 
+	float camPad0[2];
 };
 
 struct alignas(16) cbPerEntity
@@ -120,7 +124,32 @@ struct alignas(16) cbCloudGenData
 
 struct alignas(16) cbCloudLighting
 {
-    int maxSteps = 256;
+    // === Raymarch settings ===
+    int   maxSteps = 256;
+    float densityScale = 1.0f;
+    float minTransmittance = 0.01f;
+    float pad0 = 0.0f; 
+
+    // === Sun / primary lighting ===
+    DirectX::XMFLOAT3 dirSun = { 0.0f, 1.0f, 0.0f };
+    float             directExtinctionScale = 0.02f;
+
+    float             directStrength = 1.0f; 
+    DirectX::XMFLOAT3 lightSun = { 220.0f, 240.0f, 250.0f };
+
+    // === Secondary ===
+    DirectX::XMFLOAT3 secondaryColor = { 1.0f, 0.96f, 0.9f };
+    float             secondaryStrength = 2.0f;
+
+    float secondaryExtinctionScale = 0.02f;
+    float pad2[3] = { 0.0f, 0.0f, 0.0f };
+
+    // === Ambient ===
+    DirectX::XMFLOAT3 ambientColor = { 1.0f, 0.96f, 0.9f };
+    float             ambientExtinctionScale = 0.05f;
+
+    float ambientStrength = 1.0f;
+    float pad3[3] = { 0.0f, 0.0f, 0.0f };
 };
 
 struct EntityData {

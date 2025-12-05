@@ -107,14 +107,16 @@ void main(uint3 dispatchThreadID : SV_DispatchThreadID)
         return;
     }
     
+    CloudLightingParams lightingParams = gCloudLighting; // Cache cbuffer locally
+    float3 dirSunN = normalize(lightingParams.dirSun);
     uint3 texDim = uint3(width, height, depth);
 
     // Convert dispatch index -> UV at voxel center
     float3 sampleUV = VoxelIndexToNvdfUV(dispatchThreadID, texDim);
     float3 sampleWS = UVToWorld(sampleUV);
 
-    float tauSun = GetOpticalDepthAlongDirection(sampleWS, DIR_SUN, DIRECT_EXTINCTION_SCALE);
-    float tauVert = GetOpticalDepthAlongDirection(sampleWS, normalize(float3(0, 1, 0)), AMBIENT_EXTINCTION_SCALE);
+    float tauSun = GetOpticalDepthAlongDirection(sampleWS, dirSunN, lightingParams.directExtinctionScale);
+    float tauVert = GetOpticalDepthAlongDirection(sampleWS, normalize(float3(0, 1, 0)), lightingParams.ambientExtinctionScale);
 
     gCache[dispatchThreadID] = float4(tauSun, tauVert, 0.0f, 0.0f);
 }
