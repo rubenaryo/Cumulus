@@ -14,6 +14,10 @@ cbuffer VSCamera : register(b10)
     float4x4 viewProj;
     float4x4 invView;
     float4x4 invProj;
+    
+    float minDist; 
+    float maxDist; 
+    float2 camPad0;
 }
 
 // Values changed for every entity

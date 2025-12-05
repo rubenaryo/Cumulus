@@ -2,7 +2,7 @@
 #include "Raymarch_Common.hlsli"
 
 // === Raymarch / Quality ===
-#define GPU_CLOUD 1
+#define GPU_CLOUD 0
 #define USE_ADAPTIVE_STEP        1   // Adaptive step size along ray
 #define USE_JITTERED_STEP        1   // Stochastic jitter per step
 #define USE_HIGH_HIGH_FREQUENCY  1   // Extra near-camera detail
@@ -312,8 +312,8 @@ float3 VolumeRaymarchNvdf(float3 eyePos, float3 dir, float3 bgColor, float maxRa
 #endif
 
     // Clamp to your global near/far
-    tEnter = max(tEnter, MIN_DIST);
-    tExit = min(min(tExit, MAX_DIST), maxRayDist);
+    tEnter = max(tEnter, minDist);
+    tExit = min(min(tExit, maxDist), maxRayDist);
 
     if (tExit <= tEnter)
         return bgColor;
