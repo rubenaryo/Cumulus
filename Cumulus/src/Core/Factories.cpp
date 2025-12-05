@@ -1025,7 +1025,6 @@ void TextureFactory::LoadAll3DTextures(ID3D12Device* pDevice, ID3D12GraphicsComm
     Load3DTexturesInPath(path(TEX3D_RGBA_PATHW), 4, pDevice, pCommandList, codex);
 }
 
-
 void TextureFactory::Load3DTexturesInPath(const std::filesystem::path& basePath, size_t channelCount, ID3D12Device* pDevice, ID3D12GraphicsCommandList* pCommandList, ResourceCodex& codex)
 {
     namespace fs = std::filesystem;
@@ -1065,24 +1064,23 @@ void TextureFactory::Load3DTexturesInPath(const std::filesystem::path& basePath,
     }
 }
 
-void TextureFactory::CreateProceduralNVDFTexture(ID3D12Device* pDevice, ID3D12GraphicsCommandList* pCommandList, ResourceCodex& codex)
+void TextureFactory::CreateProceduralNVDFTexture(const wchar_t* name, ID3D12Device* pDevice, ID3D12GraphicsCommandList* pCommandList, ResourceCodex& codex)
 {
-    const wchar_t* PROC_NVDF_NAME = L"ProceduralNVDF";
-    Texture& tex = codex.InsertTexture(GetResourceID(PROC_NVDF_NAME));
+    Texture& tex = codex.InsertTexture(GetResourceID(name));
 
     UINT PROC_NVDF_WIDTH = 512;
     UINT PROC_NVDF_HEIGHT= 512;
     UINT PROC_NVDF_DEPTH = 64;
 
     // Create a blank 3d texture in the common state.
-    bool success = tex.Create(PROC_NVDF_NAME, pDevice, PROC_NVDF_WIDTH, PROC_NVDF_HEIGHT, PROC_NVDF_DEPTH,
+    bool success = tex.Create(name, pDevice, PROC_NVDF_WIDTH, PROC_NVDF_HEIGHT, PROC_NVDF_DEPTH,
         DXGI_FORMAT_R32G32B32A32_FLOAT,
         D3D12_RESOURCE_FLAG_ALLOW_UNORDERED_ACCESS,
         D3D12_RESOURCE_STATE_GENERIC_READ);
 
     if (!success)
     {
-        Muon::Printf(L"Error: Failed to create 3D Texture for Procedural NVDF: %s\n", PROC_NVDF_NAME);
+        Muon::Printf(L"Error: Failed to create 3D Texture for Procedural NVDF: %s\n", name);
         return;
     }
 
@@ -1091,14 +1089,14 @@ void TextureFactory::CreateProceduralNVDFTexture(ID3D12Device* pDevice, ID3D12Gr
     success &= tex.InitSRV(pDevice, pSRVHeap);
     if (!success)
     {
-        Muon::Printf(L"Error: Failed to init srv for Procedural NVDF: %s\n", PROC_NVDF_NAME);
+        Muon::Printf(L"Error: Failed to init srv for Procedural NVDF: %s\n", name);
         return;
     }
 
     success &= tex.InitUAV(pDevice, pSRVHeap);
     if (!success)
     {
-        Muon::Printf(L"Error: Failed to init uav for Procedural NVDF: %s\n", PROC_NVDF_NAME);
+        Muon::Printf(L"Error: Failed to init uav for Procedural NVDF: %s\n", name);
         return;
     }
 }

@@ -59,7 +59,8 @@ void ResourceCodex::Init()
     MeshFactory::LoadAllMeshes(*gCodexInstance);
     TextureFactory::LoadAllNVDF(GetDevice(), GetCommandList(), *gCodexInstance);
     TextureFactory::LoadAll3DTextures(GetDevice(), GetCommandList(), *gCodexInstance);
-    TextureFactory::CreateProceduralNVDFTexture(GetDevice(), GetCommandList(), *gCodexInstance);
+    TextureFactory::CreateProceduralNVDFTexture(L"ProceduralNVDF", GetDevice(), GetCommandList(), *gCodexInstance);
+    TextureFactory::CreateProceduralNVDFTexture(L"ProceduralSDF", GetDevice(), GetCommandList(), *gCodexInstance);
     TextureFactory::CreateRaymarchCacheTexture(GetDevice(), GetCommandList(), *gCodexInstance);
     MaterialFactory::CreateAllMaterials(*gCodexInstance);
 
