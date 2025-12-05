@@ -11,8 +11,8 @@
 // Preset: "Density only"  -> all USE_*_LIGHTING = 0
 // Preset: "Lit clouds"    -> enable desired USE_*_LIGHTING = 1
 #define USE_DIRECT_LIGHTING      1  // Sun / directional lighting
-#define USE_AMBIENT_LIGHTING     0   // Sky / ambient term
-#define USE_MULTIPLE_SCATTERING  0  // Approx. multiple scattering
+#define USE_AMBIENT_LIGHTING     1   // Sky / ambient term
+#define USE_MULTIPLE_SCATTERING  1  // Approx. multiple scattering
 
 // === Debug / Visualization ===
 #define DEBUG_AABB_INTERSECT     0   // Visualize volume/hull hits
