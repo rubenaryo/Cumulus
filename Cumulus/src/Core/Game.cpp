@@ -308,7 +308,8 @@ void Game::Update(Muon::StepTimer const& timer)
     debugEntityWorld = XMMatrixMultiply(debugEntityWorld, DirectX::XMMatrixRotationRollPitchYaw(0, 0, PI / 2.0f));
     debugEntityWorld = XMMatrixMultiply(debugEntityWorld, DirectX::XMMatrixRotationRollPitchYaw(-PI / 2.0f, 0, 0));
     debugEntityWorld = XMMatrixMultiply(debugEntityWorld, DirectX::XMMatrixScaling(10.f, 10.f, 10.f));
-    float yPos = 1000 * (sin(time.totalTime * .5f));
+    //float yPos = 1000 * (sin(time.totalTime * .5f));
+    float yPos = 50.0;
     debugEntityWorld = XMMatrixMultiply(debugEntityWorld, DirectX::XMMatrixTranslation(0, yPos, 0));
 
     Muon::cbPerEntity& entity = mEntityCBData[0].entityMatrices;
