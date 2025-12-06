@@ -28,8 +28,8 @@ static const float AUTHORING_TO_WORLD_SCALE = SIDE_LENGTH / NVDF_DOMAIN_SIDE_LEN
 
 // Volume bounds in world space
 static const float SIDE_LENGTH = 4000.0; 
-static const float3 VOLUME_MIN_WS = float3(-SIDE_LENGTH / 2, 0.0, -SIDE_LENGTH / 2);
-static const float3 VOLUME_MAX_WS = float3(SIDE_LENGTH / 2, SIDE_LENGTH / 8, SIDE_LENGTH / 2);
+static const float3 VOLUME_MIN_WS = float3(-SIDE_LENGTH / 2, -SIDE_LENGTH / 16, -SIDE_LENGTH / 2);
+static const float3 VOLUME_MAX_WS = float3(SIDE_LENGTH / 2, SIDE_LENGTH / 16, SIDE_LENGTH / 2);
 
 // Mapping from NVDF authoring space to world 
 static const float NVDF_DOMAIN_SIDE_LENGTH = 4000.0; // NVDF authoring domain: 4km x 4km x 0.5km (matches the world volume).
@@ -89,6 +89,7 @@ struct LightCacheSample
     // Tau is optical depth to X 
     float tauSun;  
     float tauVertical; 
+    float empty[2]; 
 };
 
 LightCacheSample MakeLightCacheSample(float2 sample)

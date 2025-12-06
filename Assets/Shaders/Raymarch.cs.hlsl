@@ -244,10 +244,10 @@ float3 ComputeDirectLighting(
     float stepSize, 
     float3 dirSun, 
     float3 lightSun,
-    float directExtinctionScale, 
-    float directLightingStrength)
+    float directLightingStrength,
+    float opticalDepthToSun)
 {
-    float opticalDepthToSun = GetApproxOpticalDepthToSun(samplePos, dirSun, directExtinctionScale);
+
     float T_sun = exp(-opticalDepthToSun); // transmittance from sun to point
 
     // Phase term: how strongly this point scatters sun light toward the camera
@@ -330,6 +330,7 @@ float3 VolumeRaymarchNvdf(float3 eyePos, float3 dir, float3 bgColor, float maxRa
 
     RayMarchInfo march;
     InitRayMarchInfo(march, tEnter, tExit);
+    tEnter = 0.0;
 
     CloudLightingParams lightingParams = gCloudLighting; // Load lighting params once
     float3 sunDirN = normalize(lightingParams.dirSun);
@@ -415,7 +416,7 @@ float3 VolumeRaymarchNvdf(float3 eyePos, float3 dir, float3 bgColor, float maxRa
             // Lighting 
             #if (USE_DIRECT_LIGHTING || USE_AMBIENT_LIGHTING || USE_MULTIPLE_SCATTERING)
                 float3 lighting = 0.0.xxx;
-                LightCacheSample lightCacheSample = MakeLightCacheSample(GetApproxOpticalDepthToSun(samplePos, sunDirN, lightingParams.directExtinctionScale));
+                LightCacheSample lightCacheSample = MakeLightCacheSample(lightCacheTex.SampleLevel(linearClamp, WorldToNvdfUV(samplePos), 0.0f));
                 
                 #if USE_DIRECT_LIGHTING
                 float3 directL = ComputeDirectLighting(
@@ -426,9 +427,9 @@ float3 VolumeRaymarchNvdf(float3 eyePos, float3 dir, float3 bgColor, float maxRa
                             sigma,
                             march.stepSize,
                             sunDirN,
-                            lightingParams.lightSun,
-                            lightingParams.directExtinctionScale,
-                            lightingParams.directStrength
+                            lightingParams.lightSun, 
+                            lightingParams.directStrength, 
+                            lightCacheSample.tauSun
                         );
                         lighting += directL;
                 #endif
@@ -443,8 +444,6 @@ float3 VolumeRaymarchNvdf(float3 eyePos, float3 dir, float3 bgColor, float maxRa
                 #endif
 
                 #if USE_MULTIPLE_SCATTERING
-                        
-                        
                         float sunDot = dot(sunDirN, viewDirN);
 
                         float3 msL = ComputeMultipleScattering(
@@ -514,34 +513,6 @@ float3 VolumeRaymarchNvdf(float3 eyePos, float3 dir, float3 bgColor, float maxRa
     return outColor;
 #endif
 }
-
-float GetMaxRayDist(float depth, float3 eyePos, int3 dispatchThreadID)
-{ 
-    uint width, height;
-    gOutput.GetDimensions(width, height);
-    
-    int2 pixelCoord = dispatchThreadID.xy;
-    
-    // NDC coordinates (already computed)
-    float2 uv = (float2(pixelCoord) + 0.5) / float2(width, height);
-    uv = uv * 2.0 - 1.0;
-    uv.y = -uv.y;
-
-    // Reconstruct clip-space position
-    float4 clipPos = float4(uv.x, uv.y, depth * 2.0f - 1.0f, 1.0f);
-
-    // To view space
-    float4 viewPos = mul(invProj, clipPos);
-    viewPos.xyz /= viewPos.w;
-
-    // To world space
-    float3 worldPosAtDepth = mul(invView, float4(viewPos.xyz, 1.0f)).xyz;
-
-    // Distance from eye along the view ray
-    float maxRayDist = length(worldPosAtDepth - eyePos);
-    return maxRayDist;
-}
-
  
 [numthreads(8, 8, 1)]
 void main(int3 dispatchThreadID : SV_DispatchThreadID)
@@ -568,8 +539,8 @@ void main(int3 dispatchThreadID : SV_DispatchThreadID)
     float3 eyePos = float3(invView[0][3], invView[1][3], invView[2][3]); // from the 4th column instead of row..
     float3 bgColor = gInput[pixelCoord].rgb;
     float depth = depthStencilBuffer[dispatchThreadID.xy].r;
-    float maxRayDist = GetMaxRayDist(depth, eyePos, dispatchThreadID);
-
+    float viewSpaceZ = (minDist * maxDist) / (maxDist - depth * (maxDist - minDist));
+    float maxRayDist = viewSpaceZ / viewDir.z; // viewDir.z is the view-space forward component
     float3 finalColor = VolumeRaymarchNvdf(eyePos, worldDir, bgColor, maxRayDist, dispatchThreadID);
     
     gOutput[dispatchThreadID.xy] = float4(finalColor, 1.0);
