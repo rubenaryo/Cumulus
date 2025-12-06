@@ -377,7 +377,7 @@ float3 VolumeRaymarchNvdf(float3 eyePos, float3 dir, float3 bgColor, float maxRa
             float jitter = StaticStepJitter(dispatchThreadID.xy, march.stepIndex); // [-0.5, 0.5]
             float jitterDistance = jitter * march.stepSize;
             samplePos += viewDirN * jitterDistance;
-            nvdfUV = WorldToNvdfUV(samplePos);
+            float3 nvdfUV = WorldToNvdfUV(samplePos);
 #endif
             
 #if GPU_CLOUD
@@ -387,7 +387,7 @@ float3 VolumeRaymarchNvdf(float3 eyePos, float3 dir, float3 bgColor, float maxRa
             float dimensionalProfile = nvdfSample.g;
             float detailType = nvdfSample.b;
             // NVDF range for density scale is [0.2, 0.6] -> mapping smoothstep [0, 1] to it
-            float densityScale = clamp(detailType - 0.3f, 0.2f, 0.6f); //smoothstep(-4.0, -12.0, sdfDistance) * 0.4 + 0.2;
+            float nvdfDensityScale = clamp(detailType - 0.3f, 0.2f, 0.6f); //smoothstep(-4.0, -12.0, sdfDistance) * 0.4 + 0.2;
             dimensionalProfile *= (1.0 - collisionValue);
 #else
 
