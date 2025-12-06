@@ -72,6 +72,7 @@ void Camera::UpdateView()
 
 void Camera::UpdateProjection(float aspectRatio)
 {
+
     switch (mCameraMode)
     {
     case CM_ORTHOGRAPHIC:
@@ -86,11 +87,27 @@ void Camera::UpdateProjection(float aspectRatio)
     }
     case CM_PERSPECTIVE:
     {
-        mProjection = XMMatrixPerspectiveFovLH(
-            XM_PIDIV4,      // FOV
-            aspectRatio,    // Screen Aspect ratio
-            mNear,          // Near clip plane
-            mFar);          // Far clip plane
+        // Replace XMMatrixPerspectiveFovLH with manual construction for reversed-Z
+        float fovY = XM_PIDIV4;
+        float tanHalfFovY = tanf(fovY / 2.0f);
+        float height = 1.0f / tanHalfFovY;
+        float width = height / aspectRatio;
+
+        // Reversed-Z projection matrix (1.0 at near, 0.0 at far)
+        XMMATRIX reversedProj = {
+            width, 0.0f,   0.0f,                          0.0f,
+            0.0f,  height, 0.0f,                          0.0f,
+            0.0f,  0.0f,   mNear / (mNear - mFar),        1.0f,
+            0.0f,  0.0f,   (mNear * mFar) / (mNear - mFar), 0.0f
+        };
+
+        mProjection = reversedProj;
+
+        //mProjection = XMMatrixPerspectiveFovLH(
+        //    XM_PIDIV4,      // FOV
+        //    aspectRatio,    // Screen Aspect ratio
+        //    mNear,          // Near clip plane
+        //    mFar);          // Far clip plane
 
         break;
     }

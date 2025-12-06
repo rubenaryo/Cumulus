@@ -563,7 +563,7 @@ return SUCCEEDED(hr);
         pCommandList->ClearRenderTargetView(gOffscreenTarget->GetRTVHandleCPU(), gClearValue.Color, 0, nullptr);
         
         // Clear the depth buffer
-        pCommandList->ClearDepthStencilView(GetDepthStencilView(), D3D12_CLEAR_FLAG_DEPTH, 1.0f, 0, 0, nullptr);
+        pCommandList->ClearDepthStencilView(GetDepthStencilView(), D3D12_CLEAR_FLAG_DEPTH, 0.0f, 0, 0, nullptr);
 
         return true;
     }
