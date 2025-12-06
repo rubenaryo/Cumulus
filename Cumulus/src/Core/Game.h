@@ -36,7 +36,7 @@ public:
     void OnSuspending();
     void OnResuming();
     void OnMove();
-    void SpawnProjectile();
+    void SpawnProjectile(const DirectX::XMFLOAT3& spawnPos);
     void OnResize(int newWidth, int newHeight);
 
     // Input Callbacks

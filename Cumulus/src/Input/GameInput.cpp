@@ -100,7 +100,9 @@ namespace Input {
             }
             case GameCommands::ShootProjectile:
             {
-                game->SpawnProjectile();
+                DirectX::XMFLOAT3 out;
+                DirectX::XMStoreFloat3(&out, pCamera->GetPosition());
+                game->SpawnProjectile(out);
                 break;
             }
             }

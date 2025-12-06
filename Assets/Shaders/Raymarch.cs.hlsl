@@ -15,8 +15,13 @@
 #define USE_MULTIPLE_SCATTERING  1  // Approx. multiple scattering
 
 // === Debug / Visualization ===
-#define DEBUG_AABB_INTERSECT     0   // Visualize volume/hull hits
+#define DEBUG_AABB_INTERSECT     1   // Visualize volume/hull hits
 #define DEBUG_STEP_COUNT         0   // Step-count gradient debug
+
+#if DEBUG_AABB_INTERSECT
+#include "VS_Common.hlsli"
+#endif
+
 
 Texture2D gInput : register(t0);
 Texture3D sdfTex : register(t1); // Cached sdf for accelerating sdf 
@@ -305,15 +310,18 @@ float3 VolumeRaymarchNvdf(float3 eyePos, float3 dir, float3 bgColor, float maxRa
     }
 
 #if DEBUG_AABB_INTERSECT
-    for(uint i = 0; i < hullCount; ++i)
+    for (uint i = 0; i < entityCount; ++i)
     {
-        float hullEnter, hullExit;
-        ConvexHull ch = hulls[i];
+        cbPerEntity entity = entities[i];
 
+        //no collision:
+        if (entity.hullIdx < 0) continue;
+
+        float hullEnter, hullExit;
+        ConvexHull ch = hulls[entity.hullIdx];
+        float3 dir = float3(1.0, 1.0, 1.0);
         if (RayConvexHullIntersect(eyePos, dir, ch, hullEnter, hullExit))
         {
-            // minBoxEnter = min(minBoxEnter, hullEnter);
-            // maxBoxExit = max(maxBoxExit, hullExit);
             return float3(1, 0, 0) * bgColor; // Visualize hull intersection
         }
     }

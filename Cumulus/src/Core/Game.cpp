@@ -58,7 +58,7 @@ bool Game::Init(HWND window, int width, int height)
 
     ResourceCodex& codex = ResourceCodex::GetSingleton();
 
-    mCamera.Init(DirectX::XMFLOAT3(500.0, 300.0, 100.0), width / (float)height, 0.1f, 1000.0f);
+    mCamera.Init(DirectX::XMFLOAT3(250.0, 250.0, 0.0), width / (float)height, 0.1f, 10000.0f);
 
     // Assemble opaque render pass
     {
@@ -146,7 +146,7 @@ bool Game::InitFrameResources(UINT width, UINT height)
     GenerateCloudGenConstants(mCloudData, settings.numClouds, settings.cloudScale);
     
     // Updating AABBs
-    const Mesh* m = codex.GetMesh(GetResourceID(L"sphere.obj"));
+    const Mesh* m = codex.GetMesh(GetResourceID(L"cube.obj"));
     cbIntersections intersections = {};
     intersections.aabbCount = 1;
     intersections.aabbs[0] = m->GetAABB();
@@ -280,12 +280,22 @@ void Game::InitEntities()
 
 
     // ---- 3. Store ----------------------------------------------------------
-
     jetIdx = 0;
     cpuEntityData.push_back(jetEntity);
+
+    for (int i = 0; i < 50; ++i) {
+        XMVECTOR forward;
+        mCamera.GetForward(forward);
+        XMVECTOR loc = mCamera.GetPosition() + forward * 10.f * (i + 1.f);
+
+        DirectX::XMFLOAT3 loc3;
+        DirectX::XMStoreFloat3(&loc3, loc);
+        loc3.x -= 0.5f;
+        SpawnProjectile(loc3);
+    }
 }
 
-void Game::SpawnProjectile()
+void Game::SpawnProjectile(const DirectX::XMFLOAT3& spawnPos)
 {
     using namespace DirectX;
     using namespace Muon;
@@ -297,32 +307,37 @@ void Game::SpawnProjectile()
     ResourceCodex& codex = ResourceCodex::GetSingleton();
 
     EntityData newProjectile{};
-    newProjectile.resourceID = GetResourceID(L"sphere.obj");
+    newProjectile.resourceID = GetResourceID(L"cube.obj");
     newProjectile.hullIdx = sphereHullIdx;
 
-    // Store world & invWorld
+    // Camera view & world
     XMMATRIX view = mCamera.GetView();
     XMMATRIX camWorld = XMMatrixInverse(nullptr, view);
 
-    XMStoreFloat4x4(&newProjectile.entityMatrices.world, camWorld);
-    XMStoreFloat4x4(&newProjectile.entityMatrices.invWorld, view);
+    // --- USE spawnPos HERE ---
+    camWorld.r[3] = XMVectorSet(spawnPos.x, spawnPos.y, spawnPos.z, 1.0f);
 
-    // Extract camera basis
+    // Store world / invWorld
+    XMStoreFloat4x4(&newProjectile.entityMatrices.world, camWorld);
+    XMMATRIX invWorld = XMMatrixInverse(nullptr, camWorld);
+    XMStoreFloat4x4(&newProjectile.entityMatrices.invWorld, invWorld);
+
+    // Camera orientation basis (from camWorld)
     XMVECTOR camForward = XMVector3Normalize(camWorld.r[2]);
     XMVECTOR camUp = XMVector3Normalize(camWorld.r[1]);
 
-    // Build projectile velocity
+    // Projectile velocity
     float forwardSpeed = 50.f;
     float upBoost = 10.f;
 
     XMVECTOR vel = camForward * forwardSpeed + camUp * upBoost;
 
-    // Store velocity
     XMStoreFloat4(&newProjectile.vel, vel);
 
     projectileIndices.push_back(cpuEntityData.size());
     cpuEntityData.push_back(newProjectile);
 }
+
 
 
 
@@ -383,7 +398,7 @@ void Game::UpdateEntities(Muon::FrameResources& currFrameResources, const Muon::
             float rotationRate = projectile.vel.w;        // rot per second
 
             // --- MOVE ---
-            XMVECTOR forwardMove = linearVel * time.deltaTime;
+            XMVECTOR forwardMove = linearVel * 0;
             world.r[3] = XMVectorAdd(world.r[3], forwardMove);  // modify translation
 
             // --- ROTATE ---
