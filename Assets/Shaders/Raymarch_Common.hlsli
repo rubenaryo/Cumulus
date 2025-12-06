@@ -9,23 +9,7 @@ Description : Common Raymarching Structures for Collision and Noise for Cloud Da
 
 // Constants 
 static const float PI = 3.14159265359;
-
-// Raymarch settings
-static const int MAX_STEPS = 256; // Max steps per ray
-static const float MIN_DIST = 0.001; // Global near distance
-static const float MAX_DIST = 4000.0; // Global far distance
 static const float EPSILON = 0.001; // Small epsilon for safety
-static const float MIN_TRANSMITTANCE = 0.01; // Early-out when mostly opaque
-
-// Lighting Settings 
-static const float3 DIR_SUN = normalize(float3(0.0, 1.0, 0.0)); // Temporary hardcoded light dir
-static const float3 LIGHT_SUN = float3(220, 240, 250);; // sun color/brightness
-static const float DIRECT_EXTINCTION_SCALE = 0.02;
-static const float3 SECONDARY_COLOR = float3(1.0, 0.96, 0.9);
-static const float SECONDARY_STRENGTH = 2;
-static const float3 AMBIENT_COLOR = float3(1.0, 0.96, 0.9);
-static const float AMBIENT_STRENGTH = 1;
-static const float AMBIENT_EXTINCTION_SCALE = 0.05; 
 
 // Volume bounds in world space
 static const float SIDE_LENGTH = 4000.0; 
@@ -36,10 +20,6 @@ static const float3 VOLUME_MAX_WS = float3(SIDE_LENGTH / 2, SIDE_LENGTH / 8, SID
 static const float NVDF_DOMAIN_SIDE_LENGTH = 4000.0; // NVDF authoring domain: 4km x 4km x 0.5km (matches the world volume).
 static const float NOISE_DOMAIN_SIDE_LENGTH = 100.0; // Noise domain: 3D noise pattern repeats every 100m in X/Y/Z.
 static const float AUTHORING_TO_WORLD_SCALE = SIDE_LENGTH / NVDF_DOMAIN_SIDE_LENGTH;
-
-// Density -> extinction scaling
-static const float DENSITY_SCALE = 1; // To be tuned / driven by NVDF
-
 
 struct RayMarchInfo
 {
@@ -138,10 +118,40 @@ cbuffer HullFacesBuffer : register(b5)
 	float4 hullFaces[1024];
 };
 
-cbuffer CloudLightingBuffer : register(b7)
+struct CloudLightingParams
 {
+    // Raymarch settings
     int maxSteps;
-}
+    float densityScale;
+    float minTransmittance;
+    float pad0;
+
+    // Sun / primary lighting
+    float3 dirSun;
+    float directExtinctionScale;
+
+    float directStrength;
+    float3 lightSun;
+
+    // Secondary (multiple scattering)
+    float3 secondaryColor;
+    float secondaryStrength;
+
+    float secondaryExtinctionScale;
+    float3 pad2;
+
+    // Ambient / sky lighting
+    float3 ambientColor;
+    float ambientExtinctionScale;
+
+    float ambientStrength;
+    float3 pad3;
+};
+
+cbuffer CloudLightingBuffer : register(b6)
+{
+    CloudLightingParams gCloudLighting;
+};
 
 float3 WorldToNvdfUV(float3 worldPos)
 {
