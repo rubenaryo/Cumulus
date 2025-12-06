@@ -87,12 +87,6 @@ void Camera::UpdateProjection(float aspectRatio)
     }
     case CM_PERSPECTIVE:
     {
-        // Replace XMMatrixPerspectiveFovLH with manual construction for reversed-Z
-        float fovY = XM_PIDIV4;
-        float tanHalfFovY = tanf(fovY / 2.0f);
-        float height = 1.0f / tanHalfFovY;
-        float width = height / aspectRatio;
-
         mProjection = XMMatrixPerspectiveFovLH(
             XM_PIDIV4,      // FOV
             aspectRatio,    // Screen Aspect ratio
