@@ -5,15 +5,27 @@ cbuffer cbCloudGenBuffer : register(b6)
     float4 seeds[16];
     
     int numSeeds;
-    float pad[3];
+    int demoMode;
+    float pad[2];
 };
+
+cbuffer cbJetBuffer : register(b7)
+{
+    float4 positions[4];
+}
+
+cbuffer Time : register(b8)
+{
+    float totalTime;
+    float deltaTime;
+}
 
 // this stores the cloud textures that we prebaked
 Texture3D proceduralNoiseTex : register(t7);
 SamplerState linearWrap : register(s2);
 
 #include "Raymarch_Common.hlsli"
-
+#include "VS_Common.hlsli"
 // enable to use sdf sphere instead of vesica segments
 // gives a performance boost at a small visual hit
 #define USE_SPHERE 0
@@ -126,17 +138,58 @@ void main(int3 dispatchThreadID : SV_DispatchThreadID)
 // CLOUD GEN
 //------------------------------
     // SDF is getting clouds around the given seeds
-    float d = 999999999.f;
 
+
+    float d = 999999999.f;
+    float gMultiplier = 1.0;
     float scale = 0;    // keeping track of average scale of clouds
     // making numSeeds number of clouds at their input locations and scales as passed by the CPU
-    for (uint i = 0; i < numSeeds; ++i)
+    float jetSpeed = 0;
+    if (demoMode == 0)
     {
-        float4 curr = seeds[i];
-        scale += curr.a;
-        d = smooth_min(d, SDF_Cloud(worldPos, i % 3 + 2, curr.xyz, curr.a), 0.8);
+        for (uint i = 0; i < numSeeds; ++i)
+        {
+            float4 curr = seeds[i];
+            scale += curr.a;
+            d = smooth_min(d, SDF_Cloud(worldPos, i % 3 + 2, curr.xyz, curr.a), 0.8);
+        }
+        scale /= numSeeds;
     }
-    scale /= numSeeds;
+
+    
+    else if (demoMode == 1)
+    {
+        uint numTrails = 1;
+
+        float3 jetStartOffset1 = float3(15.0, -5.0, 14.0);
+        float3 jetStartOffset2 = float3(15.0, -5.0, -14.0);
+
+        for (uint i = 0; i < numTrails; ++i)
+        {
+            float rightLine = SDF_RoundCone(worldPos, positions[2 * i].xyz + jetStartOffset1, positions[2 * i + 1].xyz + jetStartOffset1, positions[2 * i].w, positions[2 * i + 1].w);
+            float leftLine = SDF_RoundCone(worldPos, positions[2 * i].xyz + jetStartOffset2, positions[2 * i + 1].xyz + jetStartOffset2, positions[2 * i].w, positions[2 * i + 1].w);
+            float curr = min(rightLine, leftLine);
+
+            d = smooth_min(d, curr, 0.8);
+
+            float jetTravelDistance = length(positions[2 * i + 1].xyz - positions[2 * i].xyz);
+            jetSpeed = jetTravelDistance / totalTime;
+            float distanceFromJet = length(worldPos - positions[2 * i + 1].xyz);
+            float timeAlive = distanceFromJet / max(jetSpeed, 0.0001);
+            float lifeTime = 25.0;
+
+
+            float currentDensityMultiplier = (1.0 - saturate(timeAlive / lifeTime));
+
+            scale += (positions[2 * i].a + positions[2 * i + 1].a) * 0.5f;
+
+            float disStart = length(worldPos - positions[2 * i].xyz);
+            float disEnd = length(worldPos - positions[2 * i + 1].xyz);
+
+            gMultiplier = lerp(0.15, 1.0, currentDensityMultiplier);
+        }
+        scale /= numTrails;
+    }
     // We then encode SDF into the range [0, 1] from [-256, 4096], as this is what Nubis expects
     const float sdfMin = -256.0;
     const float sdfMax = 4096.0;
@@ -163,7 +216,7 @@ void main(int3 dispatchThreadID : SV_DispatchThreadID)
     // where float normalized_height = (worldPos.y - VOLUME_MIN_WS.y) / (VOLUME_MAX_WS.y - VOLUME_MIN_WS.y) + 0.3;
     // but we already baked this into the g channel of the input texture, and we already do the scale check there
     float b = tex.g;
-    
+    g *= gMultiplier;
     //---------------------------
     // COLLISION CODE
     //---------------------------
@@ -181,12 +234,17 @@ void main(int3 dispatchThreadID : SV_DispatchThreadID)
         return;
     }
     
-    for (uint i = 0; i < hullCount; ++i)
+    for (uint i = 0; i < entityCount; ++i)
     {
+        cbPerEntity entity = entities[i];
+        
+        //no collision:
+        if (entity.hullIdx < 0) continue;
+
         float hullEnter, hullExit;
-        ConvexHull ch = hulls[i];
+        ConvexHull ch = hulls[entity.hullIdx];
         float3 dir = float3(1.0, 1.0, 1.0);
-        if (PointInsideConvexHull(worldPos, ch))
+        if (PointInsideConvexHull(worldPos, ch, entity.world))
         {
             a = 1.0f;
             collision = true;
@@ -196,7 +254,7 @@ void main(int3 dispatchThreadID : SV_DispatchThreadID)
 
     if (!collision)
     {
-        a = max(gOutput[coord].a - 0.01, 0.0);
+        a = max(gOutput[coord].a - 0.01 * deltaTime, 0.0);
     }
     
     // Texture output:

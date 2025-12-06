@@ -7,9 +7,24 @@ Description : Common Raymarching Structures for Collision and Noise for Cloud Da
 #ifndef RAYMARCH_COMMON_HLSLI
 #define RAYMARCH_COMMON_HLSLI
 
+
+#define JET_MODE  0   // Extra near-camera detail
+
 // Constants 
 static const float PI = 3.14159265359;
 static const float EPSILON = 0.001; // Small epsilon for safety
+
+#if JET_MODE
+// Volume bounds in world space
+static const float SIDE_LENGTH = 5000.0;
+static const float3 VOLUME_MIN_WS = float3(-SIDE_LENGTH / 2, 0.0, -SIDE_LENGTH / 2);
+static const float3 VOLUME_MAX_WS = float3(SIDE_LENGTH / 2, SIDE_LENGTH / 8, SIDE_LENGTH / 2);
+
+// Mapping from NVDF authoring space to world 
+static const float NVDF_DOMAIN_SIDE_LENGTH = 5000.0; // NVDF authoring domain: 4km x 4km x 0.5km (matches the world volume).
+static const float NOISE_DOMAIN_SIDE_LENGTH = 100.0; // Noise domain: 3D noise pattern repeats every 100m in X/Y/Z.
+static const float AUTHORING_TO_WORLD_SCALE = SIDE_LENGTH / NVDF_DOMAIN_SIDE_LENGTH;
+#else
 
 // Volume bounds in world space
 static const float SIDE_LENGTH = 4000.0; 
@@ -20,6 +35,7 @@ static const float3 VOLUME_MAX_WS = float3(SIDE_LENGTH / 2, SIDE_LENGTH / 8, SID
 static const float NVDF_DOMAIN_SIDE_LENGTH = 4000.0; // NVDF authoring domain: 4km x 4km x 0.5km (matches the world volume).
 static const float NOISE_DOMAIN_SIDE_LENGTH = 100.0; // Noise domain: 3D noise pattern repeats every 100m in X/Y/Z.
 static const float AUTHORING_TO_WORLD_SCALE = SIDE_LENGTH / NVDF_DOMAIN_SIDE_LENGTH;
+#endif
 
 struct RayMarchInfo
 {
@@ -241,10 +257,10 @@ bool RayConvexHullIntersect(
     return tExit > max(tEnter, 0.0);
 }
 
-bool PointInsideConvexHull(float3 pointWS, ConvexHull hull)
+bool PointInsideConvexHull(float3 pointWS, ConvexHull hull, float4x4 invWorld)
 {
     // Transform point into hull local space
-    float3 p = mul(hull.invWorld, float4(pointWS, 1.0)).xyz;
+    float3 p = mul(invWorld, float4(pointWS, 1.0)).xyz;
 
     uint faceStart = hull.faceOffset;
     uint faceEnd   = hull.faceOffset + hull.faceCount;

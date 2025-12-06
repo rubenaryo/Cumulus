@@ -31,6 +31,8 @@ struct alignas(16) cbPerEntity
 {
     DirectX::XMFLOAT4X4 world;
     DirectX::XMFLOAT4X4 invWorld;
+    int hullIdx;
+    int padding[3];
 };
 
 struct alignas(16) DirectionalLight
@@ -79,7 +81,7 @@ struct alignas(16) cbConvexHull
 struct alignas(16) cbHulls
 {
     uint32_t hullCount;
-    cbConvexHull hulls[1];
+    cbConvexHull hulls[12];
 };
 
 
@@ -120,7 +122,12 @@ struct alignas(16) cbCloudGenData
     DirectX::XMFLOAT4 seeds[16];
     
     int numSeeds;
-    float pad[3];
+
+    //0 is no demo
+    //1 is draw jet
+    //2 is draw balls
+    int demoMode = 0;
+    float pad[2];
 };
 
 struct alignas(16) cbCloudLighting
@@ -153,11 +160,28 @@ struct alignas(16) cbCloudLighting
     float pad3[3] = { 0.0f, 0.0f, 0.0f };
 };
 
+
+struct alignas(16) cbJetTrailPositions {
+    DirectX::XMFLOAT4 positions[4];
+};
+
 struct EntityData {
     cbPerEntity entityMatrices;
-    cbConvexHull hull;
+    int hullIdx;
+    Muon::ResourceID resourceID;
+    DirectX::XMFLOAT4 vel;
+    DirectX::XMFLOAT4 rot;
+};
+
+const static int MAX_ENTITY_COUNT = 64;
+struct alignas(256) cbEntities {
+    cbPerEntity entities[MAX_ENTITY_COUNT];
+
+    int entityCount;
+    int padding[3];
 };
 
 }
+
 
 #endif

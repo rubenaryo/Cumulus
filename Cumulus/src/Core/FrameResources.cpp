@@ -48,73 +48,96 @@ bool FrameResources::Create(UINT width, UINT height)
     mAABBBuffer.Create(L"AABB Buffer", sizeof(cbIntersections));
     mHullBuffer.Create(L"Hull Buffer", sizeof(cbHulls));
     mHullFaceBuffer.Create(L"Hull Faces Buffer", sizeof(cbHullFaces));
-
+    mTimeBuffer.Create(L"Time", sizeof(cbTime));
+    mJetTrailBuffer.Create(L"Jet Trail", sizeof(cbJetTrailPositions));
+    mEntitiesBuffer.Create(L"Entities", sizeof(cbEntities));
 	return true;
 }
 
-bool FrameResources::UpdateEntities(cbPerEntity& data)
+bool FrameResources::UpdateWorldMatrix(const cbPerEntity& data)
 {
     memcpy(mWorldMatrixBuffer.GetMappedPtr(), &data, sizeof(cbPerEntity));
     return true;
 }
 
-bool FrameResources::UpdateCamera(cbCamera& data)
+bool FrameResources::UpdateCamera(const cbCamera& data)
 {
     memcpy(mCameraBuffer.GetMappedPtr(), &data, sizeof(cbCamera));
     return true;
 }
 
-bool FrameResources::UpdateLights(cbLights& data)
+bool FrameResources::UpdateLights(const cbLights& data)
 {
     memcpy(mLightBuffer.GetMappedPtr(), &data, sizeof(cbLights));
     return true;
 }
 
-bool FrameResources::UpdateTime(cbTime& data)
+bool FrameResources::UpdateTime(const cbTime& data)
 {
     memcpy(mTimeBuffer.GetMappedPtr(), &data, sizeof(cbTime));
     return true;
 }
 
-bool FrameResources::UpdateAABB(cbIntersections& data)
+bool FrameResources::UpdateAABB(const cbIntersections& data)
 {
     memcpy(mAABBBuffer.GetMappedPtr(), &data, sizeof(cbIntersections));
     return true;
 }
 
-bool FrameResources::UpdateAtmosphere(cbAtmosphere& data)
+bool FrameResources::UpdateAtmosphere(const cbAtmosphere& data)
 {
     memcpy(mAtmosphereBuffer.GetMappedPtr(), &data, sizeof(cbAtmosphere));
     return true;
 }
 
-bool FrameResources::UpdateCloudData(cbCloudGenData& data)
+bool FrameResources::UpdateCloudData(const cbCloudGenData& data)
 {
     memcpy(mCloudGenBuffer.GetMappedPtr(), &data, sizeof(cbCloudGenData));
     return true;
 }
 
-bool FrameResources::UpdateCloudLighting(cbCloudLighting& data)
+bool FrameResources::UpdateCloudLighting(const cbCloudLighting& data)
 {
     memcpy(mCloudLightingBuffer.GetMappedPtr(), &data, sizeof(cbCloudLighting));
     return true;
 }
 
-bool FrameResources::UpdateHulls(cbHulls& data)
+bool FrameResources::UpdateHulls(const cbHulls& data)
 {
     memcpy(mHullBuffer.GetMappedPtr(), &data, sizeof(cbHulls));
     return true;
 }
 
-bool FrameResources::UpdateHullFaces(cbHullFaces& data)
+bool FrameResources::UpdateHullFaces(const cbHullFaces& data)
 {
     memcpy(mHullFaceBuffer.GetMappedPtr(), &data, sizeof(cbHullFaces));
     return true;
 }
 
+bool FrameResources::UpdateJetTrail(const cbJetTrailPositions& data)
+{
+    memcpy(mJetTrailBuffer.GetMappedPtr(), &data, sizeof(cbJetTrailPositions));
+    return false;
+}
+
+bool FrameResources::UpdateEntities(const std::vector<EntityData>& cpuEntities)
+{
+    cbEntities bufferEntities{};
+    for (int i = 0; i < cpuEntities.size() && i < 64; ++i) {
+        bufferEntities.entities[i].hullIdx = cpuEntities[i].hullIdx;
+        bufferEntities.entities[i].world = cpuEntities[i].entityMatrices.world;
+        bufferEntities.entities[i].invWorld = cpuEntities[i].entityMatrices.invWorld;
+    }
+    bufferEntities.entityCount = cpuEntities.size();
+
+    memcpy(mEntitiesBuffer.GetMappedPtr(), &bufferEntities, sizeof(cbEntities));
+    return false;
+}
+
 void FrameResources::Destroy()
 {
     mCmdAllocator.Reset();
+    mEntitiesBuffer.Destroy();
     mWorldMatrixBuffer.Destroy();
     mCameraBuffer.Destroy();
     mLightBuffer.Destroy();
@@ -125,7 +148,6 @@ void FrameResources::Destroy()
     mCloudLightingBuffer.Destroy();
     mHullBuffer.Destroy();
     mHullFaceBuffer.Destroy();
+    mJetTrailBuffer.Destroy();
 }
-
-
 }
