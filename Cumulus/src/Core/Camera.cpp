@@ -93,21 +93,11 @@ void Camera::UpdateProjection(float aspectRatio)
         float height = 1.0f / tanHalfFovY;
         float width = height / aspectRatio;
 
-        // Reversed-Z projection matrix (1.0 at near, 0.0 at far)
-        XMMATRIX reversedProj = {
-            width, 0.0f,   0.0f,                          0.0f,
-            0.0f,  height, 0.0f,                          0.0f,
-            0.0f,  0.0f,   mNear / (mNear - mFar),        1.0f,
-            0.0f,  0.0f,   (mNear * mFar) / (mNear - mFar), 0.0f
-        };
-
-        mProjection = reversedProj;
-
-        //mProjection = XMMatrixPerspectiveFovLH(
-        //    XM_PIDIV4,      // FOV
-        //    aspectRatio,    // Screen Aspect ratio
-        //    mNear,          // Near clip plane
-        //    mFar);          // Far clip plane
+        mProjection = XMMatrixPerspectiveFovLH(
+            XM_PIDIV4,      // FOV
+            aspectRatio,    // Screen Aspect ratio
+            mNear,          // Near clip plane
+            mFar);          // Far clip plane
 
         break;
     }
