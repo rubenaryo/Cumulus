@@ -286,7 +286,7 @@ void Game::InitEntities()
     for (int i = 0; i < 50; ++i) {
         XMVECTOR forward;
         mCamera.GetForward(forward);
-        XMVECTOR loc = mCamera.GetPosition() + forward * 10.f * (i + 1.f);
+        XMVECTOR loc = mCamera.GetPosition() + forward * 40.f * (i + 1.f);
 
         DirectX::XMFLOAT3 loc3;
         DirectX::XMStoreFloat3(&loc3, loc);

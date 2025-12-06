@@ -577,6 +577,10 @@ void main(int3 dispatchThreadID : SV_DispatchThreadID)
     float3 bgColor = gInput[pixelCoord].rgb;
     float depth = depthStencilBuffer[dispatchThreadID.xy].r;
     float maxRayDist = GetMaxRayDist(depth, eyePos, dispatchThreadID);
+    float normalizedDist = maxRayDist / 20.0f; 
+    
+    gOutput[dispatchThreadID.xy] = float4(normalizedDist, normalizedDist, normalizedDist, 1.0f);
+    return; 
 
     float3 finalColor = VolumeRaymarchNvdf(eyePos, worldDir, bgColor, maxRayDist, dispatchThreadID);
     
