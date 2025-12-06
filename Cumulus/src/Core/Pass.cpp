@@ -221,7 +221,7 @@ bool GraphicsPass::GeneratePipelineState()
     // Depth stencil state
     psoDesc.DepthStencilState.DepthEnable = mEnableDepth;
     psoDesc.DepthStencilState.DepthWriteMask = D3D12_DEPTH_WRITE_MASK_ALL;
-    psoDesc.DepthStencilState.DepthFunc = D3D12_COMPARISON_FUNC_LESS;
+    psoDesc.DepthStencilState.DepthFunc = D3D12_COMPARISON_FUNC_GREATER;
     psoDesc.DSVFormat = mEnableDepth ? Muon::GetDepthStencilFormat() : DXGI_FORMAT_UNKNOWN;
 
     // Render target formats

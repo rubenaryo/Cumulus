@@ -563,7 +563,7 @@ return SUCCEEDED(hr);
         pCommandList->ClearRenderTargetView(gOffscreenTarget->GetRTVHandleCPU(), gClearValue.Color, 0, nullptr);
         
         // Clear the depth buffer
-        pCommandList->ClearDepthStencilView(GetDepthStencilView(), D3D12_CLEAR_FLAG_DEPTH, 1.0f, 0, 0, nullptr);
+        pCommandList->ClearDepthStencilView(GetDepthStencilView(), D3D12_CLEAR_FLAG_DEPTH, 0.0f, 0, 0, nullptr);
 
         return true;
     }
@@ -741,7 +741,7 @@ return SUCCEEDED(hr);
         success &= CreateDepthStencilBuffer(GetDevice(), GetCommandList(), GetCommandQueue(), width, height, gDepthStencilBuffer);
         CHECK_SUCCESS(success, "Error: Failed to create depth stencil buffer!\n");
 
-        success &= SetViewport(GetCommandList(), 0, 0, width, height, 0.0f, 1.0f);
+        success &= SetViewport(GetCommandList(), 0, 0, width, height, 1.0f, 0.0f);
         CHECK_SUCCESS(success, "Error: Failed to set viewport!\n");
 
         success &= SetScissorRects(GetCommandList(), 0, 0, width, height);

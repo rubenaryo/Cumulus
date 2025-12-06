@@ -72,6 +72,7 @@ void Camera::UpdateView()
 
 void Camera::UpdateProjection(float aspectRatio)
 {
+
     switch (mCameraMode)
     {
     case CM_ORTHOGRAPHIC:
