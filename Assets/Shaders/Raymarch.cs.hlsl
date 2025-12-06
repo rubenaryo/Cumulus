@@ -2,7 +2,7 @@
 #include "Raymarch_Common.hlsli"
 
 // === Raymarch / Quality ===
-#define GPU_CLOUD 0
+#define GPU_CLOUD 1
 #define USE_ADAPTIVE_STEP        1   // Adaptive step size along ray
 #define USE_JITTERED_STEP        1   // Stochastic jitter per step
 #define USE_HIGH_HIGH_FREQUENCY  1   // Extra near-camera detail
