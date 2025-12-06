@@ -1,5 +1,4 @@
-RWTexture3D<float4> nvdfTex : register(u0);
-RWTexture3D<float2> sdfTex : register(u1);
+RWTexture3D<float4> gOutput : register(u0);
 
 cbuffer cbCloudGenBuffer : register(b6)
 {
@@ -9,16 +8,19 @@ cbuffer cbCloudGenBuffer : register(b6)
     float pad[3];
 };
 
-// Texture output: 
-// r - sdf distance - how far we are from the cloud
-// g - dimensionalProfile - this is what eli's writing to? Need to merge these well
-// b - detail type - aka billowy vs whispy [0, 1]
-// a - density scale - where is cloud [0, 1]
+// this stores the cloud textures that we prebaked
+Texture3D proceduralNoiseTex : register(t7);
+SamplerState linearWrap : register(s2);
 
 #include "Raymarch_Common.hlsli"
 
+// enable to use sdf sphere instead of vesica segments
+// gives a performance boost at a small visual hit
 #define USE_SPHERE 0
 
+//--------------
+// SDF FUNCTIONS
+//--------------
 float smooth_min(float a, float b, float k)
 {
     float h = max(k - abs(a - b), 0.0) / k;
@@ -46,7 +48,7 @@ float SDF_VesicaSegment(float3 p,float3 a,float3 b, float w)
  
     return length(q - h.xy) - h.z;
 }
-
+// p = query, end points a and b, end point radii r1 and r2
 float SDF_RoundCone(float3 p, float3 a, float3 b, float r1, float r2)
 {
     float3 ba = b - a;
@@ -71,6 +73,11 @@ float SDF_RoundCone(float3 p, float3 a, float3 b, float r1, float r2)
     return (sqrt(x2 * a2 * il2) + y * rr) * il2 - r1;
 }
 
+// Custom SDF function to create a cloud
+// Calls upon RoundCone and either Sphere or VesicaSegment
+// Clouds are constructed by making a round cone around the input origin
+// and spawning numSeed number of spheres/vesicas around it
+// all positions are randomized and are scaled by the input scale
 float SDF_Cloud(float3 query, int numSeed, float3 origin, float scale)
 {
     float d = 9999999.f;
@@ -107,48 +114,55 @@ void main(int3 dispatchThreadID : SV_DispatchThreadID)
     int3 coord = dispatchThreadID.xyz;
 
     uint width, height, depth;
-    nvdfTex.GetDimensions(width, height, depth);
+    gOutput.GetDimensions(width, height, depth);
     
-    // nvdfTex/sdfTex dims assumed to be equal
     if (coord.x >= width || coord.y >= height || coord.z >= depth)
         return;
     
     float3 uvw = float3(coord) / float3(width, height, depth);
     float3 worldPos = NvdfUVToWorld(uvw);
     
-    //------------------------------
-    // CLOUD GEN
-    //------------------------------
+//------------------------------
+// CLOUD GEN
+//------------------------------
     // SDF is getting clouds around the given seeds
     float d = 999999999.f;
 
-    float scale = 0;
+    float scale = 0;    // keeping track of average scale of clouds
+    // making numSeeds number of clouds at their input locations and scales as passed by the CPU
     for (uint i = 0; i < numSeeds; ++i)
     {
         float4 curr = seeds[i];
         scale += curr.a;
         d = smooth_min(d, SDF_Cloud(worldPos, i % 3 + 2, curr.xyz, curr.a), 0.8);
     }
-    scale /= numSeeds;  // scale is an average of all scales
+    scale /= numSeeds;
     // We then encode SDF into the range [0, 1] from [-256, 4096], as this is what Nubis expects
     const float sdfMin = -256.0;
     const float sdfMax = 4096.0;
     // We offset d by scale so we can add a bit more  detail around the harsh sdf edges
     float encodedSdf = ((d - scale) - sdfMin) / (sdfMax - sdfMin);
     encodedSdf = saturate(encodedSdf);
-    nvdfTex[coord].r = encodedSdf; // r is sdf output
+    float r = encodedSdf; // r is sdf output
     
     // g is the cloud's detail - aka its actual form and outline
     // to get it, we calculate billowy noise with 12 iterations of fbm
+    // using the following call: fbm_3D_BillowNoise(worldPos * 0.008, float3(6.0, 6.0, 6.0), 12)
+    // we baked this into the r channel of a texture
     // it also slowly fades out based on distance from d by scale
     float norm_scale = d / scale;
-    // fade out as we get closer to the edge
-    //float norm_edge_dist = DistToEdge(worldPos) / scale;
-    float billow = d > scale ? 0.0 : fbm_3D_BillowNoise(worldPos * 0.008, float3(6.0, 6.0, 6.0), 12);
-    nvdfTex[coord].g = billow < norm_scale ? 0.0 : billow * (1.0 - norm_scale);
+    float2 tex = d > scale * 1.5f ? float2(0.0, 0.0) : proceduralNoiseTex.SampleLevel(linearWrap, uvw, 0.0).rg;
+    // TODO: fade out as we get closer to the edge so we don't have harsh cutoffs at the edge of the grid
+    // float norm_edge_dist = DistToEdge(worldPos) / scale;
+    
+    float billow = d > scale ? 0.0 : tex.r; 
+    float g = billow < norm_scale ? 0.0 : billow * (1.0 - norm_scale);
+    
     // b is detail type, which is a bit larger billows that get attenuated by height, as higher parts are more whispy
-    float normalized_height = (worldPos.y - VOLUME_MIN_WS.y) / (VOLUME_MAX_WS.y - VOLUME_MIN_WS.y) + 0.3;
-    nvdfTex[coord].b = d > scale * 1.5 ? 0.0 : fbm_3D_BillowNoise(worldPos * 0.006, float3(6.0, 6.0, 6.0), 3) * normalized_height;
+    // we calculated this with: d > scale * 1.5 ? 0.0 :fbm_3D_BillowNoise(worldPos * 0.006, float3(6.0, 6.0, 6.0), 3) * normalized_height
+    // where float normalized_height = (worldPos.y - VOLUME_MIN_WS.y) / (VOLUME_MAX_WS.y - VOLUME_MIN_WS.y) + 0.3;
+    // but we already baked this into the g channel of the input texture, and we already do the scale check there
+    float b = tex.g;
     
     //---------------------------
     // COLLISION CODE
@@ -156,9 +170,14 @@ void main(int3 dispatchThreadID : SV_DispatchThreadID)
     // collision gets put into the density scale part, which gets calculated in raymarch for now
     
     bool collision = false;
-    if (d > scale * 1.6)
+    float a;
+    // we exit early if there are no clouds to collide with
+    if (d > scale * 1.51)
     {
-        nvdfTex[coord].a = max(nvdfTex[coord].a - 0.01, 0.0);
+        gOutput[coord] = float4(r,
+                            g,
+                            b,
+                            max(gOutput[coord].a - 0.01, 0.0));
         return;
     }
     for (uint j = 0; j < hullCount; ++j)
@@ -168,7 +187,7 @@ void main(int3 dispatchThreadID : SV_DispatchThreadID)
         float3 dir = float3(1.0, 1.0, 1.0);
         if (PointInsideConvexHull(worldPos, ch))
         {
-            nvdfTex[coord].a = 1.0f;
+            a = 1.0f;
             collision = true;
             break;
         }
@@ -176,6 +195,13 @@ void main(int3 dispatchThreadID : SV_DispatchThreadID)
 
     if (!collision)
     {
-        nvdfTex[coord].a = max(nvdfTex[coord].a - 0.01, 0.0);
+        a = max(gOutput[coord].a - 0.01, 0.0);
     }
+    
+    // Texture output:
+    // r - sdf distance - how far we are from the cloud
+    // g - dimensionalProfile - the outline of the cloud
+    // b - detail type - aka billowy vs whispy [0, 1]
+    // a - collision value in range [0, 1]
+    gOutput[coord] = float4(r, g, b, a);
 }

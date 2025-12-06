@@ -352,14 +352,15 @@ void Game::UpdateProceduralNVDF()
         return;
     }
 
-    int32_t nvdfIdx = mProcNVDFPass.GetResourceRootIndex("nvdfTex");
-    if (nvdfIdx != ROOTIDX_INVALID)
+    Texture* pProcNoise = codex.GetTexture(GetResourceID(L"ProceduralCloudNoise_3D"));
+    int32_t procNoiseIndex = mProcNVDFPass.GetResourceRootIndex("proceduralNoiseTex");
+    if (procNoiseIndex != ROOTIDX_INVALID)
     {
-        pCommandList->SetComputeRootDescriptorTable(nvdfIdx, pProcNVDFTex->GetUAVHandleGPU());
+        pCommandList->SetComputeRootDescriptorTable(procNoiseIndex, pProcNoise->GetSRVHandleGPU());
     }
 
-    int32_t sdfIdx = mProcNVDFPass.GetResourceRootIndex("sdfTex");
-    if (sdfIdx != ROOTIDX_INVALID)
+    int32_t outputIdx = mProcNVDFPass.GetResourceRootIndex("gOutput");
+    if (outputIdx != ROOTIDX_INVALID)
     {
         pCommandList->SetComputeRootDescriptorTable(sdfIdx, pProcSDFTex->GetUAVHandleGPU());
     }
