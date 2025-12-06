@@ -132,16 +132,26 @@ void ImguiNewFrame(float gameTime, const Camera& cam, SceneSettings& settings)
 
         if (ImGui::BeginTabItem("Clouds"))
         {
-            int cloudNum = settings.numClouds;
-            float cloudScale = settings.cloudScale;
+            int cloudNum = settings.clouds.numClouds;
+            float cloudScale = settings.clouds.cloudScale;
+
             ImGui::SliderInt("Number of Clouds", &cloudNum, 0, 16);
             ImGui::SliderFloat("Cloud Scale", &cloudScale, 0.1f, 25.f, "%.1f");
-            if (ImGui::Button("Regenerate Clouds") || cloudNum != settings.numClouds || cloudScale != settings.cloudScale)
+            ImGui::SliderFloat("Wind Scale", &settings.clouds.windScale, 0.f, 3.f, "%.1f");
+            ImGui::SliderFloat2("Planar Wind Direction", &settings.clouds.windDir.x, 0.f, 1.f, "%.1f");
+
+            if (ImGui::Button("Regenerate Clouds") || 
+                cloudNum != settings.clouds.numClouds || 
+                cloudScale != settings.clouds.cloudScale ||
+                settings.clouds.windScale > 0.f)
             {
-                settings.numClouds = cloudNum;
-                settings.cloudScale = cloudScale;
-                settings.updateClouds = true;
+                settings.clouds.numClouds = cloudNum;
+                settings.clouds.cloudScale = cloudScale;
+                settings.clouds.updateClouds = true;
             }
+
+
+
             ImGui::EndTabItem();
         }
 

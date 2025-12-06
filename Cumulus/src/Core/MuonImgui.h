@@ -23,12 +23,19 @@ namespace Muon
 		float view_azimuth_angle_radians = -0.1f;
 	};
 
+	struct CloudInput
+	{
+		int numClouds = 4;
+		float cloudScale = 1.0f;
+		bool updateClouds = false;
+		float windScale = 1.0f;
+		DirectX::XMFLOAT2 windDir = { 1.0f, 0.0f };
+	};
+
 	struct SceneSettings {
 		bool drawObjects = true;
 		AtmosphereInput atmosphere;
-		int numClouds = 4;
-		float cloudScale = 1.0;
-		bool updateClouds = false;
+		CloudInput clouds;
 		cbCloudLighting lighting;
 		bool updateLighting = false;
 	};
