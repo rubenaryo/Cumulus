@@ -4,7 +4,7 @@ Date : 2019/11
 Description : Implementation of GameInput method overrides
 ----------------------------------------------*/
 #include <Core/WinApp.h>
-
+#include <Core/Game.h>
 #include "InputSystem.h"
 #include "GameInput.h"
 
@@ -18,7 +18,7 @@ namespace Input {
     GameInput::~GameInput()
     {}
 
-    void GameInput::Frame(float dt, Muon::Camera* pCamera)
+    void GameInput::Frame(float dt, Muon::Camera* pCamera, Game* game)
     {
         using namespace DirectX;
 
@@ -98,6 +98,11 @@ namespace Input {
 
                 break;
             }
+            case GameCommands::ShootProjectile:
+            {
+                game->SpawnProjectile();
+                break;
+            }
             }
         }
         
@@ -120,5 +125,6 @@ namespace Input {
 
         mKeyMap[GameCommands::MouseRotation] = new Chord(L"Mouse Rotation", VK_LBUTTON, KeyState::StillPressed);
         mKeyMap[GameCommands::MouseMovement] = new Chord(L"Mouse Movement", VK_RBUTTON, KeyState::StillPressed);
+        mKeyMap[GameCommands::ShootProjectile] = new Chord(L"Shoot Projectile", 'F', KeyState::JustPressed);
     }
 }
