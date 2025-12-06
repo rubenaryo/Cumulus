@@ -198,6 +198,25 @@ void UpdateAtmosphere(cbAtmosphere& constants,
     constants.white_point = XMFLOAT3(1.082414f, 0.967556f, 0.950030f);
 }
 
+void UpdateLightFromAtmosphere(cbAtmosphere& atmosphere, SceneSettings& settings)
+{
+    using namespace DirectX;
+
+    if (settings.atmosphere.sunDir.y > -0.01)
+    {
+        settings.lighting.dirSun = XMFLOAT3(-1.0 * settings.atmosphere.sunDir.x,
+                                             1.0 * settings.atmosphere.sunDir.y,
+                                            -1.0 * settings.atmosphere.sunDir.z);
+    }
+    else
+    {
+        settings.lighting.dirSun = XMFLOAT3( 1.0 * settings.atmosphere.sunDir.x,
+                                            -1.0 * settings.atmosphere.sunDir.y,
+                                             1.0 * settings.atmosphere.sunDir.z);
+    }
+    settings.updateLighting = true;
+}
+
 }
 
 #endif

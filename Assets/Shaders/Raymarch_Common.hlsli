@@ -141,28 +141,31 @@ struct CloudLightingParams
     int maxSteps;
     float densityScale;
     float minTransmittance;
-    float pad0;
+    float clPad0;
 
     // Sun / primary lighting
     float3 dirSun;
     float directExtinctionScale;
 
     float directStrength;
-    float3 lightSun;
+    float3 sunColor; 
+    
+    float sunIntensity; 
+    float3 clPad1; 
 
     // Secondary (multiple scattering)
     float3 secondaryColor;
     float secondaryStrength;
 
     float secondaryExtinctionScale;
-    float3 pad2;
+    float3 clPad2;
 
     // Ambient / sky lighting
     float3 ambientColor;
     float ambientExtinctionScale;
 
     float ambientStrength;
-    float3 pad3;
+    float3 clPad3;
 };
 
 cbuffer CloudLightingBuffer : register(b6)
