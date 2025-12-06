@@ -50,7 +50,7 @@ public:
     float               GetAzimuth() const;
     float               GetZenith() const;
     void GetAxes(DirectX::XMVECTOR& forward, DirectX::XMVECTOR& right, DirectX::XMVECTOR& up) const;
-
+    void GetForward(DirectX::XMVECTOR& forward) const;
     void SetTarget(DirectX::XMVECTOR target);
     void UpdateAzimuthZenith();
 

@@ -9,6 +9,7 @@ Description : Utility functions
 #include <stdio.h>
 #include <locale>
 #include <codecvt>
+#include <algorithm>
 
 namespace Muon
 {
@@ -64,4 +65,73 @@ namespace Muon
 	{
 		return (size + (alignment - 1)) & ~(alignment - 1);
 	}
+	float SrgbChannelToLinear(float c)
+	{
+		if (c <= 0.04045f)
+			return c / 12.92f;
+		return std::pow((c + 0.055f) / 1.055f, 2.4f);
+	}
+
+	DirectX::XMFLOAT3 SrgbToLinear3(const DirectX::XMFLOAT3 c)
+	{
+		return DirectX::XMFLOAT3(
+			SrgbChannelToLinear(c.x),
+			SrgbChannelToLinear(c.y),
+			SrgbChannelToLinear(c.z)
+		);
+	}
+
+	DirectX::XMFLOAT3 SrgbToLinear3(const float c[3])
+	{
+		return DirectX::XMFLOAT3(
+			SrgbChannelToLinear(c[0]),
+			SrgbChannelToLinear(c[1]),
+			SrgbChannelToLinear(c[2])
+		);
+	}
+
+	DirectX::XMFLOAT3 SrgbToLinear3(float r, float g, float b)
+	{
+		return DirectX::XMFLOAT3(
+			SrgbChannelToLinear(r),
+			SrgbChannelToLinear(g),
+			SrgbChannelToLinear(b)
+		);
+	}
+
+	float LinearChannelToSrgb(float c)
+	{
+		c = std::clamp(c, 0.0f, 1.0f);
+		if (c <= 0.0031308f)
+			return 12.92f * c;
+		return 1.055f * std::pow(c, 1.0f / 2.4f) - 0.055f;
+	}
+
+	DirectX::XMFLOAT3 LinearToSrgb3(const DirectX::XMFLOAT3 c)
+	{
+		return DirectX::XMFLOAT3(
+			LinearChannelToSrgb(c.x),
+			LinearChannelToSrgb(c.y),
+			LinearChannelToSrgb(c.z)
+		);
+	}
+
+	DirectX::XMFLOAT3 LinearToSrgb3(const float c[3])
+	{
+		return DirectX::XMFLOAT3(
+			LinearChannelToSrgb(c[0]),
+			LinearChannelToSrgb(c[1]),
+			LinearChannelToSrgb(c[2])
+		);
+	}
+
+	DirectX::XMFLOAT3 LinearToSrgb3(float r, float g, float b)
+	{
+		return DirectX::XMFLOAT3(
+			LinearChannelToSrgb(r),
+			LinearChannelToSrgb(g),
+			LinearChannelToSrgb(b)
+		);
+	}
+
 }

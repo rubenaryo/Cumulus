@@ -48,7 +48,7 @@ private:
 
     void Update(Muon::StepTimer const& timer);
     void UpdateProceduralNVDF();
-    void UpdateRaymarchCache();
+    void UpdateRaymarchCache(Muon::FrameResources& currFrameResources);
     void Render();
 
     void CreateDeviceDependentResources();

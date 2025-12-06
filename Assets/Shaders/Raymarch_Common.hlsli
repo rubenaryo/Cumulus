@@ -49,17 +49,6 @@ static const int MAX_STEPS = 256; // Max steps per ray
 static const float MIN_DIST = 0.001; // Global near distance
 static const float MAX_DIST = 4000.0; // Global far distance
 static const float EPSILON = 0.001; // Small epsilon for safety
-static const float MIN_TRANSMITTANCE = 0.01; // Early-out when mostly opaque
-
-// Lighting Settings 
-static const float3 DIR_SUN = normalize(float3(0.0, 1.0, 0.0)); // Temporary hardcoded light dir
-static const float3 LIGHT_SUN = float3(220, 240, 250);; // sun color/brightness
-static const float DIRECT_EXTINCTION_SCALE = 0.02;
-static const float3 SECONDARY_COLOR = float3(1.0, 0.96, 0.9);
-static const float SECONDARY_STRENGTH = 2;
-static const float3 AMBIENT_COLOR = float3(1.0, 0.96, 0.9);
-static const float AMBIENT_STRENGTH = 1;
-static const float AMBIENT_EXTINCTION_SCALE = 0.05; 
 
 // Volume bounds in world space
 static const float SIDE_LENGTH = 4000.0; 
@@ -172,10 +161,40 @@ cbuffer HullFacesBuffer : register(b5)
 	float4 hullFaces[1024];
 };
 
-cbuffer CloudLightingBuffer : register(b7)
+struct CloudLightingParams
 {
+    // Raymarch settings
     int maxSteps;
-}
+    float densityScale;
+    float minTransmittance;
+    float pad0;
+
+    // Sun / primary lighting
+    float3 dirSun;
+    float directExtinctionScale;
+
+    float directStrength;
+    float3 lightSun;
+
+    // Secondary (multiple scattering)
+    float3 secondaryColor;
+    float secondaryStrength;
+
+    float secondaryExtinctionScale;
+    float3 pad2;
+
+    // Ambient / sky lighting
+    float3 ambientColor;
+    float ambientExtinctionScale;
+
+    float ambientStrength;
+    float3 pad3;
+};
+
+cbuffer CloudLightingBuffer : register(b6)
+{
+    CloudLightingParams gCloudLighting;
+};
 
 float3 WorldToNvdfUV(float3 worldPos)
 {
@@ -311,10 +330,8 @@ float dot2(in float3 v)
 float random(int x)
 {
     x = (x << 13) ^ x;
-    return (1 - (x * (x * x * 15731 + 789221)
-            + 1376312589) & (0x7fffffff))
-            / 10737741824.0;
-
+    x = (x * (x * x * 15731 + 789221) + 1376312589) & 0x7fffffff;
+    return 1.0 - x / 1073741824.0;
 }
 // pseudo random float3 given a float3
 float3 random3(float3 p)
@@ -325,52 +342,10 @@ float3 random3(float3 p)
                  * 43758.5453);
 }
 
-// standard worley noise that Avi translated from the GLSL version
-// provided in CIS5600
-float WorleyNoise3D(float3 p, float tiles)
-{
-    p *= tiles;
-    // Tile the space
-    float3 pointInt = floor(p);
-    float3 pointfrac = frac(p);
-
-    float minDist = 1.0; // Minimum distance initialized to max.
-
-    // Search all neighboring cells and this cell for their point
-    for (int z = -1; z <= 1; z++)
-    {
-        for (int y = -1; y <= 1; y++)
-        {
-            for (int x = -1; x <= 1; x++)
-            {
-                float3 neighbor = float3(float(x), float(y), float(z));
-
-                // Random point inside current neighboring cell
-                float3 pt = random3(pointInt + neighbor);
-
-                // Compute the distance b/t the point and the fragment
-                // Store the min dist thus far
-                float3 diff = neighbor + pt - pointfrac;
-                float dist = length(diff);
-                minDist = min(minDist, dist);
-            }
-        }
-    }
-    return minDist;
-}
 // random hash function, created by IQ
 float hash(float3 p)
 {
     return frac(sin(dot(p, float3(127.1, 311.7, 74.7))) * 43758.5453);
-}
-// vec3 variant of hash function, created by IQ
-float3 hash3(float3 p)
-{
-    return float3(
-        hash(p),
-        hash(p + float3(1.0, 0.0, 0.0)),
-        hash(p + float3(0.0, 1.0, 0.0))
-    );
 }
 
 // Below are two different Perlin-based noise functions with FBM helpers I made.

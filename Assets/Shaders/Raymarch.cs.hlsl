@@ -2,7 +2,7 @@
 #include "Raymarch_Common.hlsli"
 
 // === Raymarch / Quality ===
-#define GPU_CLOUD 0
+#define GPU_CLOUD 1
 #define USE_ADAPTIVE_STEP        1   // Adaptive step size along ray
 #define USE_JITTERED_STEP        1   // Stochastic jitter per step
 #define USE_HIGH_HIGH_FREQUENCY  1   // Extra near-camera detail
@@ -10,9 +10,9 @@
 // === Lighting ===
 // Preset: "Density only"  -> all USE_*_LIGHTING = 0
 // Preset: "Lit clouds"    -> enable desired USE_*_LIGHTING = 1
-#define USE_DIRECT_LIGHTING      1   // Sun / directional lighting
+#define USE_DIRECT_LIGHTING      1  // Sun / directional lighting
 #define USE_AMBIENT_LIGHTING     1   // Sky / ambient term
-#define USE_MULTIPLE_SCATTERING  1   // Approx. multiple scattering
+#define USE_MULTIPLE_SCATTERING  1  // Approx. multiple scattering
 
 // === Debug / Visualization ===
 #define DEBUG_AABB_INTERSECT     0   // Visualize volume/hull hits
@@ -129,7 +129,7 @@ float GetFractionFromValue(float x, float minVal, float maxVal)
 
 // Compute optical depth from samplePos toward sunDir
 // Returns tau; transmittance is exp(-tau)
-float GetApproxOpticalDepthToSun(float3 samplePos, float3 sunDir)
+float GetApproxOpticalDepthToSun(float3 samplePos, float3 sunDir, float directExtinctionScale)
 {
 #if GPU_CLOUD
     // TODO: Implement optical depth calculation to the sun using procedural NVDF 
@@ -156,22 +156,23 @@ float GetApproxOpticalDepthToSun(float3 samplePos, float3 sunDir)
     for (int i = 0; i < 2; ++i)
     {
         float3 lightPos = samplePos + sunDir * t;
-
+        float3 nvdfUV = WorldToNvdfUV(lightPos);
         // Exit if beyond volume intersection
         if (t > tExit)
             break;
 
         // Sample SDF
-        float sdfEncoded = sdfTex.SampleLevel(linearClamp, WorldToNvdfUV(lightPos), 0.0f).r;
+
+        float sdfEncoded = sdfTex.SampleLevel(linearClamp, nvdfUV, 0.0f).r;
         float sdfDistance = DecodeSdf(sdfEncoded) * AUTHORING_TO_WORLD_SCALE;
 
         if (sdfDistance < 0.0)
         {
             // Inside cloud: approximate density similar to view ray
-            float4 nvdfSample = nvdfTex.SampleLevel(linearClamp, WorldToNvdfUV(lightPos), 0.0f);
+            float4 nvdfSample = nvdfTex.SampleLevel(linearClamp, nvdfUV, 0.0f);
             float dimensionalProfile = nvdfSample.g;
             float detailType = nvdfSample.b;
-            float densityScale = nvdfSample.a;
+            float nvdfDensityScale = nvdfSample.a;
 
             // Ideally reuse GetUprezzedVoxelCloudDensity here
             float density = GetUprezzedVoxelCloudDensity(
@@ -179,12 +180,12 @@ float GetApproxOpticalDepthToSun(float3 samplePos, float3 sunDir)
                 lightPos,
                 dimensionalProfile,
                 detailType,
-                densityScale,
+                nvdfDensityScale,
                 noiseTex,
                 linearWrap
             );
 
-            float sigma = dimensionalProfile * (1 - DIRECT_EXTINCTION_SCALE);
+            float sigma = dimensionalProfile * directExtinctionScale;
 
             float stepSizeInside = minStepSize; // or a tuned fixed step
             depth += sigma * stepSizeInside;
@@ -240,15 +241,18 @@ float3 ComputeDirectLighting(
     float3 viewDir,
     float density,
     float sigma,
-    float stepSize)
+    float stepSize, 
+    float3 dirSun, 
+    float3 lightSun,
+    float directExtinctionScale, 
+    float directLightingStrength)
 {
-    float opticalDepthToSun = GetApproxOpticalDepthToSun(samplePos, DIR_SUN);
+    float opticalDepthToSun = GetApproxOpticalDepthToSun(samplePos, dirSun, directExtinctionScale);
     float T_sun = exp(-opticalDepthToSun); // transmittance from sun to point
 
     // Phase term: how strongly this point scatters sun light toward the camera
     // DIR_SUN points from world towards the sun
-    float3 sunDirToPoint = DIR_SUN; // direction from point to sun
-    float cosAngle = dot(normalize(sunDirToPoint), normalize(viewDir)); // cos(theta) between sun and view
+    float cosAngle = dot(dirSun, viewDir); // cos(theta) between sun and view
     float eccentricity = 0.75; // forward-scattering; tweak for look
     float phase = saturate(HenyeyGreenstein(cosAngle, 0.75) * 3.0);
 
@@ -256,7 +260,7 @@ float3 ComputeDirectLighting(
     float segmentScatter = 1.0 - exp(-sigma * stepSize);
 
     // Direct lighting contribution for this step (before camera transmittance)
-    float3 L_step = LIGHT_SUN * T_sun * phase * segmentScatter;
+    float3 L_step = lightSun * T_sun * phase * segmentScatter * directLightingStrength;
 
     return L_step;
 }
@@ -265,7 +269,9 @@ float3 ComputeMultipleScattering(
     float dimensionalProfile,
     float opticalDepthToSun,
     float sunDot,
-    float sdfDistance)
+    float sdfDistance,
+    float3 secondaryColor, 
+    float secondaryStrength)
 {
     float ms_volume = dimensionalProfile;
     float cloud_distance = sdfDistance;
@@ -275,15 +281,17 @@ float3 ComputeMultipleScattering(
     // Exponential shaping based on summed density / tau to sun
     ms_volume *= exp(-opticalDepthToSun * factor);
 
-    return SECONDARY_COLOR * ms_volume * SECONDARY_STRENGTH;
+    return secondaryColor * ms_volume * secondaryStrength;
 }
 
 float3 ComputeAmbientLighting(
     float dimensionalProfile,
-    float opticalDepthVertical)
+    float opticalDepthVertical,
+    float3 ambientColor, 
+    float ambientStrength)
 {
-    float ambient_scattering = pow(1.0 - dimensionalProfile, 0.5) * exp(-opticalDepthVertical);
-    return AMBIENT_COLOR * exp(-opticalDepthVertical) * AMBIENT_STRENGTH; 
+    float ambient_scattering = sqrt(saturate(1.0 - dimensionalProfile)) * exp(-opticalDepthVertical);
+    return ambientColor * exp(-opticalDepthVertical) * ambientStrength;
 }
 
 
@@ -312,8 +320,8 @@ float3 VolumeRaymarchNvdf(float3 eyePos, float3 dir, float3 bgColor, float maxRa
 #endif
 
     // Clamp to your global near/far
-    tEnter = max(tEnter, MIN_DIST);
-    tExit = min(min(tExit, MAX_DIST), maxRayDist);
+    tEnter = max(tEnter, minDist);
+    tExit = min(min(tExit, maxDist), maxRayDist);
 
     if (tExit <= tEnter)
         return bgColor;
@@ -323,23 +331,29 @@ float3 VolumeRaymarchNvdf(float3 eyePos, float3 dir, float3 bgColor, float maxRa
     RayMarchInfo march;
     InitRayMarchInfo(march, tEnter, tExit);
 
+    CloudLightingParams lightingParams = gCloudLighting; // Load lighting params once
+    float3 sunDirN = normalize(lightingParams.dirSun);
+    float3 viewDirN = normalize(dir);
+    
+
     // Ray march until the ray exits the volume or max steps are reached
     [loop]
-    for (int i = 0; i < maxSteps && march.distance < march.tExit; ++i)
+    for (int i = 0; i < lightingParams.maxSteps && march.distance < march.tExit; ++i)
     {
         march.stepIndex = i;
 
-        float3 samplePos = eyePos + march.distance * dir;
+        float3 samplePos = eyePos + march.distance * viewDirN;
 #if GPU_CLOUD
         float4 sdfSample = proceduralNvdfTex.SampleLevel(linearClamp, WorldToNvdfUV(samplePos), 0.0f);
         float collisionValue = sdfSample.a;
         float sdfDistance =  DecodeSdf(sdfSample.r) * AUTHORING_TO_WORLD_SCALE * (1.0 - collisionValue);
         // NVDF range for a is [0.2, 0.6] -> mapping smoothstep [0, 1] to it
-        sdfSample.a = smoothstep(-4.0, -12.0, sdfDistance) * 0.4 + 0.2;
+        sdfSample.a = clamp(sdfSample.b - 0.3f, 0.2f, 0.6f); //smoothstep(-4.0, -12.0, sdfDistance) * 0.4 + 0.2;
         sdfSample.g *= 1.0 - collisionValue;
 #else
-        float4 sdfSample = sdfTex.SampleLevel(linearClamp, WorldToNvdfUV(samplePos), 0.0f);
-        float collisionValue = proceduralNvdfTex.SampleLevel(linearClamp, WorldToNvdfUV(samplePos), 0.0f).a;
+        float3 nvdfUV = WorldToNvdfUV(samplePos);
+        float4 sdfSample = sdfTex.SampleLevel(linearClamp, nvdfUV, 0.0f);
+        float collisionValue = proceduralNvdfTex.SampleLevel(linearClamp, nvdfUV, 0.0f).a;
         sdfSample.g *= (1.0 - collisionValue);
         // collision hack, step size is reduced to show the hole better
         float sdfDistance = DecodeSdf(sdfSample.r) * AUTHORING_TO_WORLD_SCALE * (1.0 - collisionValue);
@@ -362,25 +376,26 @@ float3 VolumeRaymarchNvdf(float3 eyePos, float3 dir, float3 bgColor, float maxRa
 #if USE_JITTERED_STEP
             float jitter = StaticStepJitter(dispatchThreadID.xy, march.stepIndex); // [-0.5, 0.5]
             float jitterDistance = jitter * march.stepSize;
-            samplePos += dir * jitterDistance;
+            samplePos += viewDirN * jitterDistance;
+            float3 nvdfUV = WorldToNvdfUV(samplePos);
 #endif
             
 #if GPU_CLOUD
-            float4 nvdfSample = proceduralNvdfTex.SampleLevel(linearClamp, WorldToNvdfUV(samplePos), 0.0f);
+            float4 nvdfSample = proceduralNvdfTex.SampleLevel(linearClamp, nvdfUV, 0.0f);
             float collisionValue = nvdfSample.a;
         
             float dimensionalProfile = nvdfSample.g;
             float detailType = nvdfSample.b;
             // NVDF range for density scale is [0.2, 0.6] -> mapping smoothstep [0, 1] to it
-            float densityScale = smoothstep(-4.0, -12.0, sdfDistance) * 0.4 + 0.2;
+            float nvdfDensityScale = clamp(detailType - 0.3f, 0.2f, 0.6f); //smoothstep(-4.0, -12.0, sdfDistance) * 0.4 + 0.2;
             dimensionalProfile *= (1.0 - collisionValue);
 #else
 
-            float4 nvdfSample = nvdfTex.SampleLevel(linearClamp, WorldToNvdfUV(samplePos), 0.0f);
+            float4 nvdfSample = nvdfTex.SampleLevel(linearClamp, nvdfUV, 0.0f);
             float dimensionalProfile = nvdfSample.g;
             float detailType = nvdfSample.b;
-            float densityScale = nvdfSample.a;
-            float collisionValue = proceduralNvdfTex.SampleLevel(linearClamp, WorldToNvdfUV(samplePos), 0.0f).a;
+            float nvdfDensityScale = nvdfSample.a;
+            float collisionValue = proceduralNvdfTex.SampleLevel(linearClamp, nvdfUV, 0.0f).a;
             dimensionalProfile *= (1.0 - collisionValue);
 #endif
             
@@ -389,58 +404,67 @@ float3 VolumeRaymarchNvdf(float3 eyePos, float3 dir, float3 bgColor, float maxRa
                 samplePos,
                 dimensionalProfile,
                 detailType,
-                densityScale,
+                nvdfDensityScale,
                 noiseTex,
                 linearWrap
                 );
 
-            float sigma = density * DENSITY_SCALE;
+            float sigma = density * lightingParams.densityScale;
             float alpha = 1.0 - exp(-sigma * march.stepSize);
 
             // Lighting 
             #if (USE_DIRECT_LIGHTING || USE_AMBIENT_LIGHTING || USE_MULTIPLE_SCATTERING)
                 float3 lighting = 0.0.xxx;
-                LightCacheSample lightCacheSample = MakeLightCacheSample(GetApproxOpticalDepthToSun(samplePos, DIR_SUN));
+                LightCacheSample lightCacheSample = MakeLightCacheSample(GetApproxOpticalDepthToSun(samplePos, sunDirN, lightingParams.directExtinctionScale));
                 
                 #if USE_DIRECT_LIGHTING
-                        float3 directL = ComputeDirectLighting(
+                float3 directL = ComputeDirectLighting(
                             march,
                             samplePos,
                             dir, // viewDir
                             density,
                             sigma,
-                            march.stepSize
+                            march.stepSize,
+                            sunDirN,
+                            lightingParams.lightSun,
+                            lightingParams.directExtinctionScale,
+                            lightingParams.directStrength
                         );
                         lighting += directL;
                 #endif
 
                 #if USE_AMBIENT_LIGHTING
-                        float3 ambientL = ComputeAmbientLighting(dimensionalProfile, lightCacheSample.tauVertical);
+                        float3 ambientL = ComputeAmbientLighting(
+                            dimensionalProfile, 
+                            lightCacheSample.tauVertical,
+                            lightingParams.ambientColor, 
+                            lightingParams.ambientStrength);
                         lighting += ambientL;
                 #endif
 
                 #if USE_MULTIPLE_SCATTERING
                         
                         
-                        float sunDot = dot(normalize(DIR_SUN), normalize(dir));
+                        float sunDot = dot(sunDirN, viewDirN);
 
                         float3 msL = ComputeMultipleScattering(
-                            dimensionalProfile,        // or density
-                            lightCacheSample.tauSun, // inSunLightSummedDensitySamples analog
+                            dimensionalProfile,        
+                            lightCacheSample.tauSun,   
                             sunDot,
-                            sdfDistance                // cloud_distance analog
+                            sdfDistance,               // cloud_distance analog
+                            lightingParams.secondaryColor, 
+                            lightingParams.secondaryStrength
                         );
                         lighting += msL;
                 #endif
 
-                // Single contribution: lighting * alpha * T_cam
-                        float3 contrib = lighting * alpha * march.transmittance;
-                        march.accumColor += contrib;
+                float3 contrib = lighting * alpha * march.transmittance;
+                march.accumColor += contrib;
 
                 // Update camera transmittance using alpha
-                        march.transmittance *= (1.0 - alpha);
-                        if (march.transmittance < MIN_TRANSMITTANCE)
-                            break;
+                march.transmittance *= (1.0 - alpha);
+                if (march.transmittance < lightingParams.minTransmittance)
+                    break;
             #else
                 // Pure density-based fallback (your current behavior)
                 float3 contrib = cloudColor * alpha * march.transmittance;

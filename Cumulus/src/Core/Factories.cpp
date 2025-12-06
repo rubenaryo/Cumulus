@@ -1021,7 +1021,8 @@ void TextureFactory::LoadAll3DTextures(ID3D12Device* pDevice, ID3D12GraphicsComm
 {
     using namespace std::filesystem;
 
-    Load3DTexturesInPath(path(TEX3D_SCALAR_PATHW), 1, pDevice, pCommandList, codex);
+    Load3DTexturesInPath(path(TEX3D_SCALAR8_PATHW), 1, pDevice, pCommandList, codex);
+    Load3DTexturesInPath(path(TEX3D_SCALAR16_PATHW), 2, pDevice, pCommandList, codex);
     Load3DTexturesInPath(path(TEX3D_RGBA_PATHW), 4, pDevice, pCommandList, codex);
 }
 
