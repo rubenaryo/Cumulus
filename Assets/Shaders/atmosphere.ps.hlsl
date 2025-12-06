@@ -914,15 +914,15 @@ float4 main(PSInput input) : SV_TARGET
     // Test planet sphere P intersection
     float3 p = camera - earth_center;
     float p_dot_v = dot(p, view_direction);
-    if (p_dot_v < 0.12 && isCamUp > 0.1)
-    {
-        view_direction = -view_direction;
-        p_dot_v = dot(p, view_direction);
-        isFlipped = true;
-        //float3 ground_blu = float3(0.05, 0.05, 0.2);
-        //float3 ground_col = lerp(ground_blu, ground_blu * 0.1f, moon_visibility);
-        //return float4(ground_col.xyz, 1.0);
-    }
+    //if (p_dot_v < 0.12 && isCamUp > 0.1)
+    //{
+    //    view_direction = -view_direction;
+    //    p_dot_v = dot(p, view_direction);
+    //    isFlipped = true;
+    //    //float3 ground_blu = float3(0.05, 0.05, 0.2);
+    //    //float3 ground_col = lerp(ground_blu, ground_blu * 0.1f, moon_visibility);
+    //    //return float4(ground_col.xyz, 1.0);
+    //}
     float p_dot_p = dot(p, p);
     float ray_earth_center_squared_distance = p_dot_p - p_dot_v * p_dot_v;
     float discriminant =

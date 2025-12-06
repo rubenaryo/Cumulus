@@ -31,9 +31,9 @@ DirectX::XMMATRIX CreateViewFromClipMatrix(float fovY_radians, float aspect_rati
     // We need to use the same for our computations to match, even though DirectX is sometimes row-major:
     float m[16] = {
         tan_half_fov * aspect_ratio, 0.0f,         0.0f,  0.0f,
-        0.0f,                        tan_half_fov, 0.0f,  0.0f,
-        0.0f,                        0.0f,         0.0f, 1.0f,
-        0.0f,                        0.0f,         -1.0f,  1.0f
+        0.0f,                        -tan_half_fov, 0.0f,  0.0f,
+        0.0f,                        0.0f,         0.0f, -1.0f,
+        0.0f,                        0.0f,         1.0f,  1.0f
     };
 
     return DirectX::XMMATRIX(m);
@@ -127,6 +127,43 @@ void InitializeAtmosphereConstants(
     constants.white_point = XMFLOAT3(1.082414f, 0.967556f, 0.950030f);
 }
 
+DirectX::XMMATRIX CreateModelFromCam(Camera& camera)
+{
+    using namespace DirectX;
+    XMVECTOR f;
+    XMVECTOR u;
+    XMVECTOR r;
+    camera.GetAxes(f, r, u);
+    XMVECTOR eye = camera.GetPosition();
+
+    // Convert from Y-up (DirectX) to Z-up (GLSL shader expects)
+    // Y-up to Z-up means: X stays X, Y becomes Z, Z becomes -Y
+    XMFLOAT3 fwd, up, right, pos;
+    XMStoreFloat3(&fwd, f);
+    XMStoreFloat3(&up, u);
+    XMStoreFloat3(&right, r);
+    XMStoreFloat3(&pos, eye);
+
+    // Apply coordinate system transformation
+    fwd = XMFLOAT3(fwd.x, fwd.z, -fwd.y);
+    up = XMFLOAT3(up.x, up.z, -up.y);
+    right = XMFLOAT3(right.x, right.z, -right.y);
+    pos = XMFLOAT3(pos.x, pos.z, -pos.y * 0.01);
+
+    f = XMLoadFloat3(&fwd);
+    u = XMLoadFloat3(&up);
+    r = XMLoadFloat3(&right);
+    eye = XMLoadFloat3(&pos);
+
+
+    XMMATRIX mView = XMMatrixLookToRH(
+        eye,
+        f,
+        u);
+    XMMATRIX model = XMMatrixInverse(nullptr, mView);
+    return model;
+}
+
 void UpdateAtmosphere(cbAtmosphere& constants,
     Camera& camera,
     AtmosphereInput& input)
@@ -149,11 +186,12 @@ void UpdateAtmosphere(cbAtmosphere& constants,
     // Create matrices
     // NOTE: Ideally we woudln't want to recalculate view from clip every time
     XMMATRIX view_from_clip = CreateViewFromClipMatrix(kFovY, aspect_ratio);
-    XMMATRIX model_from_view = CreateModelFromViewMatrix(
-        input.view_zenith_angle_radians,
-        input.view_azimuth_angle_radians,
-        dist * 50
-    );
+    //XMMATRIX model_from_view = CreateModelFromViewMatrix(
+    //    input.view_zenith_angle_radians,
+    //    input.view_azimuth_angle_radians,
+    //    dist * 50
+    //);
+    XMMATRIX model_from_view = CreateModelFromCam(camera);
 
     // Store matrices (DirectX math uses row-major in memory, but these will actually still be like OpenGL column-major)
     XMStoreFloat4x4(&constants.view_from_clip, (view_from_clip));
@@ -161,6 +199,7 @@ void UpdateAtmosphere(cbAtmosphere& constants,
 
     // camera pos is grabbed from the calculation we already did for model matrix
     constants.camera_position = XMFLOAT3(constants.model_from_view._41, constants.model_from_view._42, constants.model_from_view._43);
+    //XMStoreFloat3(&constants.camera_position, camera.GetPosition());
     constants.isCamUp = input.view_zenith_angle_radians > XM_PIDIV2 - 0.1 ? 1 : 0;
     // Earth center (at origin in world space, but offset down in "length units")
     constants.earth_center = XMFLOAT3(0.0f, 0.0f, -6360.0f); // Earth radius in km
