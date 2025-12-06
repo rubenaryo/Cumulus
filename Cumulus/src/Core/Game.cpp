@@ -359,10 +359,10 @@ void Game::UpdateProceduralNVDF()
         pCommandList->SetComputeRootDescriptorTable(procNoiseIndex, pProcNoise->GetSRVHandleGPU());
     }
 
-    int32_t outputIdx = mProcNVDFPass.GetResourceRootIndex("gOutput");
+    int32_t outputIdx = mProcNVDFPass.GetResourceRootIndex("nvdfTex");
     if (outputIdx != ROOTIDX_INVALID)
     {
-        pCommandList->SetComputeRootDescriptorTable(sdfIdx, pProcSDFTex->GetUAVHandleGPU());
+        pCommandList->SetComputeRootDescriptorTable(outputIdx, pProcNVDFTex->GetUAVHandleGPU());
     }
 
     int32_t hullIdx = mProcNVDFPass.GetResourceRootIndex("HullsBuffer");

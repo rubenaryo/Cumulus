@@ -1,4 +1,5 @@
-RWTexture3D<float4> gOutput : register(u0);
+RWTexture3D<float4> nvdfTex: register(u0);
+RWTexture3D<float2> sdfTex: register(u1);
 
 cbuffer cbCloudGenBuffer : register(b6)
 {
@@ -114,7 +115,7 @@ void main(int3 dispatchThreadID : SV_DispatchThreadID)
     int3 coord = dispatchThreadID.xyz;
 
     uint width, height, depth;
-    gOutput.GetDimensions(width, height, depth);
+    nvdfTex.GetDimensions(width, height, depth);
     
     if (coord.x >= width || coord.y >= height || coord.z >= depth)
         return;
@@ -174,10 +175,10 @@ void main(int3 dispatchThreadID : SV_DispatchThreadID)
     // we exit early if there are no clouds to collide with
     if (d > scale * 1.51)
     {
-        gOutput[coord] = float4(r,
+        nvdfTex[coord] = float4(r,
                             g,
                             b,
-                            max(gOutput[coord].a - 0.01, 0.0));
+                            max(nvdfTex[coord].a - 0.01, 0.0));
         return;
     }
     for (uint j = 0; j < hullCount; ++j)
@@ -195,7 +196,7 @@ void main(int3 dispatchThreadID : SV_DispatchThreadID)
 
     if (!collision)
     {
-        a = max(gOutput[coord].a - 0.01, 0.0);
+        a = max(nvdfTex[coord].a - 0.01, 0.0);
     }
     
     // Texture output:
@@ -203,5 +204,5 @@ void main(int3 dispatchThreadID : SV_DispatchThreadID)
     // g - dimensionalProfile - the outline of the cloud
     // b - detail type - aka billowy vs whispy [0, 1]
     // a - collision value in range [0, 1]
-    gOutput[coord] = float4(r, g, b, a);
+    nvdfTex[coord] = float4(r, g, b, a);
 }
