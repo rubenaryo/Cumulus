@@ -20,14 +20,6 @@ cbuffer VSCamera : register(b10)
     float2 camPad0;
 }
 
-struct cbPerEntity
-{
-    float4x4 world;
-    float4x4 invWorld;
-    int hullIdx;
-    int padding[3];
-};
-
 cbuffer VSWorld : register(b11)
 {
     float4x4 world;
@@ -36,12 +28,24 @@ cbuffer VSWorld : register(b11)
     int padding[3];
 }
 
-cbuffer entities : register(b12)
+struct cbPerEntity
 {
-    cbPerEntity entities[64];
+    float4x4 world;
+    float4x4 invWorld;
+    int hullIdx;
+    float padEntity1;
+    float padEntity2;
+    float padEntity3;
+};
 
+
+cbuffer EntityBuffer : register(b12)
+{        
+    cbPerEntity entities[64];
     int entityCount;
-    int paddingEntities[3];
+    float padEntityCount1;
+    float padEntityCount2;
+    float padEntityCount3;
 }
 
 #endif

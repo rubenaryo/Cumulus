@@ -225,15 +225,15 @@ void main(int3 dispatchThreadID : SV_DispatchThreadID)
     bool collision = false;
     float a;
     // we exit early if there are no clouds to collide with
-    if (d > scale * 1.51)
-    {
-        gOutput[coord] = float4(r,
-                            g,
-                            b,
-                            max(gOutput[coord].a - 0.01, 0.0));
-        return;
-    }
-    
+    //if (d > scale * 1.51)
+    //{
+    //    gOutput[coord] = float4(r,
+    //                        g,
+    //                        b,
+    //                        max(gOutput[coord].a - 0.01, 0.0));
+    //    return;
+    //}
+    //
     for (uint i = 0; i < entityCount; ++i)
     {
         cbPerEntity entity = entities[i];
@@ -241,10 +241,8 @@ void main(int3 dispatchThreadID : SV_DispatchThreadID)
         //no collision:
         if (entity.hullIdx < 0) continue;
 
-        float hullEnter, hullExit;
         ConvexHull ch = hulls[entity.hullIdx];
-        float3 dir = float3(1.0, 1.0, 1.0);
-        if (PointInsideConvexHull(worldPos, ch, entity.world))
+        if (PointInsideConvexHull(worldPos, ch, entity.invWorld))
         {
             a = 1.0f;
             collision = true;

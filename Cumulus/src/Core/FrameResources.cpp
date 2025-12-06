@@ -50,7 +50,7 @@ bool FrameResources::Create(UINT width, UINT height)
     mHullFaceBuffer.Create(L"Hull Faces Buffer", sizeof(cbHullFaces));
     mTimeBuffer.Create(L"Time", sizeof(cbTime));
     mJetTrailBuffer.Create(L"Jet Trail", sizeof(cbJetTrailPositions));
-    mEntitiesBuffer.Create(L"Entities", sizeof(cbEntities));
+    mEntitiesBuffer.Create(L"Entities Buffer", sizeof(cbEntities));
 	return true;
 }
 
@@ -123,7 +123,7 @@ bool FrameResources::UpdateJetTrail(const cbJetTrailPositions& data)
 bool FrameResources::UpdateEntities(const std::vector<EntityData>& cpuEntities)
 {
     cbEntities bufferEntities{};
-    for (int i = 0; i < cpuEntities.size() && i < 64; ++i) {
+    for (int i = 0; i < cpuEntities.size() && i < MAX_ENTITY_COUNT; ++i) {
         bufferEntities.entities[i].hullIdx = cpuEntities[i].hullIdx;
         bufferEntities.entities[i].world = cpuEntities[i].entityMatrices.world;
         bufferEntities.entities[i].invWorld = cpuEntities[i].entityMatrices.invWorld;

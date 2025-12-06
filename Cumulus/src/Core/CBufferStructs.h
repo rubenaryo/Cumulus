@@ -27,14 +27,6 @@ struct alignas(16) cbCamera
 	float camPad0[2];
 };
 
-struct alignas(16) cbPerEntity
-{
-    DirectX::XMFLOAT4X4 world;
-    DirectX::XMFLOAT4X4 invWorld;
-    int hullIdx;
-    int padding[3];
-};
-
 struct alignas(16) DirectionalLight
 {
     DirectX::XMFLOAT3 diffuseColor;
@@ -165,20 +157,31 @@ struct alignas(16) cbJetTrailPositions {
     DirectX::XMFLOAT4 positions[4];
 };
 
+struct alignas(16) cbPerEntity
+{
+    DirectX::XMFLOAT4X4 world;
+    DirectX::XMFLOAT4X4 invWorld;
+    int hullIdx;
+    float padEntity1;
+    float padEntity2;
+    float padEntity3;
+};
+
+const int MAX_ENTITY_COUNT = 64;
+struct alignas(16) cbEntities {
+    cbPerEntity entities[MAX_ENTITY_COUNT];
+    int entityCount;
+    float padding1;
+    float padding2;
+    float padding3;
+};
+
 struct EntityData {
     cbPerEntity entityMatrices;
     int hullIdx;
     Muon::ResourceID resourceID;
     DirectX::XMFLOAT4 vel;
     DirectX::XMFLOAT4 rot;
-};
-
-const static int MAX_ENTITY_COUNT = 64;
-struct alignas(256) cbEntities {
-    cbPerEntity entities[MAX_ENTITY_COUNT];
-
-    int entityCount;
-    int padding[3];
 };
 
 }

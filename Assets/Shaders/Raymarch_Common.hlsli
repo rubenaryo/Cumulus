@@ -205,6 +205,7 @@ bool RayConvexHullIntersect(
     float3 origin,
     float3 dir,
     ConvexHull hull,
+    float4x4 invWorld,
     out float tEnter,
     out float tExit)
 {
@@ -215,8 +216,8 @@ bool RayConvexHullIntersect(
     uint faceStart = hull.faceOffset;
     uint faceEnd   = hull.faceOffset + hull.faceCount;
 
-    float3 localOrigin = mul(hull.invWorld, float4(origin, 1.0)).xyz;
-    float3 localDir    = mul(hull.invWorld, float4(dir, 0.0)).xyz;
+    float3 localOrigin = mul(invWorld, float4(origin, 1.0)).xyz;
+    float3 localDir    = mul(invWorld, float4(dir, 0.0)).xyz;
 
 
     for (uint fi = faceStart; fi < faceEnd; ++fi)
