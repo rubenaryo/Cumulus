@@ -73,6 +73,7 @@ struct LightCacheSample
     // Tau is optical depth to X 
     float tauSun;  
     float tauVertical; 
+    float empty[2]; 
 };
 
 LightCacheSample MakeLightCacheSample(float2 sample)

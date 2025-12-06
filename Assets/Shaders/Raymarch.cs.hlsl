@@ -244,10 +244,10 @@ float3 ComputeDirectLighting(
     float stepSize, 
     float3 dirSun, 
     float3 lightSun,
-    float directExtinctionScale, 
-    float directLightingStrength)
+    float directLightingStrength,
+    float opticalDepthToSun)
 {
-    float opticalDepthToSun = GetApproxOpticalDepthToSun(samplePos, dirSun, directExtinctionScale);
+
     float T_sun = exp(-opticalDepthToSun); // transmittance from sun to point
 
     // Phase term: how strongly this point scatters sun light toward the camera
@@ -415,7 +415,7 @@ float3 VolumeRaymarchNvdf(float3 eyePos, float3 dir, float3 bgColor, float maxRa
             // Lighting 
             #if (USE_DIRECT_LIGHTING || USE_AMBIENT_LIGHTING || USE_MULTIPLE_SCATTERING)
                 float3 lighting = 0.0.xxx;
-                LightCacheSample lightCacheSample = MakeLightCacheSample(GetApproxOpticalDepthToSun(samplePos, sunDirN, lightingParams.directExtinctionScale));
+                LightCacheSample lightCacheSample = MakeLightCacheSample(lightCacheTex.SampleLevel(linearClamp, WorldToNvdfUV(samplePos), 0.0f));
                 
                 #if USE_DIRECT_LIGHTING
                 float3 directL = ComputeDirectLighting(
@@ -426,9 +426,9 @@ float3 VolumeRaymarchNvdf(float3 eyePos, float3 dir, float3 bgColor, float maxRa
                             sigma,
                             march.stepSize,
                             sunDirN,
-                            lightingParams.lightSun,
-                            lightingParams.directExtinctionScale,
-                            lightingParams.directStrength
+                            lightingParams.lightSun, 
+                            lightingParams.directStrength, 
+                            lightCacheSample.tauSun
                         );
                         lighting += directL;
                 #endif

@@ -43,18 +43,22 @@ float GetOpticalDepthAlongDirection(float3 samplePos, float3 dir, float extincti
             float dimensionalProfile = nvdfSample.g;
             float detailType = nvdfSample.b;
             float densityScale = nvdfSample.a;
+            float density = dimensionalProfile; 
+            
+            if (i < 2)
+            {
+                density = GetUprezzedVoxelCloudDensity(
+                    (RayMarchInfo) 0,
+                    pos,
+                    dimensionalProfile,
+                    detailType,
+                    densityScale,
+                    noiseTex,
+                    linearWrap
+                );
+            }
 
-            float density = GetUprezzedVoxelCloudDensity(
-                (RayMarchInfo) 0,
-                pos,
-                dimensionalProfile,
-                detailType,
-                densityScale,
-                noiseTex,
-                linearWrap
-            );
-
-            float sigma = dimensionalProfile * extinctionScale;
+            float sigma = density * extinctionScale;
 
             float stepSizeInside = minStepSize;
             tau += sigma * stepSizeInside;
