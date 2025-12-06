@@ -513,34 +513,6 @@ float3 VolumeRaymarchNvdf(float3 eyePos, float3 dir, float3 bgColor, float maxRa
     return outColor;
 #endif
 }
-
-float GetMaxRayDist(float depth, float3 eyePos, int3 dispatchThreadID)
-{ 
-    uint width, height;
-    gOutput.GetDimensions(width, height);
-    
-    int2 pixelCoord = dispatchThreadID.xy;
-    
-    // NDC coordinates (already computed)
-    float2 uv = (float2(pixelCoord) + 0.5) / float2(width, height);
-    uv = uv * 2.0 - 1.0;
-    uv.y = -uv.y;
-
-    // Reconstruct clip-space position
-    float4 clipPos = float4(uv.x, uv.y, depth * 2.0f - 1.0f, 1.0f);
-
-    // To view space
-    float4 viewPos = mul(invProj, clipPos);
-    viewPos.xyz /= viewPos.w;
-
-    // To world space
-    float3 worldPosAtDepth = mul(invView, float4(viewPos.xyz, 1.0f)).xyz;
-
-    // Distance from eye along the view ray
-    float maxRayDist = length(worldPosAtDepth - eyePos);
-    return maxRayDist;
-}
-
  
 [numthreads(8, 8, 1)]
 void main(int3 dispatchThreadID : SV_DispatchThreadID)
@@ -569,7 +541,6 @@ void main(int3 dispatchThreadID : SV_DispatchThreadID)
     float depth = depthStencilBuffer[dispatchThreadID.xy].r;
     float viewSpaceZ = (minDist * maxDist) / (maxDist - depth * (maxDist - minDist));
     float maxRayDist = viewSpaceZ / viewDir.z; // viewDir.z is the view-space forward component
-    //float maxRayDist = GetMaxRayDist(depth, eyePos, dispatchThreadID);
     float3 finalColor = VolumeRaymarchNvdf(eyePos, worldDir, bgColor, maxRayDist, dispatchThreadID);
     
     gOutput[dispatchThreadID.xy] = float4(finalColor, 1.0);
