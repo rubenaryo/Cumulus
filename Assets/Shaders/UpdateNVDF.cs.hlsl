@@ -27,7 +27,7 @@ cbuffer Time : register(b8)
 // a - density scale - where is cloud [0, 1]
 
 #include "Raymarch_Common.hlsli"
-
+#include "VS_Common.hlsli"
 float smooth_min(float a, float b, float k)
 {
     float h = max(k - abs(a - b), 0.0) / k;
@@ -129,7 +129,7 @@ void main(int3 dispatchThreadID : SV_DispatchThreadID)
     float gMultiplier = 1.0;
     float scale = 0;
     float jetSpeed = 0;
-    if (false)
+    if (demoMode == 0)
     {
         for (uint i = 0; i < numSeeds; ++i)
         {
@@ -141,7 +141,7 @@ void main(int3 dispatchThreadID : SV_DispatchThreadID)
     }
 
     
-    else if (true)
+    else if (demoMode == 1)
     {
         uint numTrails = 1;
 
@@ -198,28 +198,27 @@ void main(int3 dispatchThreadID : SV_DispatchThreadID)
     // COLLISION CODE
     //---------------------------
     // collision gets put into the density scale part for now, which gets calculated in raymarch for now
-    // bool collision = false;
-    // for (uint i = 0; i < hullCount; ++i)
-    // {
-    //     float hullEnter, hullExit;
-    //     ConvexHull ch = hulls[i];
-    //     float3 dir = float3(1.0, 1.0, 1.0);
-    //     if (PointInsideConvexHull(worldPos, ch))
-    //     {
-    //         gOutput[coord].a = 1.0f;
-    //         collision = true;
-    //         break;
-    //     }
-    // }
+    bool collision = false;
+    for (uint i = 0; i < entityCount; ++i)
+    {
+        cbPerEntity entity = entities[i];
+        
+        //no collision:
+        if (entity.hullIdx < 0) continue;
 
-    // if (!collision)
-    // {
-    //     gOutput[coord].a = max(gOutput[coord].a - 0.01 * deltaTime, 0.0);
-    // }
+        float hullEnter, hullExit;
+        ConvexHull ch = hulls[entity.hullIdx];
+        float3 dir = float3(1.0, 1.0, 1.0);
+        if (PointInsideConvexHull(worldPos, ch, entity.world))
+        {
+            gOutput[coord].a = 1.0f;
+            collision = true;
+            break;
+        }
+    }
 
-    // if(positions[0].x > 500 && positions[0].y == 1000 && positions[1].x < 1000 && positions[0].x > 0){
-    //     gOutput[coord].a = 0.f;
-    // }else{
-    //     gOutput[coord].a = 1.f;
-    // }
+    if (!collision)
+    {
+        gOutput[coord].a = max(gOutput[coord].a - 0.01 * deltaTime, 0.0);
+    }
 }

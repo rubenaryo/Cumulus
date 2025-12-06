@@ -8,9 +8,10 @@ Description : Interface for GameInput child class
 
 #include <Core/Camera.h>
 #include "InputSystem.h"
+class Game;
 
 namespace Input {
-    
+
     class GameInput : public InputSystem
     {
     public:
@@ -19,7 +20,7 @@ namespace Input {
         ~GameInput();
 
         // Actions run by the input system each frame
-        void Frame(float dt, Muon::Camera* pCamera);
+        void Frame(float dt, Muon::Camera* pCamera, Game* game);
     
     protected:
         // Override implementation for setting default key mappings

@@ -13,7 +13,6 @@ This class encapsulates all app functionality
 #include <Core/Pass.h>
 #include <Core/StepTimer.h>
 #include <Core/FrameResources.h>
-
 #include <Input/GameInput.h>
 #include "MuonImgui.h"
 
@@ -37,6 +36,7 @@ public:
     void OnSuspending();
     void OnResuming();
     void OnMove();
+    void SpawnProjectile();
     void OnResize(int newWidth, int newHeight);
 
     // Input Callbacks
@@ -79,7 +79,12 @@ private:
     Muon::cbJetTrailPositions jetTrailPos;
 
     static const DirectX::XMFLOAT3 jetDir;
-    std::vector<Muon::EntityData> mEntityCBData;
+
+    std::vector<int> projectileIndices;
+
+    int sphereHullIdx = 0;
+
+    std::vector<Muon::EntityData> cpuEntityData;
 
     Muon::cbCloudGenData mCloudData;
 

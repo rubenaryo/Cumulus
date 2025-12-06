@@ -26,23 +26,24 @@ struct FrameResources
     
     bool Create(UINT width, UINT height);
 
-    bool UpdateWorldMatrix(cbPerEntity& data);
-    bool UpdateCamera(cbCamera& data);
-    bool UpdateLights(cbLights& data);
-    bool UpdateTime(cbTime& data);
-    bool UpdateAABB(cbIntersections& data);
-    bool UpdateAtmosphere(cbAtmosphere& data);
-    bool UpdateCloudData(cbCloudGenData& data);
-    bool UpdateCloudLighting(cbCloudLighting& data);
-    bool UpdateHulls(cbHulls& data);
-    bool UpdateHullFaces(cbHullFaces& data);
-    bool UpdateJetTrail(cbJetTrailPositions& jetTrailPositions);
+    bool UpdateWorldMatrix(const cbPerEntity& data);
+    bool UpdateCamera(const cbCamera& data);
+    bool UpdateLights(const cbLights& data);
+    bool UpdateTime(const cbTime& data);
+    bool UpdateAABB(const cbIntersections& data);
+    bool UpdateAtmosphere(const cbAtmosphere& data);
+    bool UpdateCloudData(const cbCloudGenData& data);
+    bool UpdateCloudLighting(const cbCloudLighting& data);
+    bool UpdateHulls(const cbHulls& data);
+    bool UpdateHullFaces(const cbHullFaces& data);
+    bool UpdateJetTrail(const cbJetTrailPositions& jetTrailPositions);
+    bool UpdateEntities(const std::vector<EntityData>& entities);
 
     void Destroy();
 
     Microsoft::WRL::ComPtr<ID3D12CommandAllocator> mCmdAllocator;
 
-    UploadBuffer mWorldMatrixBuffer;
+    UploadBuffer mEntitiesBuffer;
     UploadBuffer mCameraBuffer;
     UploadBuffer mLightBuffer;
     UploadBuffer mTimeBuffer;
@@ -53,6 +54,7 @@ struct FrameResources
     UploadBuffer mHullBuffer;
     UploadBuffer mHullFaceBuffer;
     UploadBuffer mJetTrailBuffer;
+    UploadBuffer mWorldMatrixBuffer;
 
     UINT64 mFence = 0;
 

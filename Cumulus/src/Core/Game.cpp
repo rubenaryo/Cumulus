@@ -6,8 +6,6 @@ Description : Implementation of Game.h
 #include "Game.h"
 
 #include <Core/DXCore.h>
-#include <Input/GameInput.h>
-
 #include <Core/Camera.h>
 #include <Core/COMException.h>
 #include <Core/Factories.h>
@@ -148,7 +146,7 @@ bool Game::InitFrameResources(UINT width, UINT height)
     GenerateCloudGenConstants(mCloudData, settings.numClouds, settings.cloudScale);
     
     // Updating AABBs
-    const Mesh* m = codex.GetMesh(GetResourceID(L"teapot.obj"));
+    const Mesh* m = codex.GetMesh(GetResourceID(L"sphere.obj"));
     cbIntersections intersections = {};
     intersections.aabbCount = 1;
     intersections.aabbs[0] = m->GetAABB();
@@ -167,10 +165,14 @@ bool Game::InitFrameResources(UINT width, UINT height)
         );
     }
 
-    // Initialize teapot's hull
+    // Initialize sphere hull:
     cbConvexHull cHull = {};
     cHull.faceCount = (uint32_t)h.faces.size();
     cHull.faceOffset = 0;;
+
+    cbHulls hulls = {};
+    hulls.hulls[0] = cHull;
+    hulls.hullCount = 1;
 
     // Create each frame resource and fill it with static data.
     for (size_t i = 0; i != NUM_FRAMES_IN_FLIGHT; ++i)
@@ -183,11 +185,10 @@ bool Game::InitFrameResources(UINT width, UINT height)
         frameResource.UpdateCloudLighting(settings.lighting);
         frameResource.UpdateAABB(intersections);
         frameResource.UpdateHullFaces(faces);
+        frameResource.UpdateHulls(hulls);
     }
 
     return true;
-
-    
 }
 
 // On Timer tick, run Update() on the game, then Render()
@@ -280,18 +281,57 @@ void Game::InitEntities()
     // ---- 2. Resource + hull ------------------------------------------------
 
     jetEntity.resourceID = Muon::GetResourceID(L"jet.obj");
+    jetEntity.hullIdx = -1;
 
     Hull hull = codex.GetMesh(jetEntity.resourceID)->GetHull();
     cbConvexHull cHull = {};
     cHull.faceCount = (uint32_t)hull.faces.size();
     cHull.faceOffset = 0;
 
-    jetEntity.hull = cHull;
 
     // ---- 3. Store ----------------------------------------------------------
 
     jetIdx = 0;
-    mEntityCBData.push_back(jetEntity);
+    cpuEntityData.push_back(jetEntity);
+}
+
+void Game::SpawnProjectile()
+{
+    using namespace DirectX;
+    using namespace Muon;
+
+    if (cpuEntityData.size() >= MAX_ENTITY_COUNT) {
+        return;
+    }
+
+    ResourceCodex& codex = ResourceCodex::GetSingleton();
+
+    EntityData newProjectile{};
+    newProjectile.resourceID = GetResourceID(L"sphere.obj");
+    newProjectile.hullIdx = sphereHullIdx;
+
+    // Store world & invWorld
+    XMMATRIX view = mCamera.GetView();
+    XMMATRIX camWorld = XMMatrixInverse(nullptr, view);
+
+    XMStoreFloat4x4(&newProjectile.entityMatrices.world, camWorld);
+    XMStoreFloat4x4(&newProjectile.entityMatrices.invWorld, view);
+
+    // Extract camera basis
+    XMVECTOR camForward = XMVector3Normalize(camWorld.r[2]);
+    XMVECTOR camUp = XMVector3Normalize(camWorld.r[1]);
+
+    // Build projectile velocity
+    float forwardSpeed = 50.f;
+    float upBoost = 10.f;
+
+    XMVECTOR vel = camForward * forwardSpeed + camUp * upBoost;
+
+    // Store velocity
+    XMStoreFloat4(&newProjectile.vel, vel);
+
+    projectileIndices.push_back(cpuEntityData.size());
+    cpuEntityData.push_back(newProjectile);
 }
 
 
@@ -299,10 +339,12 @@ void Game::InitEntities()
 void Game::UpdateEntities(Muon::FrameResources& currFrameResources, const Muon::cbTime& time)
 {
     using namespace Muon;
-    if (jetIdx >= 0) {
-        float jetSpeed = 5555.f * time.deltaTime;
+    using namespace DirectX;
 
-        Muon::EntityData& jet = mEntityCBData[jetIdx];   
+    if (jetIdx >= 0 && mCloudData.demoMode == 1) {
+        float jetSpeed = 55.f * time.deltaTime;
+
+        Muon::EntityData& jet = cpuEntityData[jetIdx];   
 
         DirectX::XMMATRIX world = XMLoadFloat4x4(&jet.entityMatrices.world);
 
@@ -315,8 +357,8 @@ void Game::UpdateEntities(Muon::FrameResources& currFrameResources, const Muon::
         world = DirectX::XMMatrixMultiply(world,
             DirectX::XMMatrixTranslationFromVector(translation));
 
-        XMStoreFloat4x4(&jet.entityMatrices.world, world);
-        XMStoreFloat4x4(&jet.entityMatrices.invWorld, DirectX::XMMatrixInverse(nullptr, world));
+        DirectX::XMStoreFloat4x4(&jet.entityMatrices.world, world);
+        DirectX::XMStoreFloat4x4(&jet.entityMatrices.invWorld, DirectX::XMMatrixInverse(nullptr, world));
 
         DirectX::XMVECTOR jetPos = world.r[3];
         DirectX::XMStoreFloat4(&jetTrailPos.positions[1], jetPos);
@@ -335,15 +377,49 @@ void Game::UpdateEntities(Muon::FrameResources& currFrameResources, const Muon::
         currFrameResources.UpdateJetTrail(jetTrailPos);
     }
 
+    if (!projectileIndices.empty())
+    {
+        for (int i = 0; i < projectileIndices.size(); ++i)
+        {
+            EntityData& projectile = cpuEntityData[projectileIndices[i]];
 
-    //determine new size of entity matrix buffer, update that
+            // Convert data
+            projectile.vel.y -= 9.8 * time.deltaTime;
+            XMVECTOR vel = XMLoadFloat4(&projectile.vel);
+            XMMATRIX world = XMLoadFloat4x4(&projectile.entityMatrices.world);
+
+            // Extract linear velocity
+            XMVECTOR linearVel = XMVectorSetW(vel, 0.0f); // remove rot rate
+            float rotationRate = projectile.vel.w;        // rot per second
+
+            // --- MOVE ---
+            XMVECTOR forwardMove = linearVel * time.deltaTime;
+            world.r[3] = XMVectorAdd(world.r[3], forwardMove);  // modify translation
+
+            // --- ROTATE ---
+            if (rotationRate != 0.0f)
+            {
+                // Rotate around the projectile’s local Y axis (example)
+                XMMATRIX rot = XMMatrixRotationY(rotationRate * time.deltaTime);
+
+                // Apply rotation BEFORE translation
+                world = rot * world;
+            }
+
+            // Store results back
+            DirectX::XMStoreFloat4x4(&projectile.entityMatrices.world, world);
+            DirectX::XMStoreFloat4x4(&projectile.entityMatrices.invWorld, XMMatrixInverse(nullptr, world));
+        }
+    }
+
+    currFrameResources.UpdateEntities(cpuEntityData);
 }
 
 void Game::Update(Muon::StepTimer const& timer)
 {
     float elapsedTime = float(timer.GetElapsedSeconds());
     float totalTime = float(timer.GetTotalSeconds());
-    mInput.Frame(elapsedTime, &mCamera);
+    mInput.Frame(elapsedTime, &mCamera, this);
 
     // The UI has flagged for a cloud update
     if (settings.updateClouds)
@@ -475,6 +551,12 @@ void Game::UpdateProceduralNVDF()
     if (timeRootIdx != ROOTIDX_INVALID)
     {
         pCommandList->SetComputeRootConstantBufferView(timeRootIdx, currFrameResources.mTimeBuffer.GetGPUVirtualAddress());
+    }
+
+    int32_t entitiesIdx = mProcNVDFPass.GetResourceRootIndex("entities");
+    if (entitiesIdx != ROOTIDX_INVALID)
+    {
+        pCommandList->SetComputeRootConstantBufferView(entitiesIdx, currFrameResources.mEntitiesBuffer.GetGPUVirtualAddress());
     }
 
     pCommandList->ResourceBarrier(1, &CD3DX12_RESOURCE_BARRIER::Transition(pProcNVDFTex->GetResource(),
@@ -651,11 +733,13 @@ void Game::Render()
 
         // Bind the world matrix Upload Buffer to the root index known by the material
         int32_t worldMatrixRootIdx = mOpaquePass.GetResourceRootIndex("VSWorld");
-        if (worldMatrixRootIdx != ROOTIDX_INVALID)
+        if (worldMatrixRootIdx == ROOTIDX_INVALID)
         {
-            pCommandList->SetGraphicsRootConstantBufferView(worldMatrixRootIdx, currFrameResources.mWorldMatrixBuffer.GetGPUVirtualAddress());
+            //throw error
         }
-     
+
+
+
         int32_t lightsRootIdx = mOpaquePass.GetResourceRootIndex("PSLights");
         if (lightsRootIdx != ROOTIDX_INVALID)
         {
@@ -668,11 +752,27 @@ void Game::Render()
             pCommandList->SetGraphicsRootConstantBufferView(timeRootIdx, currFrameResources.mTimeBuffer.GetGPUVirtualAddress());
         }
 
+
+
         const Mesh* pMesh = codex.GetMesh(GetResourceID(L"jet.obj"));
-        if (pMesh && settings.drawObjects)
+        if (pMesh && settings.drawObjects && mCloudData.demoMode == 1)
         {
-            currFrameResources.UpdateWorldMatrix(mEntityCBData[jetIdx].entityMatrices);
-            pMesh->DrawIndexed(pCommandList);
+           pCommandList->SetGraphicsRootConstantBufferView(worldMatrixRootIdx, currFrameResources.mEntitiesBuffer.GetGPUVirtualAddress() + jetIdx * Muon::AlignToBoundary(sizeof(cbPerEntity), 16));
+
+           pMesh->DrawIndexed(pCommandList);
+        }
+
+        if (projectileIndices.size() > 0 && mCloudData.demoMode == 2) {
+            for (int i = 0; i < projectileIndices.size(); ++i) {
+                const EntityData& projectile = cpuEntityData[projectileIndices[i]];
+                const Mesh* mesh = codex.GetMesh(projectile.resourceID);
+                if (mesh && settings.drawObjects) {
+                    pCommandList->SetGraphicsRootConstantBufferView(worldMatrixRootIdx, currFrameResources.mEntitiesBuffer.GetGPUVirtualAddress() + projectileIndices[i] * Muon::AlignToBoundary(sizeof(cbPerEntity), 16));
+
+                    //currFrameResources.UpdateWorldMatrix(projectile.entityMatrices);
+                    mesh->DrawIndexed(pCommandList);
+                }
+            }
         }
     }
 

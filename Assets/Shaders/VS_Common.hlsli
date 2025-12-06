@@ -16,11 +16,28 @@ cbuffer VSCamera : register(b10)
     float4x4 invProj;
 }
 
-// Values changed for every entity
-cbuffer VSWorld: register(b11)
+struct cbPerEntity
 {
     float4x4 world;
     float4x4 invWorld;
+    int hullIdx;
+    int padding[3];
+};
+
+cbuffer VSWorld : register(b11)
+{
+    float4x4 world;
+    float4x4 invWorld;
+    int hullIdx;
+    int padding[3];
+}
+
+cbuffer entities : register(b12)
+{
+    cbPerEntity entities[64];
+
+    int entityCount;
+    int paddingEntities[3];
 }
 
 #endif
