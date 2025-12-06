@@ -567,8 +567,9 @@ void main(int3 dispatchThreadID : SV_DispatchThreadID)
     float3 eyePos = float3(invView[0][3], invView[1][3], invView[2][3]); // from the 4th column instead of row..
     float3 bgColor = gInput[pixelCoord].rgb;
     float depth = depthStencilBuffer[dispatchThreadID.xy].r;
-    float maxRayDist = GetMaxRayDist(depth, eyePos, dispatchThreadID);
-
+    float viewSpaceZ = (minDist * maxDist) / (maxDist - depth * (maxDist - minDist));
+    float maxRayDist = viewSpaceZ / viewDir.z; // viewDir.z is the view-space forward component
+    //float maxRayDist = GetMaxRayDist(depth, eyePos, dispatchThreadID);
     float3 finalColor = VolumeRaymarchNvdf(eyePos, worldDir, bgColor, maxRayDist, dispatchThreadID);
     
     gOutput[dispatchThreadID.xy] = float4(finalColor, 1.0);

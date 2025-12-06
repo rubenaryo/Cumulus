@@ -22,7 +22,7 @@ struct alignas(16) cbCamera
     DirectX::XMFLOAT4X4 invView;
     DirectX::XMFLOAT4X4 invProj;
 
-    float minDist = 0.001f; 
+    float minDist = 0.01f; 
     float maxDist = 4000.0f; 
 	float camPad0[2];
 };
