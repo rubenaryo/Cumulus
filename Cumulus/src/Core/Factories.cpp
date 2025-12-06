@@ -259,7 +259,7 @@ bool TextureFactory::Upload3DTextureFromData(const wchar_t* textureName, void* d
 
     Texture& tex = codex.InsertTexture(GetResourceID(textureName));
 
-    if (!tex.Create(textureName, pDevice, (UINT)width, (UINT)height, (UINT)depth, fmt, D3D12_RESOURCE_FLAG_NONE, D3D12_RESOURCE_STATE_COPY_DEST))
+    if (!tex.Create(textureName, pDevice, (UINT)width, (UINT)height, (UINT)depth, fmt, D3D12_RESOURCE_FLAG_ALLOW_UNORDERED_ACCESS, D3D12_RESOURCE_STATE_COPY_DEST))
     {
         Muon::Printf(L"Error: Failed to create default heap resource for 3d texture %s!\n", textureName);
         return false;
@@ -274,6 +274,12 @@ bool TextureFactory::Upload3DTextureFromData(const wchar_t* textureName, void* d
     if (!tex.InitSRV(pDevice, Muon::GetSRVHeap()))
     {
         Muon::Printf(L"Error: Failed to create create D3D12 Resource and SRV for 3d texture %s!\n", textureName);
+        return false;
+    }
+
+    if (!tex.InitUAV(pDevice, Muon::GetSRVHeap()))
+    {
+        Muon::Printf(L"Error: Failed to create create D3D12 Resource and UAV for 3d texture %s!\n", textureName);
         return false;
     }
 
@@ -592,8 +598,8 @@ bool TextureFactory::LoadTexturesForNVDF(std::filesystem::path directoryPath, ID
     // Since NVDF's are only used in the compute shader, we must transition them away from being pixel shader resources.
     pCommandList->ResourceBarrier(1, &CD3DX12_RESOURCE_BARRIER::Transition(
         pNVDFTex->GetResource(),
-        D3D12_RESOURCE_STATE_PIXEL_SHADER_RESOURCE,
-        D3D12_RESOURCE_STATE_NON_PIXEL_SHADER_RESOURCE
+        D3D12_RESOURCE_STATE_ALL_SHADER_RESOURCE,
+        D3D12_RESOURCE_STATE_GENERIC_READ
     ));
 
     return true;
@@ -931,8 +937,8 @@ bool TextureFactory::Load3DTextureFromSlices(std::filesystem::path directoryPath
     // In reality, we should track the resource state explicitly by building a new system.
     pCommandList->ResourceBarrier(1, &CD3DX12_RESOURCE_BARRIER::Transition(
         p3DTex->GetResource(),
-        D3D12_RESOURCE_STATE_PIXEL_SHADER_RESOURCE,
-        D3D12_RESOURCE_STATE_NON_PIXEL_SHADER_RESOURCE
+        D3D12_RESOURCE_STATE_ALL_SHADER_RESOURCE,
+        D3D12_RESOURCE_STATE_GENERIC_READ
     ));
 
     return success;
@@ -1021,7 +1027,7 @@ void TextureFactory::LoadAll3DTextures(ID3D12Device* pDevice, ID3D12GraphicsComm
 {
     using namespace std::filesystem;
 
-    Load3DTexturesInPath(path(TEX3D_SCALAR8_PATHW), 1, pDevice, pCommandList, codex);
+    Load3DTexturesInPath(path(TEX3D_SCALAR8_PATHW), 2, pDevice, pCommandList, codex);
     Load3DTexturesInPath(path(TEX3D_SCALAR16_PATHW), 2, pDevice, pCommandList, codex);
     Load3DTexturesInPath(path(TEX3D_RGBA_PATHW), 4, pDevice, pCommandList, codex);
 }

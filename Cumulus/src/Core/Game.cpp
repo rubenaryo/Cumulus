@@ -199,8 +199,6 @@ void Game::Frame()
         Update(mTimer);
     });
 
-    UpdateProceduralNVDF();
-
     Render();
     AdvanceFence();
 
@@ -327,14 +325,11 @@ void Game::Update(Muon::StepTimer const& timer)
     currFrameResources.UpdateHulls(hulls);
 }
 
-void Game::UpdateProceduralNVDF()
+void Game::UpdateProceduralNVDF(Muon::FrameResources& currFrameResources)
 {
     using namespace Muon;
 
     ID3D12GraphicsCommandList* pCommandList = Muon::GetCommandList();
-    FrameResources& currFrameResources = mFrameResources.at(mCurrFrameResourceIdx);
-
-    ResetCommandList(nullptr);
     pCommandList->SetDescriptorHeaps(1, GetSRVHeap()->GetHeapAddr());
 
     if (!mProcNVDFPass.Bind(pCommandList))
@@ -344,9 +339,17 @@ void Game::UpdateProceduralNVDF()
     }
 
     ResourceCodex& codex = ResourceCodex::GetSingleton();
-    Texture* pProcNVDFTex = codex.GetTexture(GetResourceID(L"ProceduralNVDF"));
-    Texture* pProcSDFTex = codex.GetTexture(GetResourceID(L"ProceduralSDF"));
-    if (!pProcNVDFTex || !pProcSDFTex)
+
+#define USE_PROCEDURAL_CLOUD 0
+#if USE_PROCEDURAL_CLOUD
+    Texture* pNVDFTex = codex.GetTexture(GetResourceID(L"ProceduralNVDF"));
+    Texture* pSDFTex = codex.GetTexture(GetResourceID(L"ProceduralSDF"));
+#else
+    Texture* pNVDFTex = codex.GetTexture(GetResourceID(L"StormbirdCloud_NVDF"));
+    Texture* pSDFTex = codex.GetTexture(GetResourceID(L"StormbirdCloudSDF_3D"));
+#endif
+
+    if (!pNVDFTex || !pSDFTex)
     {
         Muon::Printf("Error: Failed to get procedural nvdf/sdf texture!\n");
         return;
@@ -359,10 +362,16 @@ void Game::UpdateProceduralNVDF()
         pCommandList->SetComputeRootDescriptorTable(procNoiseIndex, pProcNoise->GetSRVHandleGPU());
     }
 
-    int32_t outputIdx = mProcNVDFPass.GetResourceRootIndex("nvdfTex");
-    if (outputIdx != ROOTIDX_INVALID)
+    int32_t nvdfIdx = mProcNVDFPass.GetResourceRootIndex("nvdfTex");
+    if (nvdfIdx != ROOTIDX_INVALID)
     {
-        pCommandList->SetComputeRootDescriptorTable(outputIdx, pProcNVDFTex->GetUAVHandleGPU());
+        pCommandList->SetComputeRootDescriptorTable(nvdfIdx, pNVDFTex->GetUAVHandleGPU());
+    }
+
+    int32_t sdfIdx = mProcNVDFPass.GetResourceRootIndex("sdfTex");
+    if (sdfIdx != ROOTIDX_INVALID)
+    {
+        pCommandList->SetComputeRootDescriptorTable(sdfIdx, pSDFTex->GetUAVHandleGPU());
     }
 
     int32_t hullIdx = mProcNVDFPass.GetResourceRootIndex("HullsBuffer");
@@ -383,21 +392,24 @@ void Game::UpdateProceduralNVDF()
         pCommandList->SetComputeRootConstantBufferView(cloudIdx, currFrameResources.mCloudGenBuffer.GetGPUVirtualAddress());
     }
 
-
-    pCommandList->ResourceBarrier(1, &CD3DX12_RESOURCE_BARRIER::Transition(pProcNVDFTex->GetResource(),
+    pCommandList->ResourceBarrier(1, &CD3DX12_RESOURCE_BARRIER::Transition(pNVDFTex->GetResource(),
         D3D12_RESOURCE_STATE_GENERIC_READ, D3D12_RESOURCE_STATE_UNORDERED_ACCESS));
 
-    UINT numGroupsX = (UINT)ceilf(pProcNVDFTex->GetWidth() / 16.0f);
-    UINT numGroupsY = (UINT)ceilf(pProcNVDFTex->GetHeight() / 16.0f);
-    UINT numGroupsZ = (UINT)ceilf(pProcNVDFTex->GetDepth() / 2.0f);
+    pCommandList->ResourceBarrier(1, &CD3DX12_RESOURCE_BARRIER::Transition(pSDFTex->GetResource(),
+        D3D12_RESOURCE_STATE_GENERIC_READ, D3D12_RESOURCE_STATE_UNORDERED_ACCESS));
+
+    UINT numGroupsX = (UINT)ceilf(pNVDFTex->GetWidth() / 16.0f);
+    UINT numGroupsY = (UINT)ceilf(pNVDFTex->GetHeight() / 16.0f);
+    UINT numGroupsZ = (UINT)ceilf(pNVDFTex->GetDepth() / 2.0f);
     pCommandList->Dispatch(numGroupsX, numGroupsY, numGroupsZ);
 
-    pCommandList->ResourceBarrier(1, &CD3DX12_RESOURCE_BARRIER::Transition(pProcNVDFTex->GetResource(),
+    pCommandList->ResourceBarrier(1, &CD3DX12_RESOURCE_BARRIER::UAV(pNVDFTex->GetResource()));
+    pCommandList->ResourceBarrier(1, &CD3DX12_RESOURCE_BARRIER::Transition(pNVDFTex->GetResource(),
         D3D12_RESOURCE_STATE_UNORDERED_ACCESS, D3D12_RESOURCE_STATE_GENERIC_READ));
 
-    CloseCommandList();
-    ExecuteCommandList();
-    FlushCommandQueue(); // TODO: Give this process its own cmd allocator so we don't stall everything here
+    pCommandList->ResourceBarrier(1, &CD3DX12_RESOURCE_BARRIER::UAV(pSDFTex->GetResource()));
+    pCommandList->ResourceBarrier(1, &CD3DX12_RESOURCE_BARRIER::Transition(pSDFTex->GetResource(),
+        D3D12_RESOURCE_STATE_UNORDERED_ACCESS, D3D12_RESOURCE_STATE_GENERIC_READ));
 }
 
 void Game::UpdateRaymarchCache(Muon::FrameResources& currFrameResources)
@@ -466,6 +478,7 @@ void Game::UpdateRaymarchCache(Muon::FrameResources& currFrameResources)
     pCommandList->Dispatch(numGroupsX, numGroupsY, numGroupsZ);
     
     // Done writing, prepare for reading
+    pCommandList->ResourceBarrier(1, &CD3DX12_RESOURCE_BARRIER::UAV(pLightingCache->GetResource()));
     pCommandList->ResourceBarrier(1, &CD3DX12_RESOURCE_BARRIER::Transition(pLightingCache->GetResource(),
         D3D12_RESOURCE_STATE_UNORDERED_ACCESS, D3D12_RESOURCE_STATE_GENERIC_READ));
         
@@ -586,6 +599,8 @@ void Game::Render()
         }
     }
 
+    UpdateProceduralNVDF(currFrameResources);
+
     if (mTimer.GetTotalTicks() % 16 == 0)
     {
         UpdateRaymarchCache(currFrameResources);
@@ -597,11 +612,16 @@ void Game::Render()
 
     if (mRaymarchPass.Bind(pCommandList))
     {
-        Texture* collisionTexture = codex.GetTexture(GetResourceID(L"ProceduralNVDF"));
-        Texture* pSdf = codex.GetTexture(GetResourceID(L"StormbirdCloudSDF_3D"));
-        Texture* pNVDF = codex.GetTexture(GetResourceID(L"StormbirdCloud_NVDF"));
         Texture* pNoise = codex.GetTexture(GetResourceID(L"Noise_3D"));
         Texture* pLightingCache = codex.GetTexture(GetResourceID(L"LightingCache"));
+
+    #if USE_PROCEDURAL_CLOUD
+        Texture* pSdf = codex.GetTexture(GetResourceID(L"ProceduralSDF"));
+        Texture* pNVDF = codex.GetTexture(GetResourceID(L"ProceduralNVDF"));
+    #else
+        Texture* pSdf = codex.GetTexture(GetResourceID(L"StormbirdCloudSDF_3D"));
+        Texture* pNVDF = codex.GetTexture(GetResourceID(L"StormbirdCloud_NVDF"));
+    #endif
 
         pCommandList->ResourceBarrier(1, &CD3DX12_RESOURCE_BARRIER::Transition(pOffscreenTarget->GetResource(),
             D3D12_RESOURCE_STATE_RENDER_TARGET, D3D12_RESOURCE_STATE_GENERIC_READ));
@@ -673,12 +693,6 @@ void Game::Render()
             pCommandList->SetComputeRootDescriptorTable(depthBufferIdx, GetDepthStencilSRV().HandleGPU);
         }
 
-        int32_t collisionIndex = mRaymarchPass.GetResourceRootIndex("proceduralNvdfTex");
-        if (collisionIndex != ROOTIDX_INVALID)
-        {
-            pCommandList->SetComputeRootDescriptorTable(collisionIndex, collisionTexture->GetSRVHandleGPU());
-        }
-
         int32_t lightingCacheIndex = mRaymarchPass.GetResourceRootIndex("lightCacheTex");
         if (lightingCacheIndex != ROOTIDX_INVALID)
         {
@@ -692,6 +706,7 @@ void Game::Render()
         UINT numGroupsY = (UINT)ceilf(pOffscreenTarget->GetHeight() / 8.0f);
         pCommandList->Dispatch(numGroupsX, numGroupsY, 1);
 
+        pCommandList->ResourceBarrier(1, &CD3DX12_RESOURCE_BARRIER::UAV(pComputeOutput->GetResource()));
         pCommandList->ResourceBarrier(1, &CD3DX12_RESOURCE_BARRIER::Transition(pComputeOutput->GetResource(),
             D3D12_RESOURCE_STATE_UNORDERED_ACCESS, D3D12_RESOURCE_STATE_GENERIC_READ));
 

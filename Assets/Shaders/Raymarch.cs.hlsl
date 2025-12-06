@@ -2,7 +2,7 @@
 #include "Raymarch_Common.hlsli"
 
 // === Raymarch / Quality ===
-#define GPU_CLOUD 1
+#define GPU_CLOUD 0
 #define USE_ADAPTIVE_STEP        1   // Adaptive step size along ray
 #define USE_JITTERED_STEP        1   // Stochastic jitter per step
 #define USE_HIGH_HIGH_FREQUENCY  1   // Extra near-camera detail
@@ -24,7 +24,7 @@ Texture3D nvdfTex : register(t2); // Model textures combined [sdf.r, model.r, mo
 Texture3D noiseTex : register(t3); // Low frequency, high frequency noises for wispy and billowy clouds 
 Texture3D lightCacheTex : register(t4); // Optical depth from the centers of voxel 
 Texture2D depthStencilBuffer : register(t5); // The scene's depth-stencil buffer, bound hsere post-graphics passes
-Texture3D proceduralNvdfTex : register(t6); // Sdf and model textures combined [sdf.r, model.r, model.g, model.b] 
+//Texture3D proceduralNvdfTex : register(t6); // Sdf and model textures combined [sdf.r, model.r, model.g, model.b] 
 
 SamplerState linearWrap : register(s2);
 SamplerState linearClamp : register(s3); 
@@ -344,19 +344,20 @@ float3 VolumeRaymarchNvdf(float3 eyePos, float3 dir, float3 bgColor, float maxRa
 
         float3 samplePos = eyePos + march.distance * viewDirN;
 #if GPU_CLOUD
-        float4 sdfSample = proceduralNvdfTex.SampleLevel(linearClamp, WorldToNvdfUV(samplePos), 0.0f);
-        float collisionValue = sdfSample.a;
+        float4 sdfSample = sdfTex.SampleLevel(linearClamp, WorldToNvdfUV(samplePos), 0.0f);
+        float collisionValue = sdfSample.g;
         float sdfDistance =  DecodeSdf(sdfSample.r) * AUTHORING_TO_WORLD_SCALE * (1.0 - collisionValue);
         // NVDF range for a is [0.2, 0.6] -> mapping smoothstep [0, 1] to it
-        sdfSample.a = clamp(sdfSample.b - 0.3f, 0.2f, 0.6f); //smoothstep(-4.0, -12.0, sdfDistance) * 0.4 + 0.2;
-        sdfSample.g *= 1.0 - collisionValue;
+        //sdfSample.a = clamp(sdfSample.b - 0.3f, 0.2f, 0.6f); //smoothstep(-4.0, -12.0, sdfDistance) * 0.4 + 0.2;
 #else
         float3 nvdfUV = WorldToNvdfUV(samplePos);
         float4 sdfSample = sdfTex.SampleLevel(linearClamp, nvdfUV, 0.0f);
-        float collisionValue = proceduralNvdfTex.SampleLevel(linearClamp, nvdfUV, 0.0f).a;
-        sdfSample.g *= (1.0 - collisionValue);
+        
+        float sdfValue = sdfSample.r;
+        float collisionValue = sdfSample.g;
+        
         // collision hack, step size is reduced to show the hole better
-        float sdfDistance = DecodeSdf(sdfSample.r) * AUTHORING_TO_WORLD_SCALE * (1.0 - collisionValue);
+        float sdfDistance = DecodeSdf(sdfValue) * AUTHORING_TO_WORLD_SCALE * (1.0 - collisionValue);
 #endif
         // Sample NVDF volume: .r = encoded SDF, .g = density (dimensional profile)
         
@@ -381,7 +382,7 @@ float3 VolumeRaymarchNvdf(float3 eyePos, float3 dir, float3 bgColor, float maxRa
 #endif
             
 #if GPU_CLOUD
-            float4 nvdfSample = proceduralNvdfTex.SampleLevel(linearClamp, nvdfUV, 0.0f);
+            float4 nvdfSample = nvdfTex.SampleLevel(linearClamp, nvdfUV, 0.0f);
             float collisionValue = nvdfSample.a;
         
             float dimensionalProfile = nvdfSample.g;
@@ -392,10 +393,11 @@ float3 VolumeRaymarchNvdf(float3 eyePos, float3 dir, float3 bgColor, float maxRa
 #else
 
             float4 nvdfSample = nvdfTex.SampleLevel(linearClamp, nvdfUV, 0.0f);
+            float collisionValue = nvdfSample.r;
             float dimensionalProfile = nvdfSample.g;
             float detailType = nvdfSample.b;
             float nvdfDensityScale = nvdfSample.a;
-            float collisionValue = proceduralNvdfTex.SampleLevel(linearClamp, nvdfUV, 0.0f).a;
+            //float collisionValue = sdfTex.SampleLevel(linearClamp, nvdfUV, 0.0f).g;
             dimensionalProfile *= (1.0 - collisionValue);
 #endif
             

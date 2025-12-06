@@ -164,6 +164,7 @@ void main(int3 dispatchThreadID : SV_DispatchThreadID)
     // where float normalized_height = (worldPos.y - VOLUME_MIN_WS.y) / (VOLUME_MAX_WS.y - VOLUME_MIN_WS.y) + 0.3;
     // but we already baked this into the g channel of the input texture, and we already do the scale check there
     float b = tex.g;
+    float a = clamp(b - 0.3f, 0.2f, 0.6f); //smoothstep(-4.0, -12.0, sdfDistance) * 0.4 + 0.2;
     
     //---------------------------
     // COLLISION CODE
@@ -171,16 +172,24 @@ void main(int3 dispatchThreadID : SV_DispatchThreadID)
     // collision gets put into the density scale part, which gets calculated in raymarch for now
     
     bool collision = false;
-    float a;
+    float collisionValue;
     // we exit early if there are no clouds to collide with
     if (d > scale * 1.51)
     {
-        nvdfTex[coord] = float4(r,
-                            g,
-                            b,
-                            max(nvdfTex[coord].a - 0.01, 0.0));
+        collisionValue = max(nvdfTex[coord].a - 0.01, 0.0);
+        
+    #if 0
+        nvdfTex[coord] = float4(collisionValue, g, b, a);
+        sdfTex[coord] = float2(r, collisionValue);
+    #else
+        nvdfTex[coord].r = collisionValue;
+        sdfTex[coord].g = collisionValue;
+    #endif
+        
         return;
     }
+    
+    
     for (uint j = 0; j < hullCount; ++j)
     {
         float hullEnter, hullExit;
@@ -188,7 +197,7 @@ void main(int3 dispatchThreadID : SV_DispatchThreadID)
         float3 dir = float3(1.0, 1.0, 1.0);
         if (PointInsideConvexHull(worldPos, ch))
         {
-            a = 1.0f;
+            collisionValue = 1.0f;
             collision = true;
             break;
         }
@@ -196,13 +205,25 @@ void main(int3 dispatchThreadID : SV_DispatchThreadID)
 
     if (!collision)
     {
-        a = max(nvdfTex[coord].a - 0.01, 0.0);
+        collisionValue = max(nvdfTex[coord].a - 0.01, 0.0);
     }
     
-    // Texture output:
-    // r - sdf distance - how far we are from the cloud
+    // NVDF output:
+    // r - collision value in range [0, 1]
     // g - dimensionalProfile - the outline of the cloud
-    // b - detail type - aka billowy vs whispy [0, 1]
-    // a - collision value in range [0, 1]
-    nvdfTex[coord] = float4(r, g, b, a);
+    // b - detail type - aka billowy vs wispy [0, 1]
+    // a - density scale
+    
+    // SDF output:
+    // r - sdf distance - how far we are from the cloud
+    // g - collision value in range [0, 1]
+    
+    #if 0
+    nvdfTex[coord] = float4(collisionValue, g, b, a);
+    sdfTex[coord] = float2(r, collisionValue);
+    #else
+    nvdfTex[coord].r = collisionValue;
+    sdfTex[coord].g = collisionValue;
+    #endif
+
 }

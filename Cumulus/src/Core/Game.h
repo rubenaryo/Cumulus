@@ -44,7 +44,7 @@ public:
 
 private:
     void Update(Muon::StepTimer const& timer);
-    void UpdateProceduralNVDF();
+    void UpdateProceduralNVDF(Muon::FrameResources& currFrameResources);
     void UpdateRaymarchCache(Muon::FrameResources& currFrameResources);
     void Render();
 
