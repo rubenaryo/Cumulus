@@ -24,13 +24,6 @@ cbuffer Time : register(b8)
 Texture3D proceduralNoiseTex : register(t7);
 SamplerState linearWrap : register(s2);
 
-
-// Texture output: 
-// r - sdf distance - how far we are from the cloud
-// g - dimensionalProfile - this is what eli's writing to? Need to merge these well
-// b - detail type - aka billowy vs whispy [0, 1]
-// a - density scale - where is cloud [0, 1]
-
 #include "Raymarch_Common.hlsli"
 #include "VS_Common.hlsli"
 // enable to use sdf sphere instead of vesica segments
@@ -223,7 +216,7 @@ void main(int3 dispatchThreadID : SV_DispatchThreadID)
     // where float normalized_height = (worldPos.y - VOLUME_MIN_WS.y) / (VOLUME_MAX_WS.y - VOLUME_MIN_WS.y) + 0.3;
     // but we already baked this into the g channel of the input texture, and we already do the scale check there
     float b = tex.g;
-    gOutput[coord].g *= gMultiplier;
+    g *= gMultiplier;
     //---------------------------
     // COLLISION CODE
     //---------------------------

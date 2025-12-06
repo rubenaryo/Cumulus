@@ -733,10 +733,10 @@ void Game::Render()
         }
 
         // Bind the world matrix Upload Buffer to the root index known by the material
-        int32_t worldMatrixRootIdx = mOpaquePass.GetResourceRootIndex("VSWorld");
-        if (worldMatrixRootIdx == ROOTIDX_INVALID)
+        int32_t entityMatrix = mOpaquePass.GetResourceRootIndex("VSWorld");
+        if (entityMatrix == ROOTIDX_INVALID)
         {
-            //throw error
+            Print(L"Error: Entity Matrix not initialized!\n");
         }
 
 
@@ -753,12 +753,10 @@ void Game::Render()
             pCommandList->SetGraphicsRootConstantBufferView(timeRootIdx, currFrameResources.mTimeBuffer.GetGPUVirtualAddress());
         }
 
-
-
         const Mesh* pMesh = codex.GetMesh(GetResourceID(L"jet.obj"));
         if (pMesh && settings.drawObjects && mCloudData.demoMode == 1)
         {
-           pCommandList->SetGraphicsRootConstantBufferView(worldMatrixRootIdx, currFrameResources.mEntitiesBuffer.GetGPUVirtualAddress() + jetIdx * Muon::AlignToBoundary(sizeof(cbPerEntity), 16));
+           pCommandList->SetGraphicsRootConstantBufferView(entityMatrix, currFrameResources.mEntitiesBuffer.GetGPUVirtualAddress() + jetIdx * Muon::AlignToBoundary(sizeof(cbPerEntity), 16));
 
            pMesh->DrawIndexed(pCommandList);
         }
@@ -768,7 +766,7 @@ void Game::Render()
                 const EntityData& projectile = cpuEntityData[projectileIndices[i]];
                 const Mesh* mesh = codex.GetMesh(projectile.resourceID);
                 if (mesh && settings.drawObjects) {
-                    pCommandList->SetGraphicsRootConstantBufferView(worldMatrixRootIdx, currFrameResources.mEntitiesBuffer.GetGPUVirtualAddress() + projectileIndices[i] * Muon::AlignToBoundary(sizeof(cbPerEntity), 16));
+                    pCommandList->SetGraphicsRootConstantBufferView(entityMatrix, currFrameResources.mEntitiesBuffer.GetGPUVirtualAddress() + projectileIndices[i] * Muon::AlignToBoundary(sizeof(cbPerEntity), 16));
 
                     //currFrameResources.UpdateWorldMatrix(projectile.entityMatrices);
                     mesh->DrawIndexed(pCommandList);
