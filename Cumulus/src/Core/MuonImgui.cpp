@@ -158,7 +158,7 @@ void ImguiNewFrame(float gameTime, const Camera& cam, SceneSettings& settings)
 
             float directExtinctionScale = settings.lighting.directExtinctionScale;
             ImGui::SliderFloat("Direct / Secondary Extinction",
-                &directExtinctionScale, 0.0f, 5.0f);
+                &directExtinctionScale, 0.0f, 0.2f);
 
             float directStrength = settings.lighting.directStrength;
             ImGui::SliderFloat("Direct Strength",

@@ -13,8 +13,8 @@ static const float EPSILON = 0.001; // Small epsilon for safety
 
 // Volume bounds in world space
 static const float SIDE_LENGTH = 4000.0; 
-static const float3 VOLUME_MIN_WS = float3(-SIDE_LENGTH / 2, 0.0, -SIDE_LENGTH / 2);
-static const float3 VOLUME_MAX_WS = float3(SIDE_LENGTH / 2, SIDE_LENGTH / 8, SIDE_LENGTH / 2);
+static const float3 VOLUME_MIN_WS = float3(-SIDE_LENGTH / 2, -SIDE_LENGTH / 16, -SIDE_LENGTH / 2);
+static const float3 VOLUME_MAX_WS = float3(SIDE_LENGTH / 2, SIDE_LENGTH / 16, SIDE_LENGTH / 2);
 
 // Mapping from NVDF authoring space to world 
 static const float NVDF_DOMAIN_SIDE_LENGTH = 4000.0; // NVDF authoring domain: 4km x 4km x 0.5km (matches the world volume).
