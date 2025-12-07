@@ -8,6 +8,7 @@ Description : Useful functions for atmospheric rendering calculations
 #define ATMOSPHEREUTILS_H
 
 #include <Core/Camera.h>
+#include <Utils/Utils.h>
 #include <Core/MuonImgui.h>
 #include <Core/CBufferStructs.h>
 #include <DirectXMath.h>
@@ -201,19 +202,77 @@ void UpdateAtmosphere(cbAtmosphere& constants,
 void UpdateLightFromAtmosphere(cbAtmosphere& atmosphere, SceneSettings& settings)
 {
     using namespace DirectX;
+    XMVECTOR sunVec = XMLoadFloat3(&settings.atmosphere.sunDir);
+    XMVECTOR up = { 0.f, 1.f, 0.f };
+    float sun_height = XMVectorGetX(XMVector3Dot(sunVec, up));
+    float nightVal = SmoothStep(0.20, -0.10, sun_height);
 
-    if (settings.atmosphere.sunDir.y > -0.01)
+    // Setting colors
+    // Daytime
+    if (nightVal < 0.1)
     {
+        settings.lighting.directExtinctionScale = 0.11;
+        settings.lighting.directStrength = 0.653;
+        float noonCol[3] = {223.f / 255.f, 224.f / 255.f, 230.f / 255.f};
+        settings.lighting.sunColor = SrgbToLinear3(noonCol);
+        settings.lighting.sunIntensity = 200.26f;
+        XMFLOAT3 noonSecCol(153.f, 181.f, 207.f);
+        settings.lighting.secondaryColor = SrgbToLinear3(noonSecCol);
+        settings.lighting.secondaryStrength = 1.562f;
+        XMFLOAT3 noonAmbCol(210.f, 222.f, 255.f);
+        settings.lighting.ambientColor = SrgbToLinear3(noonAmbCol);
+        settings.lighting.ambientExtinctionScale = 0.002f;
+        settings.lighting.ambientStrength = 0.675f;
+
         settings.lighting.dirSun = XMFLOAT3(-1.0 * settings.atmosphere.sunDir.x,
-                                             1.0 * settings.atmosphere.sunDir.y,
-                                            -1.0 * settings.atmosphere.sunDir.z);
+            1.0 * settings.atmosphere.sunDir.y,
+            -1.0 * settings.atmosphere.sunDir.z);
+    }
+    // full nighttime
+    else if (nightVal > 0.9)
+    {
+
+        settings.lighting.directExtinctionScale = 0.069;
+        settings.lighting.directStrength = 0.190;
+        XMFLOAT3 nightCol(48.f, 55.f, 73.f);
+        settings.lighting.sunColor = SrgbToLinear3(nightCol);
+        settings.lighting.sunIntensity = 0.f;
+        XMFLOAT3 noonSecCol(101.f, 127.f, 151.f);
+        settings.lighting.secondaryColor = SrgbToLinear3(noonSecCol);
+        settings.lighting.secondaryStrength = 0.067f;
+        XMFLOAT3 noonAmbCol(230.f, 233.f, 253.f);
+        settings.lighting.ambientColor = SrgbToLinear3(noonAmbCol);
+        settings.lighting.ambientExtinctionScale = 0.013f;
+        settings.lighting.ambientStrength = 0.295f;
+
+        settings.lighting.dirSun = XMFLOAT3(1.0 * settings.atmosphere.sunDir.x,
+            -1.0 * settings.atmosphere.sunDir.y,
+            1.0 * settings.atmosphere.sunDir.z);
     }
     else
     {
-        settings.lighting.dirSun = XMFLOAT3( 1.0 * settings.atmosphere.sunDir.x,
-                                            -1.0 * settings.atmosphere.sunDir.y,
-                                             1.0 * settings.atmosphere.sunDir.z);
+        XMFLOAT3 testCol(248.f, 55.f, 73.f);
+        settings.lighting.sunColor = SrgbToLinear3(testCol);
+
+        settings.lighting.dirSun = XMFLOAT3(-1.0 * settings.atmosphere.sunDir.x,
+                                            1.0 * settings.atmosphere.sunDir.y,
+                                            -1.0 * settings.atmosphere.sunDir.z);
     }
+
+    //// updating whether sun or moon is our light direction
+    //if (settings.atmosphere.sunDir.y > -0.01)
+    //{
+    //    settings.lighting.dirSun = XMFLOAT3(-1.0 * settings.atmosphere.sunDir.x,
+    //                                         1.0 * settings.atmosphere.sunDir.y,
+    //                                        -1.0 * settings.atmosphere.sunDir.z);
+    //}
+    //else
+    //{
+    //    settings.lighting.dirSun = XMFLOAT3( 1.0 * settings.atmosphere.sunDir.x,
+    //                                        -1.0 * settings.atmosphere.sunDir.y,
+    //                                         1.0 * settings.atmosphere.sunDir.z);
+    //}
+
     settings.updateLighting = true;
 }
 
