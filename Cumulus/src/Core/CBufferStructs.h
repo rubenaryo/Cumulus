@@ -50,9 +50,12 @@ struct alignas(16) cbTime
 {
     float totalTime = 0;
     float deltaTime = 0;
+
+    float timePadding1;
+	float timePadding2;
 };
 
-struct alignas(256) cbIntersections
+struct alignas(16) cbIntersections
 {
     uint32_t aabbCount;
     AABB aabbs[1];
@@ -166,7 +169,7 @@ struct alignas(16) cbJetTrailPositions {
     DirectX::XMFLOAT4 positions[4];
 };
 
-struct alignas(16) cbPerEntity
+struct alignas(256) cbPerEntity
 {
     DirectX::XMFLOAT4X4 world;
     DirectX::XMFLOAT4X4 invWorld;
@@ -177,12 +180,17 @@ struct alignas(16) cbPerEntity
 };
 
 const int MAX_ENTITY_COUNT = 64;
-struct alignas(16) cbEntities {
+struct alignas(256) cbEntities {
     cbPerEntity entities[MAX_ENTITY_COUNT];
     int entityCount;
     float padding1;
     float padding2;
     float padding3;
+    float paddTrue[7];
+    float padHelp1;
+    float padHelp2;
+    float padHelp3;
+
 };
 
 struct EntityData {

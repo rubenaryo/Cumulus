@@ -25,7 +25,9 @@ cbuffer VSWorld : register(b11)
     float4x4 world;
     float4x4 invWorld;
     int hullIdx;
-    int padding[3];
+    float padVS1;
+    float padVS2;
+    float padVS3;
 }
 
 struct cbPerEntity
@@ -36,6 +38,10 @@ struct cbPerEntity
     float padEntity1;
     float padEntity2;
     float padEntity3;
+    float paddTrue[7];
+    float padHelp1;
+    float padHelp2;
+    float padHelp3;
 };
 
 

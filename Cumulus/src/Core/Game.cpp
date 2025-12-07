@@ -833,7 +833,9 @@ void Game::Render()
                 const EntityData& projectile = cpuEntityData[projectileIndices[i]];
                 const Mesh* mesh = codex.GetMesh(projectile.resourceID);
                 if (mesh && settings.drawObjects) {
-                    pCommandList->SetGraphicsRootConstantBufferView(entityMatrix, currFrameResources.mEntitiesBuffer.GetGPUVirtualAddress() + projectileIndices[i] * Muon::AlignToBoundary(sizeof(cbPerEntity), 16));
+                    static const size_t kEntityCBSize =
+                        (sizeof(cbPerEntity) + 255) & ~255;
+                    pCommandList->SetGraphicsRootConstantBufferView(entityMatrix, currFrameResources.mEntitiesBuffer.GetGPUVirtualAddress() + projectileIndices[i] * kEntityCBSize);
 
                     currFrameResources.UpdateWorldMatrix(projectile.entityMatrices);
                     mesh->DrawIndexed(pCommandList);

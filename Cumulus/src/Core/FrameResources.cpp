@@ -38,7 +38,7 @@ bool FrameResources::Create(UINT width, UINT height)
 		return false;
 	}
 
-    mWorldMatrixBuffer.Create(L"world matrix buffer", sizeof(cbPerEntity));
+    mWorldMatrixBuffer.Create(L"world matrix buffer", Muon::AlignToBoundary(sizeof(cbPerEntity), 256));
     mCameraBuffer.Create(L"Camera CB", sizeof(cbCamera));
     mLightBuffer.Create(L"Light Buffer", sizeof(cbLights));
     mTimeBuffer.Create(L"Time", sizeof(cbTime));
@@ -55,7 +55,7 @@ bool FrameResources::Create(UINT width, UINT height)
 
 bool FrameResources::UpdateWorldMatrix(const cbPerEntity& data)
 {
-    memcpy(mWorldMatrixBuffer.GetMappedPtr(), &data, sizeof(cbPerEntity));
+    memcpy(mWorldMatrixBuffer.GetMappedPtr(), &data, Muon::AlignToBoundary(sizeof(cbPerEntity), 256));
     return true;
 }
 
