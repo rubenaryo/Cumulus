@@ -39,6 +39,10 @@ namespace Muon
 	// Credit: https://bottosson.github.io/posts/oklab/
 	DirectX::XMFLOAT3 OkLabToSrgb3(const DirectX::XMFLOAT3 okLab); 
 	DirectX::XMFLOAT3 SrgbToOkLab3(const DirectX::XMFLOAT3 srgb);
+	DirectX::XMFLOAT3 OkLabToLinear(const DirectX::XMFLOAT3 okLab);
+	DirectX::XMFLOAT3 LinearToOkLab3(const DirectX::XMFLOAT3 srgb);
+
+	DirectX::XMFLOAT3 LerpOkLab(const DirectX::XMFLOAT3& from, const DirectX::XMFLOAT3& to, float t);
 
 	inline float SmoothStep(float edge0, float edge1, float x)
 	{
@@ -46,9 +50,9 @@ namespace Muon
 		return t * t * (3.0f - 2.0f * t);
 	}
 
-	inline float Lerp(float x, float y, float t)
+	inline float Lerp(float from, float to, float t)
 	{
-		return (1 - t) * x + t * y;
+		return (1 - t) * from + t * to;
 	}
 }
 
