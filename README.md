@@ -97,13 +97,13 @@ It extends the architectural principles of Guerrilla Games' **[Nubis 3](https://
  - Compute Shader for collisions and cloud data generation
  - Post-processing pipeline
  - Automated loading of models/textures from files
- - Construction of 3D NVDF data fields for the core Nubis method, 3D textures for atmosphere
+ - 3D Texture construction: NVDF / SDF / Noise
 ### Extra Features
  - String-based, shader-driven resource binding for easy user experience
     - Driven by ID3D12ShaderReflection
  - Rendering is abstracted into a “Pass” framework, 
     - Automatically generates Root Signatures and Pipeline States (shader-driven)
- - Upload Buffer system for staging CPU data temporarily before copying to the default heap
+ - User-friendly abstractions for D3D12 objects: Texture, Upload Buffer, FrameResource
  - Automatic lifetime reporting for catching memory leaks in Debug mode
  - Diligent error detection and logging
  - ImGUI integration
@@ -160,6 +160,7 @@ This project is built using MSVC with the Visual Studio 2022 toolset (v143) for 
 ## Related Presentations 
 - [Milestone 1 Presentation](https://docs.google.com/presentation/d/1gGSEbZ7L8bbZHOn7OLQdZIwVBOCtymcEXTAHn48AE7w/edit?usp=sharing)
 - [Milestone 2 Presentation](https://docs.google.com/presentation/d/1K_11dz4fgYK21hM76VZPrON-3IzXVvsdjsIIQxzjrf8/edit?usp=sharing)
+- [Milestone 3 Presentation](https://docs.google.com/presentation/d/1Wxr8XVlCBgfmKN3kdevFCKOIQIkZpVcvfKtLUC52uyo/edit?usp=sharing)
 
 ## Bloopers
 <p align="center">
