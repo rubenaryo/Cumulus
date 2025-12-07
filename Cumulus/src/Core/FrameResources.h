@@ -55,6 +55,8 @@ struct FrameResources
     UploadBuffer mHullFaceBuffer;
     UploadBuffer mJetTrailBuffer;
     UploadBuffer mWorldMatrixBuffer;
+    UploadBuffer mGodRayBuffer;
+
 
     UINT64 mFence = 0;
 

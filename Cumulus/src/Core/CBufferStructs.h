@@ -190,6 +190,18 @@ struct alignas(256) cbEntities {
     int padding[3];
 };
 
+struct alignas(16) cbGodRay {
+    DirectX::XMFLOAT2 lightScreenPos;     // 0–1 screen space
+    float exposure;            // intensity multiplier
+    float decay;               // ray attenuation
+    float density;             // sample density
+    float weight;              // sample weight
+    int numSamples;            // radial blur samples
+    float padding1;
+    float padding2;
+    float padding3;
+};
+
 }
 
 

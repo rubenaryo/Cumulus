@@ -149,5 +149,6 @@ void FrameResources::Destroy()
     mHullBuffer.Destroy();
     mHullFaceBuffer.Destroy();
     mJetTrailBuffer.Destroy();
+    mGodRayBuffer.Destroy();
 }
 }

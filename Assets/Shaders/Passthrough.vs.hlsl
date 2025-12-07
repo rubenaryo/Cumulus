@@ -1,4 +1,5 @@
 Texture2D gInput : register(t0);
+Texture2D depthStencilBuffer : register(t1);
 
 SamplerState gsamPointWrap : register(s0);
 SamplerState gsamPointClamp : register(s1);
@@ -6,6 +7,17 @@ SamplerState gsamLinearWrap : register(s2);
 SamplerState gsamLinearClamp : register(s3);
 SamplerState gsamAnisotropicWrap : register(s4);
 SamplerState gsamAnisotropicClamp : register(s5);
+
+cbuffer GodRayCB : register(b0)
+{
+    float2 lightScreenPos;     // 0–1 screen space
+    float exposure;            // intensity multiplier
+    float decay;               // ray attenuation
+    float density;             // sample density
+    float weight;              // sample weight
+    int numSamples;            // radial blur samples
+    float padding[3];
+};
 
 static const float2 gTexCoords[6] =
 {
