@@ -56,7 +56,7 @@ bool FrameResources::Create(UINT width, UINT height)
 
 bool FrameResources::UpdateWorldMatrix(const cbPerEntity& data)
 {
-    memcpy(mWorldMatrixBuffer.GetMappedPtr(), &data, sizeof(cbPerEntity));
+    memcpy(mWorldMatrixBuffer.GetMappedPtr(), &data, Muon::AlignToBoundary(sizeof(cbPerEntity), 256));
     return true;
 }
 

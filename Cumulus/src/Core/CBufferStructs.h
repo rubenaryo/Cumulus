@@ -14,183 +14,201 @@ Description : Declation of structs used as constant buffers by various shaders
 namespace Muon
 {
 
-struct alignas(16) cbCamera
-{
-    DirectX::XMFLOAT4X4 view;
-    DirectX::XMFLOAT4X4 proj;
-    DirectX::XMFLOAT4X4 viewProj;
-    DirectX::XMFLOAT4X4 invView;
-    DirectX::XMFLOAT4X4 invProj;
+    struct alignas(16) cbCamera
+    {
+        DirectX::XMFLOAT4X4 view;
+        DirectX::XMFLOAT4X4 proj;
+        DirectX::XMFLOAT4X4 viewProj;
+        DirectX::XMFLOAT4X4 invView;
+        DirectX::XMFLOAT4X4 invProj;
 
-    float minDist = 0.01f; 
-    float maxDist = 4000.0f; 
-	float camPad0[2];
-};
+        float minDist = 0.01f;
+        float maxDist = 4000.0f;
+        float camPad0[2];
+    };
 
-struct alignas(16) cbPerEntity
-{
-    DirectX::XMFLOAT4X4 world;
-    DirectX::XMFLOAT4X4 invWorld;
-    int hullIdx;
-    int padding[3];
-};
+    struct alignas(16) DirectionalLight
+    {
+        DirectX::XMFLOAT3 diffuseColor;
+        DirectX::XMFLOAT3 dir;
+    };
 
-struct alignas(16) DirectionalLight
-{
-    DirectX::XMFLOAT3 diffuseColor;
-    DirectX::XMFLOAT3 dir;
-};
+    struct alignas(16) cbLights
+    {
+        DirectX::XMFLOAT3A ambientColor;
+        DirectionalLight directionalLight;
+        DirectX::XMFLOAT3A cameraWorldPos;
+    };
 
-struct alignas(16) cbLights
-{
-    DirectX::XMFLOAT3A ambientColor;
-    DirectionalLight directionalLight;
-    DirectX::XMFLOAT3A cameraWorldPos;
-};
+    struct alignas(16) cbMaterialParams
+    {
+        DirectX::XMFLOAT4  colorTint = DirectX::XMFLOAT4(DirectX::Colors::Black);
+        float              specularExp = 0.0f;
+    };
 
-struct alignas(16) cbMaterialParams
-{
-    DirectX::XMFLOAT4  colorTint = DirectX::XMFLOAT4(DirectX::Colors::Black);
-    float              specularExp = 0.0f;
-};
+    struct alignas(16) cbTime
+    {
+        float totalTime = 0;
+        float deltaTime = 0;
 
-struct alignas(16) cbTime
-{
-    float totalTime = 0;
-    float deltaTime = 0;
-};
+        float timePadding1;
+        float timePadding2;
+    };
 
-struct alignas(256) cbIntersections
-{
-    uint32_t aabbCount;
-    AABB aabbs[1];
-};
+    struct alignas(16) cbIntersections
+    {
+        uint32_t aabbCount;
+        AABB aabbs[1];
+    };
 
-struct alignas(16) cbConvexHull
-{
-    uint32_t buffer1;
-    uint32_t buffer2;
+    struct alignas(16) cbConvexHull
+    {
+        uint32_t faceOffset;
+        uint32_t faceCount;
 
-    uint32_t faceOffset;
-    uint32_t faceCount;
+        uint32_t buffer1;
+        uint32_t buffer2;
 
-    DirectX::XMFLOAT4X4 world;
-    DirectX::XMFLOAT4X4 invWorld;
-};
+        DirectX::XMFLOAT4 aabbMin;
+        DirectX::XMFLOAT4 aabbMax;
+    };
 
-struct alignas(16) cbHulls
-{
-    uint32_t hullCount;
-    cbConvexHull hulls[12];
-};
+    struct alignas(16) cbHulls
+    {
+        uint32_t hullCount;
+        cbConvexHull hulls[12];
+    };
 
 
-struct alignas(16) cbHullFaces
-{
-    DirectX::XMFLOAT4 faces[1024];
-};
+    struct alignas(16) cbHullFaces
+    {
+        DirectX::XMFLOAT4 faces[1024];
+    };
 
-struct alignas(16) cbHullPoints
-{
-    DirectX::XMFLOAT3A points[2048];
-};
+    struct alignas(16) cbHullPoints
+    {
+        DirectX::XMFLOAT3A points[2048];
+    };
 
-struct alignas(16) cbAtmosphere
-{
-    DirectX::XMFLOAT4X4 view_from_clip;      // Inverse projection matrix
-    DirectX::XMFLOAT4X4 model_from_view;     // Inverse view matrix
-    
-    DirectX::XMFLOAT3 camera_position;
-    float pad0;
-    
-    DirectX::XMFLOAT3 earth_center;
-    float pad1;
-    
-    DirectX::XMFLOAT3 sun_direction;
-    float pad2;
-    
-    DirectX::XMFLOAT2 sun_size;
-    float exposure;
-    int32_t isCamUp;
-    
-    DirectX::XMFLOAT3 white_point;
-    float pad3;
-};
+    struct alignas(16) cbAtmosphere
+    {
+        DirectX::XMFLOAT4X4 view_from_clip;      // Inverse projection matrix
+        DirectX::XMFLOAT4X4 model_from_view;     // Inverse view matrix
 
-struct alignas(16) cbCloudGenData
-{
-    DirectX::XMFLOAT4 seeds[16];
-    
-    int numSeeds;
+        DirectX::XMFLOAT3 camera_position;
+        float pad0;
 
-    //0 is no demo
-    //1 is draw jet
-    //2 is draw balls
-    int demoMode = 1;
-    float pad[2];
-};
+        DirectX::XMFLOAT3 earth_center;
+        float pad1;
 
-struct alignas(16) cbCloudLighting
-{
-    // === Raymarch settings ===
-    int   maxSteps = 512;
-    float densityScale = 1.0f;
-    float minTransmittance = 0.01f;
-    float clPad0 = 0.0f; 
+        DirectX::XMFLOAT3 sun_direction;
+        float pad2;
 
-    // === Sun / primary lighting ===
-    DirectX::XMFLOAT3 dirSun = { 0.0f, 0.873f, 0.332f };
-    float             directExtinctionScale = 0.085f;
+        DirectX::XMFLOAT2 sun_size;
+        float exposure;
+        int32_t isCamUp;
 
-    float             directStrength = 0.972f; 
-    DirectX::XMFLOAT3 sunColor = { 0.592f, 0.173f, 0.0f};
+        DirectX::XMFLOAT3 white_point;
+        float pad3;
+    };
 
-    float             sunIntensity = 657.61f;
-    float clPad1 = 0.0f;
-    float clPad2 = 0.0f;
-    float clPad3 = 0.0f;
+    struct alignas(16) cbCloudGenData
+    {
+        DirectX::XMFLOAT4 seeds[16];
 
-    // === Secondary ===
-    DirectX::XMFLOAT3 secondaryColor = SrgbToLinear3( 1.0f, 0.8f, 0.898f );
-    float             secondaryStrength = 2.120f;
+        int numSeeds;
 
-    float secondaryExtinctionScale = 0.085f;
-    float clPad4 = 0.0f;
-    float clPad5 = 0.0f;
-    float clPad6 = 0.0f;
+        //0 is no demo
+        //1 is draw jet
+        //2 is draw balls
+        int demoMode = 1;
+        float pad[2];
+    };
 
-    // === Ambient ===
-    DirectX::XMFLOAT3 ambientColor = SrgbToLinear3(0.973f, 0.878f, 1.0f );
-    float             ambientExtinctionScale = 0.011f;
+    struct alignas(16) cbCloudLighting
+    {
+        // === Raymarch settings ===
+        int   maxSteps = 512;
+        float densityScale = 1.0f;
+        float minTransmittance = 0.01f;
+        float clPad0 = 0.0f;
 
-    float ambientStrength = 1.196;
-    float clPad7 = 0.0f;
-    float clPad8 = 0.0f;
-    float clPad9 = 0.0f;
-};
+        // === Sun / primary lighting ===
+        DirectX::XMFLOAT3 dirSun = { 0.0f, 1.0f, 0.0f };
+        float             directExtinctionScale = 0.02f;
 
-const int JET_COUNT = 5; // Should always be odd for interval positioning to work. Also manually update the val in UpdateNVDF.cs
-struct alignas(16) cbJetTrailPositions {
-    DirectX::XMFLOAT4 positions[JET_COUNT*2];
-};
+        float             directStrength = 1.0f;
+        DirectX::XMFLOAT3 sunColor = { 0.86f, 0.94f, 0.98 };
 
-struct EntityData {
-    cbPerEntity entityMatrices;
-    int hullIdx;
-    Muon::ResourceID resourceID;
-    DirectX::XMFLOAT4 vel;
-    DirectX::XMFLOAT4 rot;
-};
+        float             sunIntensity = 255.f;
+        float clPad1 = 0.0f;
+        float clPad2 = 0.0f;
+        float clPad3 = 0.0f;
 
-const static int MAX_ENTITY_COUNT = 64;
-struct alignas(256) cbEntities {
-    cbPerEntity entities[MAX_ENTITY_COUNT];
+        // === Secondary ===
+        DirectX::XMFLOAT3 secondaryColor = SrgbToLinear3(1.0f, 0.96f, 0.9f);
+        float             secondaryStrength = 2.0f;
 
-    int entityCount;
-    int padding[3];
-};
+        float secondaryExtinctionScale = 0.02f;
+        float clPad4 = 0.0f;
+        float clPad5 = 0.0f;
+        float clPad6 = 0.0f;
+
+        // === Ambient ===
+        DirectX::XMFLOAT3 ambientColor = SrgbToLinear3(1.0f, 0.96f, 0.9f);
+        float             ambientExtinctionScale = 0.05f;
+
+        float ambientStrength = 1.0f;
+        float clPad7 = 0.0f;
+        float clPad8 = 0.0f;
+        float clPad9 = 0.0f;
+    };
+
+    const int JET_COUNT = 5;
+
+    struct alignas(16) cbJetTrailPositions {
+        DirectX::XMFLOAT4 positions[JET_COUNT*2];
+    };
+
+    struct alignas(256) cbPerEntity
+    {
+        DirectX::XMFLOAT4X4 world;
+        DirectX::XMFLOAT4X4 invWorld;
+        int hullIdx;
+        float padEntity1;
+        float padEntity2;
+        float padEntity3;
+    };
+
+    const int MAX_ENTITY_COUNT = 64;
+    struct alignas(256) cbEntities {
+        cbPerEntity entities[MAX_ENTITY_COUNT];
+        int entityCount;
+        float padding1;
+        float padding2;
+        float padding3;
+        float paddTrue[7];
+        float padHelp1;
+        float padHelp2;
+        float padHelp3;
+
+    };
+
+    struct EntityData {
+        cbPerEntity entityMatrices;
+        int hullIdx;
+        Muon::ResourceID resourceID;
+        DirectX::XMFLOAT4 vel;
+        DirectX::XMFLOAT4 rot;
+    };
+
+    struct ProjectilePrefab {
+        Muon::ResourceID resourceID;
+        Muon::ResourceID textureID;
+        int hullIdx;
+        float scale;
+    };
 
 }
-
 
 #endif

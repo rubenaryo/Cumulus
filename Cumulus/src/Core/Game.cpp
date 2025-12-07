@@ -785,7 +785,10 @@ void Game::Render()
         if (pMesh && settings.drawObjects && mCloudData.demoMode == 1)
         {
            for (int i = 0; i < Muon::JET_COUNT; ++i) {
-               pCommandList->SetGraphicsRootConstantBufferView(entityMatrix, currFrameResources.mEntitiesBuffer.GetGPUVirtualAddress() + jetIdx[i] * Muon::AlignToBoundary(sizeof(cbPerEntity), 16));
+               static const size_t kEntityCBSize =
+                   (sizeof(cbPerEntity) + 255) & ~255;
+               pCommandList->SetGraphicsRootConstantBufferView(entityMatrix, currFrameResources.mEntitiesBuffer.GetGPUVirtualAddress() + jetIdx[i] * kEntityCBSize);               pMesh->DrawIndexed(pCommandList);
+               currFrameResources.UpdateWorldMatrix(cpuEntityData[jetIdx[i]].entityMatrices);
                pMesh->DrawIndexed(pCommandList);
 
            }
