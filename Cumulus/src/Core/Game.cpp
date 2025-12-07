@@ -59,7 +59,7 @@ bool Game::Init(HWND window, int width, int height)
 
     ResourceCodex& codex = ResourceCodex::GetSingleton();
 
-    mCamera.Init(DirectX::XMFLOAT3(700.0, -25.0, 0.0), width / (float)height, 0.01f, 4000.0f);
+    mCamera.Init(DirectX::XMFLOAT3(500.0, 150.0, 0.0), width / (float)height, 0.01f, 4000.0f);
 
     // Assemble opaque render pass
     {
@@ -131,6 +131,8 @@ bool Game::Init(HWND window, int width, int height)
     return success;
 }
 
+
+
 bool Game::InitFrameResources(UINT width, UINT height)
 {
     using namespace Muon;
@@ -146,34 +148,35 @@ bool Game::InitFrameResources(UINT width, UINT height)
     // Updating Clouds
     GenerateCloudGenConstants(mCloudData, settings.numClouds, settings.cloudScale);
     
-    // Updating AABBs
-    const Mesh* m = codex.GetMesh(GetResourceID(L"teapot.obj"));
-    cbIntersections intersections = {};
-    intersections.aabbCount = 1;
-    intersections.aabbs[0] = m->GetAABB();
-
-    // Updating Hull Faces
-    //todo: concat all hulls
-    Hull h = m->GetHull();
-    cbHullFaces faces = {};
-    for (size_t i = 0; i < h.faces.size(); i++)
-    {
-        faces.faces[i] = DirectX::XMFLOAT4(
-            h.faces[i].normal.x,
-            h.faces[i].normal.y,
-            h.faces[i].normal.z,
-            h.faces[i].distance
-        );
-    }
-
-    // Initialize sphere hull:
-    cbConvexHull cHull = {};
-    cHull.faceCount = (uint32_t)h.faces.size();
-    cHull.faceOffset = 0;;
+    const Mesh* teapotMesh = codex.GetMesh(GetResourceID(L"teapot.obj"));
+    const Mesh* duckyMesh = codex.GetMesh(GetResourceID(L"ducky.obj"));
+    const Mesh* sphereMesh = codex.GetMesh(GetResourceID(L"sphere.obj"));
 
     cbHulls hulls = {};
-    hulls.hulls[0] = cHull;
-    hulls.hullCount = 1;
+    cbHullFaces faces = {};
+    int facesOffset = 0;
+    int hullOffset = 0;
+
+    ProjectilePrefab duckyPrefab = {};
+    duckyPrefab.hullIdx = hullOffset;
+    duckyPrefab.resourceID = GetResourceID(L"ducky.obj");
+    duckyPrefab.scale = 100.f;
+    projectilePrefabs.push_back(duckyPrefab);
+    AddMeshToHullBuffer(duckyMesh, hulls, faces, facesOffset, hullOffset);
+
+    ProjectilePrefab teapotPrefab = {};
+    teapotPrefab.hullIdx = hullOffset;
+    teapotPrefab.resourceID = GetResourceID(L"teapot.obj");
+    teapotPrefab.scale = 4.f;
+    projectilePrefabs.push_back(teapotPrefab);
+    AddMeshToHullBuffer(teapotMesh, hulls, faces, facesOffset, hullOffset);
+
+    ProjectilePrefab spherePrefab = {};
+    spherePrefab.hullIdx = hullOffset;
+    spherePrefab.resourceID = GetResourceID(L"sphere.obj");
+    spherePrefab.scale = 100.f;
+    projectilePrefabs.push_back(spherePrefab);
+    AddMeshToHullBuffer(sphereMesh, hulls, faces, facesOffset, hullOffset);
 
     // Create each frame resource and fill it with static data.
     for (size_t i = 0; i != NUM_FRAMES_IN_FLIGHT; ++i)
@@ -184,7 +187,6 @@ bool Game::InitFrameResources(UINT width, UINT height)
         frameResource.UpdateAtmosphere(atmosphereParams);
         frameResource.UpdateCloudData(mCloudData);
         frameResource.UpdateCloudLighting(settings.lighting);
-        frameResource.UpdateAABB(intersections);
         frameResource.UpdateHullFaces(faces);
         frameResource.UpdateHulls(hulls);
     }
@@ -299,14 +301,20 @@ void Game::SpawnProjectile()
 
     ResourceCodex& codex = ResourceCodex::GetSingleton();
 
+    std::random_device rd;
+    std::mt19937 gen(rd());
+    std::uniform_int_distribution<size_t> dist(0, projectilePrefabs.size() - 1);
+    ProjectilePrefab prefab = projectilePrefabs[dist(gen)];
+
+
     EntityData newProjectile{};
-    newProjectile.resourceID = GetResourceID(L"teapot.obj");
-    newProjectile.hullIdx = sphereHullIdx;
+    newProjectile.resourceID = prefab.resourceID;
+    newProjectile.hullIdx = prefab.hullIdx;
 
     // Store world & invWorld
     XMMATRIX view = mCamera.GetView();
     XMMATRIX objWorld = XMMatrixInverse(nullptr, view);
-    objWorld = XMMatrixScaling(4.f, 4.f, 4.f) * objWorld;
+    objWorld = XMMatrixScaling(prefab.scale, prefab.scale, prefab.scale) * objWorld;
     XMMATRIX invObjWorld = XMMatrixInverse(nullptr, objWorld);
 
 
@@ -316,15 +324,15 @@ void Game::SpawnProjectile()
     // Extract camera basis
     XMVECTOR camForward = XMVector3Normalize(objWorld.r[2]);
     XMVECTOR camUp = XMVector3Normalize(objWorld.r[1]);
+    XMVECTOR camRight = XMVector3Normalize(objWorld.r[0]);
 
     // Build projectile velocity
     float forwardSpeed = 500.f;
-    float upBoost = 10.f;
+    float upBoost = 30.f;
+    float rightOrbitProtection = 10.f;
 
-    XMVECTOR vel = camForward * forwardSpeed + camUp * upBoost;
+    XMVECTOR vel = camForward * forwardSpeed + camUp * upBoost + rightOrbitProtection * CAMERA_SPEED * camRight;
 
-    std::random_device rd;
-    std::mt19937 gen(rd());
     std::uniform_real_distribution<float> dist01(0.0f, 1.0f);
 
     // random axis
@@ -413,7 +421,7 @@ void Game::UpdateEntities(Muon::FrameResources& currFrameResources, const Muon::
             EntityData& projectile = cpuEntityData[projectileIndices[i]];
 
             // Convert data
-            projectile.vel.y -= 98.0f * time.deltaTime;
+            projectile.vel.y -= 180.f * time.deltaTime;
             XMVECTOR vel = XMLoadFloat4(&projectile.vel);
             XMMATRIX world = XMLoadFloat4x4(&projectile.entityMatrices.world);
 
@@ -484,6 +492,8 @@ void Game::Update(Muon::StepTimer const& timer)
     Muon::FrameResources& currFrameResources = mFrameResources.at(mCurrFrameResourceIdx);
 
     // Updating Camera
+    mCamera.OrbitAroundTarget(elapsedTime, CAMERA_SPEED);
+
     mCamera.UpdateView();    
     Muon::cbCamera camera = mCamera.GetAsCB();
     currFrameResources.UpdateCamera(camera);
@@ -992,6 +1002,35 @@ void Game::CreateWindowSizeDependentResources(int newWidth, int newHeight)
 {
     float aspectRatio = (float)newWidth / (float)newHeight;
     mCamera.UpdateProjection(aspectRatio);
+}
+
+void Game::AddMeshToHullBuffer(const Muon::Mesh* m, Muon::cbHulls& hullsBuffer, Muon::cbHullFaces& faces, int& facesOffset, int &hullOffset)
+{
+    using namespace Muon;
+    Hull hull = m->GetHull();
+
+    for (size_t i = 0; i < hull.faces.size(); i++)
+    {
+        faces.faces[facesOffset + i] = DirectX::XMFLOAT4(
+            hull.faces[i].normal.x,
+            hull.faces[i].normal.y,
+            hull.faces[i].normal.z,
+            hull.faces[i].distance
+        );
+    }
+
+    int newFaceOffset = facesOffset + hull.faces.size();
+    int newHullOffset = hullOffset + 1;
+
+    cbConvexHull cHull = {};
+    cHull.faceCount = (uint32_t)hull.faces.size();
+    cHull.faceOffset = facesOffset;
+
+    hullsBuffer.hulls[hullOffset] = cHull;
+    hullsBuffer.hullCount = newHullOffset;
+
+    facesOffset = newFaceOffset;
+    hullOffset = newHullOffset;
 }
 
 Game::~Game()

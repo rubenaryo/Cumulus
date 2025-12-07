@@ -15,6 +15,7 @@ This class encapsulates all app functionality
 #include <Core/FrameResources.h>
 #include <Input/GameInput.h>
 #include "MuonImgui.h"
+#include "Mesh.h"
 
 class Game
 {
@@ -53,6 +54,7 @@ private:
 
     void CreateDeviceDependentResources();
     void CreateWindowSizeDependentResources(int newWidth, int newHeight);
+    void AddMeshToHullBuffer(const Muon::Mesh* m, Muon::cbHulls& hullsBuffer, Muon::cbHullFaces& faces, int& facesOffset, int& hullOffset);
 
     // Input Management
     Input::GameInput mInput;
@@ -82,13 +84,15 @@ private:
 
     std::vector<int> projectileIndices;
 
-    int sphereHullIdx = 0;
-
     std::vector<Muon::EntityData> cpuEntityData;
 
     Muon::cbCloudGenData mCloudData;
 
     // Timer for the main game loop
     Muon::StepTimer mTimer;
+
+    std::vector<Muon::ProjectilePrefab> projectilePrefabs;
+
+    const float CAMERA_SPEED = 0.05f;
 };
 #endif

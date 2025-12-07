@@ -225,6 +225,41 @@ void Camera::UpdateAzimuthZenith()
     mAzimuth = newAzimuth;
 }
 
+void Camera::OrbitAroundTarget(float deltaTime, float angularSpeed)
+{
+    // angularSpeed: radians per second
+    mAzimuth += angularSpeed * deltaTime;
+
+    // Wrap azimuth
+    if (mAzimuth > XM_2PI)  mAzimuth -= XM_2PI;
+    if (mAzimuth < 0.0f)    mAzimuth += XM_2PI;
+
+    // Current distance from target
+    XMVECTOR diff = XMVectorSubtract(mPosition, mTarget);
+    float dist = XMVectorGetX(XMVector3Length(diff));
+
+    // Recompute forward from azimuth + zenith
+    float sinZen = sinf(mZenith);
+    float cosZen = cosf(mZenith);
+
+    float x = cosf(mAzimuth) * sinZen;
+    float y = cosZen;
+    float z = sinf(mAzimuth) * sinZen;
+
+    mForward = XMVector3Normalize(XMVectorSet(x, y, z, 0.0f));
+
+    // Position = target - forward * distance
+    mPosition = XMVectorSubtract(mTarget, XMVectorScale(mForward, dist));
+
+    // Recompute right/up
+    XMVECTOR worldUp = XMVectorSet(0, 1, 0, 0);
+    mRight = XMVector3Normalize(XMVector3Cross(worldUp, mForward));
+    mUp = XMVector3Normalize(XMVector3Cross(mForward, mRight));
+
+    UpdateView();
+}
+
+
 cbCamera Camera::GetAsCB() const
 {
     DirectX::XMMATRIX viewProj = XMMatrixMultiply(mView, mProjection);

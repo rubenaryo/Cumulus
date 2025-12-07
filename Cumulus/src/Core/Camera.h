@@ -53,6 +53,8 @@ public:
     void GetForward(DirectX::XMVECTOR& forward) const;
     void SetTarget(DirectX::XMVECTOR target);
     void UpdateAzimuthZenith();
+    void OrbitAroundTarget(float deltaTime, float angularSpeed);
+
 
 private:
     // View and Projection Matrices
