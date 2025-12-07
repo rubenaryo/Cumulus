@@ -615,6 +615,7 @@ void Game::UpdateRaymarchCache(Muon::FrameResources& currFrameResources)
     Texture* pSdf = codex.GetTexture(GetResourceID(L"StormbirdCloudSDF_3D")); // TODO: Ensure same resource IDs are used in main raymarch pass. These MUST match.
     Texture* pNVDF = codex.GetTexture(GetResourceID(L"StormbirdCloud_NVDF"));
     Texture* pNoise = codex.GetTexture(GetResourceID(L"Noise_3D"));
+    Texture* pProceduralNVDF = codex.GetTexture(GetResourceID(L"ProceduralNVDF"));
 
     int32_t cloudLightingIdx = mRaymarchCachePass.GetResourceRootIndex("CloudLightingBuffer");
     if (cloudLightingIdx != ROOTIDX_INVALID)
@@ -639,12 +640,20 @@ void Game::UpdateRaymarchCache(Muon::FrameResources& currFrameResources)
     {
         pCommandList->SetComputeRootDescriptorTable(noiseIndex, pNoise->GetSRVHandleGPU());
     }
+
+    int32_t proceduralNVDFIndex = mRaymarchCachePass.GetResourceRootIndex("proceduralNvdfTex");
+    if (proceduralNVDFIndex != ROOTIDX_INVALID)
+    {
+        pCommandList->SetComputeRootDescriptorTable(proceduralNVDFIndex, pProceduralNVDF->GetSRVHandleGPU());
+    }
     
     int32_t cacheIdx = mRaymarchCachePass.GetResourceRootIndex("gCache");
     if (cacheIdx != ROOTIDX_INVALID)
     {
         pCommandList->SetComputeRootDescriptorTable(cacheIdx, pLightingCache->GetUAVHandleGPU());
     }
+
+
     
     // Prepare volume cache for writing
     pCommandList->ResourceBarrier(1, &CD3DX12_RESOURCE_BARRIER::Transition(pLightingCache->GetResource(),
@@ -808,7 +817,7 @@ void Game::Render()
 
     if (mRaymarchPass.Bind(pCommandList))
     {
-        Texture* collisionTexture = codex.GetTexture(GetResourceID(L"ProceduralNVDF"));
+        Texture* pProceduralNVDF = codex.GetTexture(GetResourceID(L"ProceduralNVDF"));
         Texture* pSdf = codex.GetTexture(GetResourceID(L"StormbirdCloudSDF_3D"));
         Texture* pNVDF = codex.GetTexture(GetResourceID(L"StormbirdCloud_NVDF"));
         Texture* pNoise = codex.GetTexture(GetResourceID(L"Noise_3D"));
@@ -884,10 +893,10 @@ void Game::Render()
             pCommandList->SetComputeRootDescriptorTable(depthBufferIdx, GetDepthStencilSRV().HandleGPU);
         }
 
-        int32_t collisionIndex = mRaymarchPass.GetResourceRootIndex("proceduralNvdfTex");
-        if (collisionIndex != ROOTIDX_INVALID)
+        int32_t proceduralNVDFIndex = mRaymarchPass.GetResourceRootIndex("proceduralNvdfTex");
+        if (proceduralNVDFIndex != ROOTIDX_INVALID)
         {
-            pCommandList->SetComputeRootDescriptorTable(collisionIndex, collisionTexture->GetSRVHandleGPU());
+            pCommandList->SetComputeRootDescriptorTable(proceduralNVDFIndex, pProceduralNVDF->GetSRVHandleGPU());
         }
 
         int32_t lightingCacheIndex = mRaymarchPass.GetResourceRootIndex("lightCacheTex");

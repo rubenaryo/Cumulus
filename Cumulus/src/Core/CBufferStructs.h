@@ -133,7 +133,7 @@ struct alignas(16) cbCloudGenData
 struct alignas(16) cbCloudLighting
 {
     // === Raymarch settings ===
-    int   maxSteps = 256;
+    int   maxSteps = 512;
     float densityScale = 1.0f;
     float minTransmittance = 0.01f;
     float clPad0 = 0.0f; 
