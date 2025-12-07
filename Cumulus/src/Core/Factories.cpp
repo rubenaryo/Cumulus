@@ -589,13 +589,6 @@ bool TextureFactory::LoadTexturesForNVDF(std::filesystem::path directoryPath, ID
         return false;
     }
 
-    // Since NVDF's are only used in the compute shader, we must transition them away from being pixel shader resources.
-    pCommandList->ResourceBarrier(1, &CD3DX12_RESOURCE_BARRIER::Transition(
-        pNVDFTex->GetResource(),
-        D3D12_RESOURCE_STATE_PIXEL_SHADER_RESOURCE,
-        D3D12_RESOURCE_STATE_NON_PIXEL_SHADER_RESOURCE
-    ));
-
     return true;
 }
 
@@ -926,14 +919,6 @@ bool TextureFactory::Load3DTextureFromSlices(std::filesystem::path directoryPath
         Printf(L"Error: Failed to fetch 3D NVDF texture: %s from codex when transitioning to compute resource\n", lookupName.c_str());
         return false;
     }
-
-    // Assumption: 3D textures will be used in the raymarch compute shader (not pixel shader)
-    // In reality, we should track the resource state explicitly by building a new system.
-    pCommandList->ResourceBarrier(1, &CD3DX12_RESOURCE_BARRIER::Transition(
-        p3DTex->GetResource(),
-        D3D12_RESOURCE_STATE_PIXEL_SHADER_RESOURCE,
-        D3D12_RESOURCE_STATE_NON_PIXEL_SHADER_RESOURCE
-    ));
 
     return success;
 }
