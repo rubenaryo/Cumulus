@@ -875,10 +875,10 @@ void Game::Render()
             pCommandList->SetComputeRootDescriptorTable(depthBufferIdx, GetDepthStencilSRV().HandleGPU);
         }
 
-        int32_t collisionIndex = mRaymarchPass.GetResourceRootIndex("proceduralNvdfTex");
-        if (collisionIndex != ROOTIDX_INVALID)
+        int32_t proceduralNVDFIndex = mRaymarchPass.GetResourceRootIndex("proceduralNvdfTex");
+        if (proceduralNVDFIndex != ROOTIDX_INVALID)
         {
-            pCommandList->SetComputeRootDescriptorTable(collisionIndex, pProceduralNVDF->GetSRVHandleGPU());
+            pCommandList->SetComputeRootDescriptorTable(proceduralNVDFIndex, pProceduralNVDF->GetSRVHandleGPU());
         }
 
         int32_t lightingCacheIndex = mRaymarchPass.GetResourceRootIndex("lightCacheTex");
