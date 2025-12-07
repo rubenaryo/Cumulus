@@ -136,28 +136,37 @@ struct alignas(16) cbCloudLighting
     int   maxSteps = 256;
     float densityScale = 1.0f;
     float minTransmittance = 0.01f;
-    float pad0 = 0.0f; 
+    float clPad0 = 0.0f; 
 
     // === Sun / primary lighting ===
     DirectX::XMFLOAT3 dirSun = { 0.0f, 1.0f, 0.0f };
     float             directExtinctionScale = 0.02f;
 
     float             directStrength = 1.0f; 
-    DirectX::XMFLOAT3 lightSun = { 220.0f, 240.0f, 250.0f };
+    DirectX::XMFLOAT3 sunColor = { 0.86f, 0.94f, 0.98};
+
+    float             sunIntensity = 255.f;
+    float clPad1 = 0.0f;
+    float clPad2 = 0.0f;
+    float clPad3 = 0.0f;
 
     // === Secondary ===
     DirectX::XMFLOAT3 secondaryColor = SrgbToLinear3( 1.0f, 0.96f, 0.9f );
     float             secondaryStrength = 2.0f;
 
     float secondaryExtinctionScale = 0.02f;
-    float pad2[3] = { 0.0f, 0.0f, 0.0f };
+    float clPad4 = 0.0f;
+    float clPad5 = 0.0f;
+    float clPad6 = 0.0f;
 
     // === Ambient ===
     DirectX::XMFLOAT3 ambientColor = SrgbToLinear3( 1.0f, 0.96f, 0.9f );
     float             ambientExtinctionScale = 0.05f;
 
     float ambientStrength = 1.0f;
-    float pad3[3] = { 0.0f, 0.0f, 0.0f };
+    float clPad7 = 0.0f;
+    float clPad8 = 0.0f;
+    float clPad9 = 0.0f;
 };
 
 

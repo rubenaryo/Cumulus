@@ -243,7 +243,8 @@ float3 ComputeDirectLighting(
     float sigma,
     float stepSize, 
     float3 dirSun, 
-    float3 lightSun,
+    float3 sunColor,
+    float sunIntensity,
     float directLightingStrength,
     float opticalDepthToSun)
 {
@@ -260,7 +261,7 @@ float3 ComputeDirectLighting(
     float segmentScatter = 1.0 - exp(-sigma * stepSize);
 
     // Direct lighting contribution for this step (before camera transmittance)
-    float3 L_step = lightSun * T_sun * phase * segmentScatter * directLightingStrength;
+    float3 L_step = sunColor * sunIntensity * T_sun * phase * segmentScatter * directLightingStrength;
 
     return L_step;
 }
@@ -427,7 +428,8 @@ float3 VolumeRaymarchNvdf(float3 eyePos, float3 dir, float3 bgColor, float maxRa
                             sigma,
                             march.stepSize,
                             sunDirN,
-                            lightingParams.lightSun, 
+                            lightingParams.sunColor,
+                            lightingParams.sunIntensity,
                             lightingParams.directStrength, 
                             lightCacheSample.tauSun
                         );
