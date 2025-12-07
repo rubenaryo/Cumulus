@@ -111,11 +111,11 @@ void ImguiNewFrame(float gameTime, const Camera& cam, SceneSettings& settings)
             ImGui::Checkbox("Toggle Dynamic Sun", &settings.atmosphere.isSunDynamic);
             if (!settings.atmosphere.isSunDynamic)
             {
-                ImGui::SliderFloat3("Sun Direction", &settings.atmosphere.sunDir.x, -1.0, 1.0, "%.1f");
+                ImGui::SliderFloat3("Sun Direction", &settings.atmosphere.sunDir.x, -1.0, 1.0, "%.2f");
             }
             else
             {
-                ImGui::SliderFloat("Time Scale:", &settings.atmosphere.timeScale, 0.0f, 5.f, "%.1f");
+                ImGui::SliderFloat("Time Scale:", &settings.atmosphere.timeScale, 0.0f, 5.f, "%.2f");
                 ImGui::Text("Sun Direction: %f, %f, %f", settings.atmosphere.sunDir.x, settings.atmosphere.sunDir.y, settings.atmosphere.sunDir.z);
             }
 
@@ -163,17 +163,26 @@ void ImguiNewFrame(float gameTime, const Camera& cam, SceneSettings& settings)
             float directStrength = settings.lighting.directStrength;
             ImGui::SliderFloat("Direct Strength",
                 &directStrength, 0.0f, 5.0f);
-
-            // === Sun light color & direction ===
-            float lightSun[3] =
+            
+            ImGui::Checkbox("Use Atmospheric Lighting", &settings.useAtmosphereParams);
+            if (settings.useAtmosphereParams)
             {
-                settings.lighting.lightSun.x,
-                settings.lighting.lightSun.y,
-                settings.lighting.lightSun.z
-            };
+                ImGui::BeginDisabled();
+            }
 
             ImGui::Text("Sun Light");
-            ImGui::ColorEdit3("##LightSun", lightSun);
+            // === Sun light color & direction ===
+            float sunColor[3] =
+            {
+                settings.lighting.sunColor.x,
+                settings.lighting.sunColor.y,
+                settings.lighting.sunColor.z
+            };
+
+            ImGui::ColorEdit3("##LightSun", sunColor);
+
+            float sunIntensity = settings.lighting.sunIntensity; 
+            ImGui::SliderFloat("Sun Intensity", &sunIntensity, 0.0f, 1000.0f, "%.2f"); 
 
             // Direction (editable, then normalized)
             float dirSun[3] =
@@ -184,6 +193,12 @@ void ImguiNewFrame(float gameTime, const Camera& cam, SceneSettings& settings)
             };
 
             ImGui::SliderFloat3("Sun Direction", dirSun, -1.0f, 1.0f, "%.2f");
+
+            if (settings.useAtmosphereParams)
+            {
+                ImGui::EndDisabled();
+            }
+            
 
             // === Secondary lighting ===
             // Engine stores linear:
@@ -246,7 +261,7 @@ void ImguiNewFrame(float gameTime, const Camera& cam, SceneSettings& settings)
             ImGui::Text("Ambient Color");
             ImGui::ColorEdit3("##AmbientColor", ambientColor);
             ImGui::SliderFloat("Ambient Extinction",
-                &ambientExtinctionScale, 0.0f, 10.0f, "%.3f");
+                &ambientExtinctionScale, 0.0f, 0.2f, "%.3f");
             ImGui::SliderFloat("Ambient Strength", &ambientStrength, 0.0f, 5.0f);
 
             // === Detect changes ===
@@ -256,9 +271,10 @@ void ImguiNewFrame(float gameTime, const Camera& cam, SceneSettings& settings)
                 minTransmittance != settings.lighting.minTransmittance ||
                 directExtinctionScale != settings.lighting.directExtinctionScale ||
                 directStrength != settings.lighting.directStrength ||
-                lightSun[0] != settings.lighting.lightSun.x ||
-                lightSun[1] != settings.lighting.lightSun.y ||
-                lightSun[2] != settings.lighting.lightSun.z ||
+                sunColor[0] != settings.lighting.sunColor.x ||
+                sunColor[1] != settings.lighting.sunColor.y ||
+                sunColor[2] != settings.lighting.sunColor.z ||
+                sunIntensity != settings.lighting.sunIntensity ||
                 dirSun[0] != settings.lighting.dirSun.x ||
                 dirSun[1] != settings.lighting.dirSun.y ||
                 dirSun[2] != settings.lighting.dirSun.z ||
@@ -290,7 +306,8 @@ void ImguiNewFrame(float gameTime, const Camera& cam, SceneSettings& settings)
                 DirectX::XMStoreFloat3(&dirNorm, dir);
 
                 settings.lighting.dirSun = { dirNorm.x, dirNorm.y, dirNorm.z };
-                settings.lighting.lightSun = { lightSun[0], lightSun[1], lightSun[2] };
+                settings.lighting.sunColor = { sunColor[0], sunColor[1], sunColor[2] };
+                settings.lighting.sunIntensity = sunIntensity;
                 settings.lighting.secondaryColor = SrgbToLinear3(secondaryColor); 
                 settings.lighting.secondaryStrength = secondaryStrength;
 

@@ -506,6 +506,10 @@ void Game::Update(Muon::StepTimer const& timer)
     Muon::UpdateAtmosphere(atmosphere, mCamera, settings.atmosphere);
     // NOTE: this is explicit to switch Y and Z due to different coordinate systems at play
     settings.atmosphere.sunDir = { atmosphere.sun_direction.x,atmosphere.sun_direction.z,atmosphere.sun_direction.y };
+    if (settings.useAtmosphereParams)
+    {
+        Muon::UpdateLightFromAtmosphere(atmosphere, settings);
+    }
     currFrameResources.UpdateAtmosphere(atmosphere);
 
     // Updating Cloud Data
@@ -640,6 +644,7 @@ void Game::UpdateRaymarchCache(Muon::FrameResources& currFrameResources)
     Texture* pSdf = codex.GetTexture(GetResourceID(L"StormbirdCloudSDF_3D")); // TODO: Ensure same resource IDs are used in main raymarch pass. These MUST match.
     Texture* pNVDF = codex.GetTexture(GetResourceID(L"StormbirdCloud_NVDF"));
     Texture* pNoise = codex.GetTexture(GetResourceID(L"Noise_3D"));
+    Texture* pProceduralNVDF = codex.GetTexture(GetResourceID(L"ProceduralNVDF"));
 
     int32_t cloudLightingIdx = mRaymarchCachePass.GetResourceRootIndex("CloudLightingBuffer");
     if (cloudLightingIdx != ROOTIDX_INVALID)
@@ -664,12 +669,20 @@ void Game::UpdateRaymarchCache(Muon::FrameResources& currFrameResources)
     {
         pCommandList->SetComputeRootDescriptorTable(noiseIndex, pNoise->GetSRVHandleGPU());
     }
+
+    int32_t proceduralNVDFIndex = mRaymarchCachePass.GetResourceRootIndex("proceduralNvdfTex");
+    if (proceduralNVDFIndex != ROOTIDX_INVALID)
+    {
+        pCommandList->SetComputeRootDescriptorTable(proceduralNVDFIndex, pProceduralNVDF->GetSRVHandleGPU());
+    }
     
     int32_t cacheIdx = mRaymarchCachePass.GetResourceRootIndex("gCache");
     if (cacheIdx != ROOTIDX_INVALID)
     {
         pCommandList->SetComputeRootDescriptorTable(cacheIdx, pLightingCache->GetUAVHandleGPU());
     }
+
+
     
     // Prepare volume cache for writing
     pCommandList->ResourceBarrier(1, &CD3DX12_RESOURCE_BARRIER::Transition(pLightingCache->GetResource(),
@@ -819,10 +832,10 @@ void Game::Render()
         }
     }
 
-    if (mTimer.GetTotalTicks() % 16 == 0)
-    {
+    //if (mTimer.GetTotalTicks() % 16 == 0)
+    //{
         UpdateRaymarchCache(currFrameResources);
-    }
+    //}
 
     // After opaque pass, transition depth buffer to be bindable as a regular texture by other passes
     pCommandList->ResourceBarrier(1, &CD3DX12_RESOURCE_BARRIER::Transition(GetDepthStencilResource(),
@@ -830,7 +843,7 @@ void Game::Render()
 
     if (mRaymarchPass.Bind(pCommandList))
     {
-        Texture* collisionTexture = codex.GetTexture(GetResourceID(L"ProceduralNVDF"));
+        Texture* pProceduralNVDF = codex.GetTexture(GetResourceID(L"ProceduralNVDF"));
         Texture* pSdf = codex.GetTexture(GetResourceID(L"StormbirdCloudSDF_3D"));
         Texture* pNVDF = codex.GetTexture(GetResourceID(L"StormbirdCloud_NVDF"));
         Texture* pNoise = codex.GetTexture(GetResourceID(L"Noise_3D"));
@@ -912,10 +925,10 @@ void Game::Render()
             pCommandList->SetComputeRootDescriptorTable(depthBufferIdx, GetDepthStencilSRV().HandleGPU);
         }
 
-        int32_t collisionIndex = mRaymarchPass.GetResourceRootIndex("proceduralNvdfTex");
-        if (collisionIndex != ROOTIDX_INVALID)
+        int32_t proceduralNVDFIndex = mRaymarchPass.GetResourceRootIndex("proceduralNvdfTex");
+        if (proceduralNVDFIndex != ROOTIDX_INVALID)
         {
-            pCommandList->SetComputeRootDescriptorTable(collisionIndex, collisionTexture->GetSRVHandleGPU());
+            pCommandList->SetComputeRootDescriptorTable(proceduralNVDFIndex, pProceduralNVDF->GetSRVHandleGPU());
         }
 
         int32_t lightingCacheIndex = mRaymarchPass.GetResourceRootIndex("lightCacheTex");
