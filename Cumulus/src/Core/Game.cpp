@@ -482,6 +482,15 @@ void Game::Update(Muon::StepTimer const& timer)
         currFrameResources.mNeedsCloudLightingUpdate = false;
     }
 
+    //Updating God Ray Settings:
+    DirectX::XMVECTOR sunDir = XMLoadFloat3(&settings.atmosphere.sunDir);
+    DirectX::XMVECTOR camPos = mCamera.GetPosition();
+    DirectX::XMVECTOR lightWorldPos = DirectX::XMVectorAdd(camPos, DirectX::XMVectorScale(sunDir, 10000000.0f));
+    lightWorldPos = DirectX::XMVectorSetW(lightWorldPos, 1.0f);
+    mGodRaySettings.lightScreenPos = mCamera.CalculateScreenPos(lightWorldPos);
+    currFrameResources.UpdateGodRay(mGodRaySettings);
+
+
     // Updating Entities
     UpdateEntities(currFrameResources, time);
 }
@@ -906,6 +915,12 @@ void Game::Render()
         if (edgeMapIdx != ROOTIDX_INVALID)
         {
             pCommandList->SetGraphicsRootDescriptorTable(edgeMapIdx, pComputeOutput->GetSRVHandleGPU());
+        }
+
+        int32_t godRayIdx = mPostProcessPass.GetResourceRootIndex("GodRayCB");
+        if (godRayIdx != ROOTIDX_INVALID)
+        {
+            pCommandList->SetGraphicsRootConstantBufferView(godRayIdx, currFrameResources.mGodRayBuffer.GetGPUVirtualAddress());
         }
 
         // Draw fullscreen quad

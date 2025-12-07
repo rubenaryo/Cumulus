@@ -88,7 +88,11 @@ private:
 
     Muon::cbCloudGenData mCloudData;
 
+    Muon::cbGodRay mGodRaySettings;
+
     // Timer for the main game loop
     Muon::StepTimer mTimer;
+
+
 };
 #endif

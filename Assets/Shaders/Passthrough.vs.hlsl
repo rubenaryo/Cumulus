@@ -10,13 +10,15 @@ SamplerState gsamAnisotropicClamp : register(s5);
 
 cbuffer GodRayCB : register(b0)
 {
-    float2 lightScreenPos;     // 0–1 screen space
+    float4 lightScreenPos;     // 0–1 screen space
     float exposure;            // intensity multiplier
     float decay;               // ray attenuation
     float density;             // sample density
     float weight;              // sample weight
     int numSamples;            // radial blur samples
-    float padding[3];
+    float padding1;
+    float padding2;
+    float padding3;
 };
 
 static const float2 gTexCoords[6] =

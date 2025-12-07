@@ -36,7 +36,8 @@ struct FrameResources
     bool UpdateCloudLighting(const cbCloudLighting& data);
     bool UpdateHulls(const cbHulls& data);
     bool UpdateHullFaces(const cbHullFaces& data);
-    bool UpdateJetTrail(const cbJetTrailPositions& jetTrailPositions);
+    bool UpdateJetTrail(const cbJetTrailPositions& data);
+    bool UpdateGodRay(const cbGodRay& data);
     bool UpdateEntities(const std::vector<EntityData>& entities);
 
     void Destroy();

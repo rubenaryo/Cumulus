@@ -119,6 +119,25 @@ XMVECTOR Camera::GetTarget() const
     return mTarget;
 }
 
+DirectX::XMFLOAT4 Camera::CalculateScreenPos(const DirectX::XMVECTOR& worldPos) const
+{
+    DirectX::XMFLOAT4 outUV;
+    DirectX::XMMATRIX viewProj = XMMatrixMultiply(mView, mProjection);
+    XMVECTOR clip = XMVector4Transform(worldPos, viewProj);
+    XMFLOAT4 clipPos;
+    XMStoreFloat4(&clipPos, clip);
+    
+    float ndcX = clipPos.x / clipPos.w;
+    float ndcY = clipPos.y / clipPos.w;
+    
+    float screenX = 0.5f * (ndcX + 1.0f);
+    float screenY = 0.5f * (1.0f - ndcY);
+    
+    outUV = XMFLOAT4(screenX, screenY, 0.0f, 1.0f);  
+
+    return outUV;
+}
+
 
 float Camera::GetAzimuth() const
 {

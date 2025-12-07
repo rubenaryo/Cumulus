@@ -50,6 +50,7 @@ bool FrameResources::Create(UINT width, UINT height)
     mHullFaceBuffer.Create(L"Hull Faces Buffer", sizeof(cbHullFaces));
     mTimeBuffer.Create(L"Time", sizeof(cbTime));
     mJetTrailBuffer.Create(L"Jet Trail", sizeof(cbJetTrailPositions));
+    mGodRayBuffer.Create(L"God Ray Settings", sizeof(cbGodRay));
     mEntitiesBuffer.Create(L"Entities", sizeof(cbEntities));
 	return true;
 }
@@ -117,6 +118,12 @@ bool FrameResources::UpdateHullFaces(const cbHullFaces& data)
 bool FrameResources::UpdateJetTrail(const cbJetTrailPositions& data)
 {
     memcpy(mJetTrailBuffer.GetMappedPtr(), &data, sizeof(cbJetTrailPositions));
+    return false;
+}
+
+bool FrameResources::UpdateGodRay(const cbGodRay& data)
+{
+    memcpy(mGodRayBuffer.GetMappedPtr(), &data, sizeof(cbGodRay));
     return false;
 }
 
