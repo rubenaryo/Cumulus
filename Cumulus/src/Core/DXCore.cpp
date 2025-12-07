@@ -429,7 +429,7 @@ return SUCCEEDED(hr);
 
         D3D12_CLEAR_VALUE optClear;
         optClear.Format = DepthStencilFormat;
-        optClear.DepthStencil.Depth = 1.0f;
+        optClear.DepthStencil.Depth = 0.0f;
         optClear.DepthStencil.Stencil = 0;
         HRESULT hr = pDevice->CreateCommittedResource(
             &CD3DX12_HEAP_PROPERTIES(D3D12_HEAP_TYPE_DEFAULT),
