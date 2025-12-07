@@ -6,15 +6,13 @@ SamplerState linearClamp : register(s3);
 Texture3D sdfTex : register(t1); // Cached sdf for accelerating sdf 
 Texture3D nvdfTex : register(t2); // Model textures combined [sdf.r, model.r, model.g, model.b] 
 Texture3D noiseTex : register(t3); // Low frequency, high frequency noises for wispy and billowy clouds 
+Texture3D proceduralNvdfTex : register(t4); // Sdf and model textures combined [sdf.r, model.r, model.g, model.b] 
 RWTexture3D<float4> gCache : register(u0);
 
 // Returns tau; transmittance is exp(-tau)
 // Returns tau along 'dir' starting at samplePos
 float GetOpticalDepthAlongDirection(float3 samplePos, float3 dir, float extinctionScale)
 {
-#if GPU_CLOUD
-    return 0.0;
-#else
     float tEnter, tExit;
     if (!RayBoxIntersect(samplePos, dir, VOLUME_MIN_WS, VOLUME_MAX_WS, tEnter, tExit))
     {
@@ -34,18 +32,30 @@ float GetOpticalDepthAlongDirection(float3 samplePos, float3 dir, float extincti
         if (t > tExit)
             break;
 
+#if GPU_CLOUD 
+        ProceduralNVDFSample procNVDFSample = MakeProceduralNVDFSample(proceduralNvdfTex.SampleLevel(linearClamp, WorldToNvdfUV(pos), 0.0f));
+        float sdfEncoded = procNVDFSample.encodedSDF; 
+        
+#else 
         float sdfEncoded = sdfTex.SampleLevel(linearClamp, WorldToNvdfUV(pos), 0.0f).r;
+#endif
         float sdfDistance = DecodeSdf(sdfEncoded) * AUTHORING_TO_WORLD_SCALE;
 
         if (sdfDistance < 0.0)
         {
+#if GPU_CLOUD
+            float dimensionalProfile = procNVDFSample.dimensionalProfile;
+            float detailType = procNVDFSample.detailType; 
+            float densityScale = clamp(detailType - 0.3f, 0.2f, 0.6f); 
+#else
             float4 nvdfSample = nvdfTex.SampleLevel(linearClamp, WorldToNvdfUV(pos), 0.0f);
             float dimensionalProfile = nvdfSample.g;
             float detailType = nvdfSample.b;
             float densityScale = nvdfSample.a;
+#endif
             float density = dimensionalProfile; 
-            
-            if (i < 2)
+
+            if (i < 8)
             {
                 density = GetUprezzedVoxelCloudDensity(
                     (RayMarchInfo) 0,
@@ -75,7 +85,6 @@ float GetOpticalDepthAlongDirection(float3 samplePos, float3 dir, float extincti
     }
 
     return tau;
-#endif
 }
 
 float3 UVToWorld(float3 uvw)
