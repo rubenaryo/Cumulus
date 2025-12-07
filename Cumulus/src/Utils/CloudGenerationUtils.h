@@ -28,9 +28,9 @@ namespace Muon
             //float x = cos(i * 12723.123);
             //float y = sin(i * 1284.789);
             //float z = sin(cos(i * 213.523) * 1924.23);
-            x *= 512.f;
-            y *= 512.f;
-            z *= 64.f;
+            x *= 4000.f;
+            y *= 500.f;
+            z *= 4000.f;
             s *= 200.f / num * scale;
             constants.seeds[i] = DirectX::XMFLOAT4(x, y, z, s);
         }
