@@ -126,14 +126,14 @@ struct alignas(16) cbCloudGenData
     //0 is no demo
     //1 is draw jet
     //2 is draw balls
-    int demoMode = 2;
+    int demoMode = 0;
     float pad[2];
 };
 
 struct alignas(16) cbCloudLighting
 {
     // === Raymarch settings ===
-    int   maxSteps = 256;
+    int   maxSteps = 512;
     float densityScale = 1.0f;
     float minTransmittance = 0.01f;
     float clPad0 = 0.0f; 

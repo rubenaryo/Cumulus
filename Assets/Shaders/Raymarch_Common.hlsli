@@ -9,6 +9,7 @@ Description : Common Raymarching Structures for Collision and Noise for Cloud Da
 
 
 #define JET_MODE  0   // Extra near-camera detail
+#define GPU_CLOUD 1
 
 // Constants 
 static const float PI = 3.14159265359;
@@ -98,6 +99,29 @@ LightCacheSample MakeLightCacheSample(float2 sample)
     lcs.tauSun = sample.r; 
     lcs.tauVertical = sample.g; 
     return lcs; 
+}
+
+// Texture output:
+// r - sdf distance - how far we are from the cloud
+// g - dimensionalProfile - the outline of the cloud
+// b - detail type - aka billowy vs whispy [0, 1]
+// a - collision value in range [0, 1
+struct ProceduralNVDFSample
+{
+    float encodedSDF; 
+    float dimensionalProfile; 
+    float detailType; 
+    float collisionFactor; 
+};
+
+ProceduralNVDFSample MakeProceduralNVDFSample(float4 sample)
+{
+    ProceduralNVDFSample pnvdf;
+    pnvdf.encodedSDF = sample.r;
+    pnvdf.dimensionalProfile = sample.g; 
+    pnvdf.detailType = sample.b; 
+    pnvdf.collisionFactor = sample.a;
+    return pnvdf;
 }
 
 struct AABB
