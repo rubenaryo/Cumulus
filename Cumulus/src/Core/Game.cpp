@@ -143,7 +143,7 @@ bool Game::InitFrameResources(UINT width, UINT height)
     InitializeAtmosphereConstants(atmosphereParams, width, height);
 
     // Updating Clouds
-    GenerateCloudGenConstants(mCloudData, settings.numClouds, settings.cloudScale);
+    GenerateCloudGenConstants(mCloudData, settings.clouds.numClouds, settings.clouds.cloudScale);
     
     // Updating AABBs
     const Mesh* m = codex.GetMesh(GetResourceID(L"sphere.obj"));
@@ -412,7 +412,7 @@ void Game::Update(Muon::StepTimer const& timer)
     mInput.Frame(elapsedTime, &mCamera, this);
 
     // The UI has flagged for a cloud update
-    if (settings.updateClouds)
+    if (settings.clouds.updateClouds)
     {
         // Mark the update on each frame resource. They will consume it when they next run. 
         for (size_t i = 0; i != NUM_FRAMES_IN_FLIGHT; ++i)
@@ -420,9 +420,15 @@ void Game::Update(Muon::StepTimer const& timer)
             Muon::FrameResources& frameResource = mFrameResources.at(i);
             frameResource.mNeedsCloudUpdate = true;
         }
-        
-        Muon::GenerateCloudGenConstants(mCloudData, settings.numClouds, settings.cloudScale);
-        settings.updateClouds = false;
+
+        Muon::GenerateCloudGenConstants(mCloudData, settings.clouds.numClouds, settings.clouds.cloudScale);
+
+        settings.clouds.updateClouds = false;
+    }
+
+    if (settings.clouds.windScale > 0.f)
+    {
+        Muon::MoveClouds(mCloudData, settings.clouds);
     }
 
     if (settings.updateLighting)

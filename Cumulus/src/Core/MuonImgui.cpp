@@ -142,8 +142,7 @@ void ImguiNewFrame(float gameTime, const Camera& cam, SceneSettings& settings)
 
             if (ImGui::Button("Regenerate Clouds") || 
                 cloudNum != settings.clouds.numClouds || 
-                cloudScale != settings.clouds.cloudScale ||
-                settings.clouds.windScale > 0.f)
+                cloudScale != settings.clouds.cloudScale)
             {
                 settings.clouds.numClouds = cloudNum;
                 settings.clouds.cloudScale = cloudScale;

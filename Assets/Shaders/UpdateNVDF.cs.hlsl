@@ -6,7 +6,7 @@ cbuffer cbCloudGenBuffer : register(b6)
     
     int numSeeds;
     int demoMode;
-    float pad[2];
+    float2 windOffset;
 };
 
 cbuffer cbJetBuffer : register(b7)
@@ -143,53 +143,51 @@ void main(int3 dispatchThreadID : SV_DispatchThreadID)
     float d = 999999999.f;
     float gMultiplier = 1.0;
     float scale = 0;    // keeping track of average scale of clouds
+    float3 offset = float3(0.0, 0.0, 0.0); //float3 (windOffset.x, 0.0, windOffset.y);
     // making numSeeds number of clouds at their input locations and scales as passed by the CPU
     float jetSpeed = 0;
-    if (demoMode == 0)
-    {
+    //if (demoMode == 0)
+    //{
         for (uint i = 0; i < numSeeds; ++i)
         {
             float4 curr = seeds[i];
             scale += curr.a;
-            d = smooth_min(d, SDF_Cloud(worldPos, i % 3 + 2, curr.xyz, curr.a), 0.8);
+            d = smooth_min(d, SDF_Cloud(worldPos - offset, i % 3 + 2, curr.xyz, curr.a), 0.8);
         }
         scale /= numSeeds;
-    }
+    //}
+    //else if (demoMode == 1)
+    //{
+    //    uint numTrails = 1;
 
+    //    float3 jetStartOffset1 = float3(15.0, -5.0, 14.0);
+    //    float3 jetStartOffset2 = float3(15.0, -5.0, -14.0);
+
+    //    for (uint i = 0; i < numTrails; ++i)
+    //    {
+    //        float rightLine = SDF_RoundCone(worldPos, positions[2 * i].xyz + jetStartOffset1, positions[2 * i + 1].xyz + jetStartOffset1, positions[2 * i].w, positions[2 * i + 1].w);
+    //        float leftLine = SDF_RoundCone(worldPos, positions[2 * i].xyz + jetStartOffset2, positions[2 * i + 1].xyz + jetStartOffset2, positions[2 * i].w, positions[2 * i + 1].w);
+    //        float curr = min(rightLine, leftLine);
+
+    //        d = smooth_min(d, curr, 0.8);
+
+    //        float jetTravelDistance = length(positions[2 * i + 1].xyz - positions[2 * i].xyz);
+    //        jetSpeed = jetTravelDistance / totalTime;
+    //        float distanceFromJet = length(worldPos - positions[2 * i + 1].xyz);
+    //        float timeAlive = distanceFromJet / max(jetSpeed, 0.0001);
+    //        float lifeTime = 25.0;
     
-    else if (demoMode == 1)
-    {
-        uint numTrails = 1;
+    //        float currentDensityMultiplier = (1.0 - saturate(timeAlive / lifeTime));
 
-        float3 jetStartOffset1 = float3(15.0, -5.0, 14.0);
-        float3 jetStartOffset2 = float3(15.0, -5.0, -14.0);
+    //        scale += (positions[2 * i].a + positions[2 * i + 1].a) * 0.5f;
 
-        for (uint i = 0; i < numTrails; ++i)
-        {
-            float rightLine = SDF_RoundCone(worldPos, positions[2 * i].xyz + jetStartOffset1, positions[2 * i + 1].xyz + jetStartOffset1, positions[2 * i].w, positions[2 * i + 1].w);
-            float leftLine = SDF_RoundCone(worldPos, positions[2 * i].xyz + jetStartOffset2, positions[2 * i + 1].xyz + jetStartOffset2, positions[2 * i].w, positions[2 * i + 1].w);
-            float curr = min(rightLine, leftLine);
+    //        float disStart = length(worldPos - positions[2 * i].xyz);
+    //        float disEnd = length(worldPos - positions[2 * i + 1].xyz);
 
-            d = smooth_min(d, curr, 0.8);
-
-            float jetTravelDistance = length(positions[2 * i + 1].xyz - positions[2 * i].xyz);
-            jetSpeed = jetTravelDistance / totalTime;
-            float distanceFromJet = length(worldPos - positions[2 * i + 1].xyz);
-            float timeAlive = distanceFromJet / max(jetSpeed, 0.0001);
-            float lifeTime = 25.0;
-
-
-            float currentDensityMultiplier = (1.0 - saturate(timeAlive / lifeTime));
-
-            scale += (positions[2 * i].a + positions[2 * i + 1].a) * 0.5f;
-
-            float disStart = length(worldPos - positions[2 * i].xyz);
-            float disEnd = length(worldPos - positions[2 * i + 1].xyz);
-
-            gMultiplier = lerp(0.15, 1.0, currentDensityMultiplier);
-        }
-        scale /= numTrails;
-    }
+    //        gMultiplier = lerp(0.15, 1.0, currentDensityMultiplier);
+    //    }
+    //    scale /= numTrails;
+    //}
     // We then encode SDF into the range [0, 1] from [-256, 4096], as this is what Nubis expects
     const float sdfMin = -256.0;
     const float sdfMax = 4096.0;

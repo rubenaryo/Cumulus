@@ -126,8 +126,8 @@ struct alignas(16) cbCloudGenData
     //0 is no demo
     //1 is draw jet
     //2 is draw balls
-    int demoMode = 2;
-    float pad[2];
+    int demoMode = 0;
+    DirectX::XMFLOAT2 windOffset;
 };
 
 struct alignas(16) cbCloudLighting
