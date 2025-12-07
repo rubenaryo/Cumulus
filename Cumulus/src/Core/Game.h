@@ -75,7 +75,7 @@ private:
     std::array<Muon::FrameResources, NUM_FRAMES_IN_FLIGHT> mFrameResources;
     size_t mCurrFrameResourceIdx = 0;
 
-    int jetIdx = -1;
+    int jetIdx[Muon::JET_COUNT];
     Muon::cbJetTrailPositions jetTrailPos;
 
     static const DirectX::XMFLOAT3 jetDir;

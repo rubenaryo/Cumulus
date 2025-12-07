@@ -126,7 +126,7 @@ struct alignas(16) cbCloudGenData
     //0 is no demo
     //1 is draw jet
     //2 is draw balls
-    int demoMode = 2;
+    int demoMode = 1;
     float pad[2];
 };
 
@@ -169,9 +169,9 @@ struct alignas(16) cbCloudLighting
     float clPad9 = 0.0f;
 };
 
-
+const int JET_COUNT = 5; // Should always be odd for interval positioning to work. Also manually update the val in UpdateNVDF.cs
 struct alignas(16) cbJetTrailPositions {
-    DirectX::XMFLOAT4 positions[4];
+    DirectX::XMFLOAT4 positions[JET_COUNT*2];
 };
 
 struct EntityData {
