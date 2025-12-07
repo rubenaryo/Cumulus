@@ -40,7 +40,7 @@ void Camera::Init(DirectX::XMFLOAT3& pos, float aspectRatio, float nearPlane, fl
     mFar = farPlane;
 
     mPosition = XMLoadFloat3(&pos);
-    mTarget = XMVectorSet(0.0f, -25.0f, 0.0f, 0.0f);
+    mTarget = XMVectorSet(0.0f, -50.0f, 0.0f, 0.0f);
 
     const float CAMERA_DIST = 1.0f; // TODO: Not sure where it's used
 

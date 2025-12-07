@@ -162,6 +162,13 @@ namespace Muon
         float maxX = -FLT_MAX;
         float minX = FLT_MAX;
 
+        float maxY = -FLT_MAX;
+        float minY = FLT_MAX;
+
+        float maxZ = -FLT_MAX;
+        float minZ = FLT_MAX;
+
+
         int aIndex = -1;
         int bIndex = -1;
 
@@ -180,7 +187,23 @@ namespace Muon
                 maxX = x;
                 bIndex = i;
             }
+
+            float y = points[i].y;
+            minY = std::min(y, minY);
+            maxY = std::max(y, maxY);
+
+            float z = points[i].z;
+            minZ = std::min(z, minZ);
+            maxZ = std::max(z, maxZ);
         }
+
+        aabbMin.x = minX;
+        aabbMin.y = minY;
+        aabbMin.z = minZ;
+
+        aabbMax.x = maxX;
+        aabbMax.y = maxY;
+        aabbMax.z = maxZ;
 
         if (aIndex == bIndex)
         {

@@ -124,28 +124,16 @@ ProceduralNVDFSample MakeProceduralNVDFSample(float4 sample)
     return pnvdf;
 }
 
-struct AABB
-{
-	float3 minBounds;
-	float3 maxBounds;
-};
-
-cbuffer AABBBuffer : register(b3)
-{
-	uint aabbCount;
-	AABB aabbs[1];
-};
-
 struct ConvexHull
 {
-    uint buffer1;   // offset into HullPoints
-    uint buffer2;
-
     uint faceOffset;    // offset into HullFaces
     uint faceCount;
-
-    float4x4 world;
-	float4x4 invWorld;
+    
+    uint buffer1; // offset into HullPoints
+    uint buffer2;
+    
+    float4 aabbMin;
+    float4 aabbMax;
 };
 
 cbuffer HullsBuffer : register(b4)
@@ -228,6 +216,12 @@ float3 NvdfUVToWorld(float3 uvw)
     return worldPos;
 }
 
+bool PointInAABB(float3 p, float3 min, float3 max)
+{
+    return all(p >= min) && all(p <= max);
+}
+
+
 bool RayConvexHullIntersect(
     float3 origin,
     float3 dir,
@@ -290,8 +284,15 @@ bool PointInsideConvexHull(float3 pointWS, ConvexHull hull, float4x4 invWorld)
 {
     // Transform point into hull local space
     float3 p = mul(invWorld, float4(pointWS, 1.0)).xyz;
+  //  float3 pMin = mul(invWorld, float4(hull.aabbMin.xyz, 1.0)).xyz;
+  //  float3 pMax = mul(invWorld, float4(hull.aabbMax.xyz, 1.0)).xyz;
 
-    uint faceStart = hull.faceOffset;
+    if (!PointInAABB(p, hull.aabbMin.xyz, hull.aabbMax.xyz))
+    {
+        return false;
+    }
+    
+        uint faceStart = hull.faceOffset;
     uint faceEnd   = hull.faceOffset + hull.faceCount;
 
     // For every plane: dot(n, x) + d <= 0 means inside
@@ -310,6 +311,8 @@ bool PointInsideConvexHull(float3 pointWS, ConvexHull hull, float4x4 invWorld)
 
     return true;
 }
+
+
 
 float DistToEdge(float3 p)
 {

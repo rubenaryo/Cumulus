@@ -59,7 +59,7 @@ bool Game::Init(HWND window, int width, int height)
 
     ResourceCodex& codex = ResourceCodex::GetSingleton();
 
-    mCamera.Init(DirectX::XMFLOAT3(500.0, 150.0, 0.0), width / (float)height, 0.01f, 4000.0f);
+    mCamera.Init(DirectX::XMFLOAT3(600.0, -200.0, 0.0), width / (float)height, 0.01f, 4000.0f);
 
     // Assemble opaque render pass
     {
@@ -147,7 +147,7 @@ bool Game::InitFrameResources(UINT width, UINT height)
 
     // Updating Clouds
     GenerateCloudGenConstants(mCloudData, settings.numClouds, settings.cloudScale);
-    
+
     const Mesh* teapotMesh = codex.GetMesh(GetResourceID(L"teapot.obj"));
     const Mesh* duckyMesh = codex.GetMesh(GetResourceID(L"ducky.obj"));
     const Mesh* sphereMesh = codex.GetMesh(GetResourceID(L"sphere.obj"));
@@ -329,7 +329,7 @@ void Game::SpawnProjectile()
     // Build projectile velocity
     float forwardSpeed = 500.f;
     float upBoost = 30.f;
-    float rightOrbitProtection = 10.f;
+    float rightOrbitProtection = 300.f;
 
     XMVECTOR vel = camForward * forwardSpeed + camUp * upBoost + rightOrbitProtection * CAMERA_SPEED * camRight;
 
@@ -869,12 +869,6 @@ void Game::Render()
             pCommandList->SetComputeRootConstantBufferView(cameraRootIdx, currFrameResources.mCameraBuffer.GetGPUVirtualAddress());
         }
 
-        int32_t aabbIdx = mRaymarchPass.GetResourceRootIndex("AABBBuffer");
-        if (aabbIdx != ROOTIDX_INVALID)
-        {
-            pCommandList->SetComputeRootConstantBufferView(aabbIdx, currFrameResources.mAABBBuffer.GetGPUVirtualAddress());
-        }
-
         int32_t hullIdx = mRaymarchPass.GetResourceRootIndex("HullsBuffer");
         if (hullIdx != ROOTIDX_INVALID)
         {
@@ -1025,6 +1019,8 @@ void Game::AddMeshToHullBuffer(const Muon::Mesh* m, Muon::cbHulls& hullsBuffer, 
     cbConvexHull cHull = {};
     cHull.faceCount = (uint32_t)hull.faces.size();
     cHull.faceOffset = facesOffset;
+    cHull.aabbMax = hull.aabbMax;
+    cHull.aabbMin = hull.aabbMin;
 
     hullsBuffer.hulls[hullOffset] = cHull;
     hullsBuffer.hullCount = newHullOffset;

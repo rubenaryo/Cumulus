@@ -13,6 +13,9 @@ namespace Muon
 		Hull();
 		Hull(const aiVector3D* points, int pointsCount);
 		std::vector<Muon::HullFace> faces;
+
+		DirectX::XMFLOAT4 aabbMin;
+		DirectX::XMFLOAT4 aabbMax;
 	protected:
 		static const int MAX_HULL_LOOPS = 25;
 		void BuildHull(const aiVector3D* points, int pointsCount);

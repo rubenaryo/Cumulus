@@ -30,7 +30,6 @@ struct FrameResources
     bool UpdateCamera(const cbCamera& data);
     bool UpdateLights(const cbLights& data);
     bool UpdateTime(const cbTime& data);
-    bool UpdateAABB(const cbIntersections& data);
     bool UpdateAtmosphere(const cbAtmosphere& data);
     bool UpdateCloudData(const cbCloudGenData& data);
     bool UpdateCloudLighting(const cbCloudLighting& data);
@@ -47,7 +46,6 @@ struct FrameResources
     UploadBuffer mCameraBuffer;
     UploadBuffer mLightBuffer;
     UploadBuffer mTimeBuffer;
-    UploadBuffer mAABBBuffer;
     UploadBuffer mAtmosphereBuffer;
     UploadBuffer mCloudGenBuffer;
     UploadBuffer mCloudLightingBuffer;

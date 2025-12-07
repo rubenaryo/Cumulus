@@ -93,6 +93,6 @@ private:
 
     std::vector<Muon::ProjectilePrefab> projectilePrefabs;
 
-    const float CAMERA_SPEED = 0.05f;
+    const float CAMERA_SPEED = 0.25f;
 };
 #endif

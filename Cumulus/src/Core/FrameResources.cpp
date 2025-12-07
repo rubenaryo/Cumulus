@@ -45,7 +45,6 @@ bool FrameResources::Create(UINT width, UINT height)
     mAtmosphereBuffer.Create(L"Atmosphere CB", sizeof(cbAtmosphere));
     mCloudGenBuffer.Create(L"CloudGen CG", sizeof(cbCloudGenData));
     mCloudLightingBuffer.Create(L"CloudLighting CB", sizeof(cbCloudLighting));
-    mAABBBuffer.Create(L"AABB Buffer", sizeof(cbIntersections));
     mHullBuffer.Create(L"Hull Buffer", sizeof(cbHulls));
     mHullFaceBuffer.Create(L"Hull Faces Buffer", sizeof(cbHullFaces));
     mTimeBuffer.Create(L"Time", sizeof(cbTime));
@@ -75,12 +74,6 @@ bool FrameResources::UpdateLights(const cbLights& data)
 bool FrameResources::UpdateTime(const cbTime& data)
 {
     memcpy(mTimeBuffer.GetMappedPtr(), &data, sizeof(cbTime));
-    return true;
-}
-
-bool FrameResources::UpdateAABB(const cbIntersections& data)
-{
-    memcpy(mAABBBuffer.GetMappedPtr(), &data, sizeof(cbIntersections));
     return true;
 }
 
@@ -142,7 +135,6 @@ void FrameResources::Destroy()
     mCameraBuffer.Destroy();
     mLightBuffer.Destroy();
     mTimeBuffer.Destroy();
-    mAABBBuffer.Destroy();
     mAtmosphereBuffer.Destroy();
     mCloudGenBuffer.Destroy();
     mCloudLightingBuffer.Destroy();

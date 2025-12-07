@@ -60,14 +60,14 @@ struct alignas(256) cbIntersections
 
 struct alignas(16) cbConvexHull
 {
-    uint32_t buffer1;
-    uint32_t buffer2;
-
     uint32_t faceOffset;
     uint32_t faceCount;
 
-    DirectX::XMFLOAT4X4 world;
-    DirectX::XMFLOAT4X4 invWorld;
+    uint32_t buffer1;
+    uint32_t buffer2;
+
+    DirectX::XMFLOAT4 aabbMin;
+    DirectX::XMFLOAT4 aabbMax;
 };
 
 struct alignas(16) cbHulls
