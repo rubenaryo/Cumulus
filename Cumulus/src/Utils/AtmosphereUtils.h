@@ -171,7 +171,7 @@ void UpdateAtmosphere(cbAtmosphere& constants,
     {
         XMFLOAT3 axis = { -sqrt(3.f) * 0.5f, 0.0f, 0.5f};
 
-        XMVECTOR rotation = XMQuaternionRotationAxis(XMVector3Normalize(XMLoadFloat3(&axis)), 0.01 * input.timeScale);
+        XMVECTOR rotation = XMQuaternionRotationAxis(XMVector3Normalize(XMLoadFloat3(&axis)), 0.005 * input.timeScale);
         // NOTE: z and y need to be flipped here because the atmosphere code expects Y up........
         XMFLOAT3 flipped = { input.sunDir.x, input.sunDir.z, input.sunDir.y };
         XMVECTOR currVec = XMLoadFloat3(&flipped);
