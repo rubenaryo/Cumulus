@@ -1,3 +1,5 @@
+#define USE_BAKED_NOISE_TEX 0
+
 RWTexture3D<float4> gOutput : register(u0);
 
 cbuffer cbCloudGenBuffer : register(b6)
@@ -204,18 +206,29 @@ void main(int3 dispatchThreadID : SV_DispatchThreadID)
     // we baked this into the r channel of a texture
     // it also slowly fades out based on distance from d by scale
     float norm_scale = d / scale;
-    float2 tex = d > scale * 1.5f ? float2(0.0, 0.0) : proceduralNoiseTex.SampleLevel(linearWrap, uvw, 0.0).rg;
-    // TODO: fade out as we get closer to the edge so we don't have harsh cutoffs at the edge of the grid
-    // float norm_edge_dist = DistToEdge(worldPos) / scale;
     
-    float billow = d > scale ? 0.0 : tex.r; 
-    float g = billow < norm_scale ? 0.0 : billow * (1.0 - norm_scale);
-    
+    // Using cached noise texture
+ #if USE_BAKED_NOISE_TEX
     // b is detail type, which is a bit larger billows that get attenuated by height, as higher parts are more whispy
     // we calculated this with: d > scale * 1.5 ? 0.0 :fbm_3D_BillowNoise(worldPos * 0.006, float3(6.0, 6.0, 6.0), 3) * normalized_height
     // where float normalized_height = (worldPos.y - VOLUME_MIN_WS.y) / (VOLUME_MAX_WS.y - VOLUME_MIN_WS.y) + 0.3;
     // but we already baked this into the g channel of the input texture, and we already do the scale check there
+     // Grabbing baked noise texture 
+    
+    float2 tex = d > scale * 1.5f ? float2(0.0, 0.0) : proceduralNoiseTex.SampleLevel(linearWrap, uvw, 0.0).rg;
+    // TODO: fade out as we get closer to the edge so we don't have harsh cutoffs at the edge of the grid
+    // float norm_edge_dist = DistToEdge(worldPos) / scale;
+    float billow = d > scale ? 0.0 : tex.r;  // Grabbing baked texture
     float b = tex.g;
+#else
+    float billow = d > scale ? 0.0 : fbm_3D_BillowNoise(worldPos * 0.008, float3(6.0, 6.0, 6.0), 12); // Grabbing baked texture
+    float normalized_height = (worldPos.y - VOLUME_MIN_WS.y) / (VOLUME_MAX_WS.y - VOLUME_MIN_WS.y) + 0.3;
+    float b = d > scale * 1.5 ? 0.0 : fbm_3D_BillowNoise(worldPos * 0.006, float3(6.0, 6.0, 6.0), 3) * normalized_height;
+#endif
+    
+    float g = billow < norm_scale ? 0.0 : billow * (1.0 - norm_scale);
+    
+ // Grabbing baked noise texture 
     g *= gMultiplier;
     //---------------------------
     // COLLISION CODE
