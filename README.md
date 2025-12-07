@@ -114,6 +114,7 @@ This project is built using MSVC with the Visual Studio 2022 toolset (v143) for 
  - Domenic Portera for the [HLSL port](https://github.com/domportera/hlsl-noise/tree/main) of the billowy noise.
  - [Eric Bruneton's Precomputed Atmospheric Scattering](https://ebruneton.github.io/precomputed_atmospheric_scattering/)
  - [Inigo Quilez's blog on SDFs](https://iquilezles.org/articles/distfunctions/)
+ - [Björn Ottosson's okLab Conversion](https://bottosson.github.io/posts/oklab/)
 
 ## Dependencies
 * [DirectX Tex](https://github.com/microsoft/DirectXTex/)
