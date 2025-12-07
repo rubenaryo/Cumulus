@@ -2,7 +2,6 @@
 #include "Raymarch_Common.hlsli"
 
 // === Raymarch / Quality ===
-#define GPU_CLOUD 1
 #define USE_ADAPTIVE_STEP        1   // Adaptive step size along ray
 #define USE_JITTERED_STEP        1   // Stochastic jitter per step
 #define USE_HIGH_HIGH_FREQUENCY  1   // Extra near-camera detail
@@ -131,10 +130,6 @@ float GetFractionFromValue(float x, float minVal, float maxVal)
 // Returns tau; transmittance is exp(-tau)
 float GetApproxOpticalDepthToSun(float3 samplePos, float3 sunDir, float directExtinctionScale)
 {
-#if GPU_CLOUD
-    // TODO: Implement optical depth calculation to the sun using procedural NVDF 
-    return 0.0;
-#else
     // Intersect light ray with cloud volume
     float tEnter, tExit;
     if (!RayBoxIntersect(samplePos, sunDir, VOLUME_MIN_WS, VOLUME_MAX_WS, tEnter, tExit))
@@ -206,7 +201,6 @@ float GetApproxOpticalDepthToSun(float3 samplePos, float3 sunDir, float directEx
     // Use cached values to approximate remaining light ray march
     float cachedOpticalDepth = lightCacheTex.SampleLevel(linearClamp, WorldToNvdfUV(samplePos + sunDir * t), 0.0f).r;
     return depth + cachedOpticalDepth;
-#endif
 }
 
 // Simple Henyey–Greenstein phase function
@@ -349,14 +343,10 @@ float3 VolumeRaymarchNvdf(float3 eyePos, float3 dir, float3 bgColor, float maxRa
         float4 sdfSample = proceduralNvdfTex.SampleLevel(linearClamp, WorldToNvdfUV(samplePos), 0.0f);
         float collisionValue = sdfSample.a;
         float sdfDistance =  DecodeSdf(sdfSample.r) * AUTHORING_TO_WORLD_SCALE * (1.0 - collisionValue);
-        // NVDF range for a is [0.2, 0.6] -> mapping smoothstep [0, 1] to it
-        sdfSample.a = clamp(sdfSample.b - 0.3f, 0.2f, 0.6f); //smoothstep(-4.0, -12.0, sdfDistance) * 0.4 + 0.2;
-        sdfSample.g *= 1.0 - collisionValue;
 #else
         float3 nvdfUV = WorldToNvdfUV(samplePos);
         float4 sdfSample = sdfTex.SampleLevel(linearClamp, nvdfUV, 0.0f);
         float collisionValue = proceduralNvdfTex.SampleLevel(linearClamp, nvdfUV, 0.0f).a;
-        sdfSample.g *= (1.0 - collisionValue);
         // collision hack, step size is reduced to show the hole better
         float sdfDistance = DecodeSdf(sdfSample.r) * AUTHORING_TO_WORLD_SCALE * (1.0 - collisionValue);
 #endif
