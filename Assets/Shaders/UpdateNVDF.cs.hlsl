@@ -221,9 +221,11 @@ void main(int3 dispatchThreadID : SV_DispatchThreadID)
     float billow = d > scale ? 0.0 : tex.r;  // Grabbing baked texture
     float b = tex.g;
 #else
-    float billow = d > scale ? 0.0 : fbm_3D_BillowNoise(worldPos * 0.008, float3(6.0, 6.0, 6.0), 12); // Grabbing baked texture
+    float billowScale = 0.006f; 
+    float relaxedBillowScale = billowScale * 0.8f; 
+    float billow = d > scale ? 0.0 : fbm_3D_BillowNoise(worldPos * billowScale, float3(6.0, 6.0, 6.0), 12); // Grabbing baked texture
     float normalized_height = (worldPos.y - VOLUME_MIN_WS.y) / (VOLUME_MAX_WS.y - VOLUME_MIN_WS.y) + 0.3;
-    float b = d > scale * 1.5 ? 0.0 : fbm_3D_BillowNoise(worldPos * 0.006, float3(6.0, 6.0, 6.0), 3) * normalized_height;
+    float b = d > scale * 1.5 ? 0.0 : fbm_3D_BillowNoise(worldPos * relaxedBillowScale, float3(6.0, 6.0, 6.0), 3) * normalized_height;
 #endif
     
     float g = billow < norm_scale ? 0.0 : billow * (1.0 - norm_scale);
