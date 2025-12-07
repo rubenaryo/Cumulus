@@ -20,6 +20,7 @@ Description : Implementation of Game.h
 #include <imgui.h>
 #include <imgui_impl_win32.h>
 #include <imgui_impl_dx12.h>
+#include <random>
 
 Game::Game() :
     mInput(),
@@ -322,8 +323,41 @@ void Game::SpawnProjectile()
 
     XMVECTOR vel = camForward * forwardSpeed + camUp * upBoost;
 
+    std::random_device rd;
+    std::mt19937 gen(rd());
+    std::uniform_real_distribution<float> dist01(0.0f, 1.0f);
+
+    // random axis
+    DirectX::XMVECTOR axis = DirectX::XMVectorSet(dist01(gen), dist01(gen), dist01(gen), 0.0f);
+    axis = DirectX::XMVector3Normalize(axis);
+
+    // store in XMFLOAT4
+    DirectX::XMFLOAT4 rot;
+    DirectX::XMStoreFloat3(reinterpret_cast<DirectX::XMFLOAT3*>(&rot), axis);
+
+    // random rotation speed (example: -2.0 to 2.0 radians/sec)
+    std::uniform_real_distribution<float> rateDist(-2.f, 2.0f);
+    rot.w = rateDist(gen);
+
+
     // Store velocity
     XMStoreFloat4(&newProjectile.vel, vel);
+
+    // Store rot
+    newProjectile.rot = rot;
+
+
+    //apply rot:
+    float angle = newProjectile.rot.w * 55.f;
+    XMMATRIX rotStart = XMMatrixRotationAxis(axis, angle);
+
+    // Apply rotation to the existing world matrix
+    DirectX::XMMATRIX world = XMLoadFloat4x4(&newProjectile.entityMatrices.world);
+    world = XMMatrixMultiply(rotStart, world);
+
+    DirectX::XMStoreFloat4x4(&newProjectile.entityMatrices.world, world);
+    DirectX::XMStoreFloat4x4(&newProjectile.entityMatrices.invWorld, XMMatrixInverse(nullptr, world));
+
 
     projectileIndices.push_back(cpuEntityData.size());
     cpuEntityData.push_back(newProjectile);
@@ -379,13 +413,13 @@ void Game::UpdateEntities(Muon::FrameResources& currFrameResources, const Muon::
             EntityData& projectile = cpuEntityData[projectileIndices[i]];
 
             // Convert data
-            projectile.vel.y -= 9.8 * time.deltaTime;
+            projectile.vel.y -= 98.0f * time.deltaTime;
             XMVECTOR vel = XMLoadFloat4(&projectile.vel);
             XMMATRIX world = XMLoadFloat4x4(&projectile.entityMatrices.world);
 
             // Extract linear velocity
             XMVECTOR linearVel = XMVectorSetW(vel, 0.0f); // remove rot rate
-            float rotationRate = projectile.vel.w;        // rot per second
+            float rotationRate = projectile.rot.w;        // rot per second
 
             // --- MOVE ---
             XMVECTOR forwardMove = linearVel * time.deltaTime;
@@ -394,11 +428,16 @@ void Game::UpdateEntities(Muon::FrameResources& currFrameResources, const Muon::
             // --- ROTATE ---
             if (rotationRate != 0.0f)
             {
-                // Rotate around the projectile’s local Y axis (example)
-                XMMATRIX rot = XMMatrixRotationY(rotationRate * time.deltaTime);
+                XMVECTOR axis = XMVector3Normalize(
+                    XMLoadFloat3(reinterpret_cast<XMFLOAT3*>(&projectile.rot))
+                );
 
-                // Apply rotation BEFORE translation
-                world = rot * world;
+                float angle = projectile.rot.w * time.deltaTime;
+
+                XMMATRIX rot = XMMatrixRotationAxis(axis, angle);
+
+                // Apply rotation to the existing world matrix
+                world = XMMatrixMultiply(rot, world);
             }
 
             // Store results back
