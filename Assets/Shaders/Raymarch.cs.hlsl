@@ -340,9 +340,8 @@ float3 VolumeRaymarchNvdf(float3 eyePos, float3 dir, float3 bgColor, float maxRa
 
         float3 samplePos = eyePos + march.distance * viewDirN;
 #if GPU_CLOUD
-        float4 sdfSample = proceduralNvdfTex.SampleLevel(linearClamp, WorldToNvdfUV(samplePos), 0.0f);
-        float collisionValue = sdfSample.a;
-        float sdfDistance =  DecodeSdf(sdfSample.r) * AUTHORING_TO_WORLD_SCALE * (1.0 - collisionValue);
+        ProceduralNVDFSample procNVDFSample = MakeProceduralNVDFSample(proceduralNvdfTex.SampleLevel(linearClamp, WorldToNvdfUV(samplePos), 0.0f));
+        float sdfDistance = DecodeSdf(procNVDFSample.encodedSDF) * AUTHORING_TO_WORLD_SCALE * (1.0 - procNVDFSample.collisionFactor);
 #else
         float3 nvdfUV = WorldToNvdfUV(samplePos);
         float4 sdfSample = sdfTex.SampleLevel(linearClamp, nvdfUV, 0.0f);
@@ -373,11 +372,10 @@ float3 VolumeRaymarchNvdf(float3 eyePos, float3 dir, float3 bgColor, float maxRa
 #endif
             
 #if GPU_CLOUD
-            float4 nvdfSample = proceduralNvdfTex.SampleLevel(linearClamp, nvdfUV, 0.0f);
-            float collisionValue = nvdfSample.a;
-        
-            float dimensionalProfile = nvdfSample.g;
-            float detailType = nvdfSample.b;
+            ProceduralNVDFSample nvdfSample = MakeProceduralNVDFSample(proceduralNvdfTex.SampleLevel(linearClamp, nvdfUV, 0.0f));
+            float collisionValue = nvdfSample.collisionFactor;
+            float dimensionalProfile = nvdfSample.dimensionalProfile;
+            float detailType = nvdfSample.detailType;
             // NVDF range for density scale is [0.2, 0.6] -> mapping smoothstep [0, 1] to it
             float nvdfDensityScale = clamp(detailType - 0.3f, 0.2f, 0.6f); //smoothstep(-4.0, -12.0, sdfDistance) * 0.4 + 0.2;
             dimensionalProfile *= (1.0 - collisionValue);
