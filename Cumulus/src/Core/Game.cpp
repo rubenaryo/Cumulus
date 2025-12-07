@@ -256,7 +256,10 @@ void Game::InitEntities()
 
             // ---- 1b. Set initial world position -----------------------------------
             float intervalZ = 200.0f;
-            XMVECTOR jetStartPos = XMVectorSet(500.0, 50.0, (-intervalZ * (JET_COUNT - 1)/2 + intervalZ * i), 1.f) - XMLoadFloat3(&jetDir) * 4000.f;
+            int middle = JET_COUNT / 2;
+            int diffFromMiddle = std::abs(i - middle);
+
+            XMVECTOR jetStartPos = XMVectorSet(500.0, 50.0, (-intervalZ * (JET_COUNT - 1)/2 + intervalZ * i), 1.f) - XMLoadFloat3(&jetDir) * 4000.f - XMLoadFloat3(&jetDir) * diffFromMiddle * 250.f;
             XMStoreFloat4(&jetTrailPos.positions[2*i], jetStartPos);
 
             // Build world matrix correctly

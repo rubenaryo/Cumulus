@@ -176,7 +176,7 @@ void main(int3 dispatchThreadID : SV_DispatchThreadID)
             jetSpeed = jetTravelDistance / totalTime;
             float distanceFromJet = length(worldPos - positions[2 * i + 1].xyz);
             float timeAlive = distanceFromJet / max(jetSpeed, 0.0001);
-            float lifeTime = 25.0;
+            float lifeTime = 15.0;
 
 
             float currentDensityMultiplier = (1.0 - saturate(timeAlive / lifeTime));
@@ -186,7 +186,10 @@ void main(int3 dispatchThreadID : SV_DispatchThreadID)
             float disStart = length(worldPos - positions[2 * i].xyz);
             float disEnd = length(worldPos - positions[2 * i + 1].xyz);
 
-         //   gMultiplier = lerp(0.15, 1.0, currentDensityMultiplier);
+            //if inside jet trail
+            if (curr < 0.f) {
+                gMultiplier = lerp(0.01, 1.0, currentDensityMultiplier);
+            }
         }
         scale /= numTrails;
     }
