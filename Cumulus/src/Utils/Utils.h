@@ -31,10 +31,13 @@ namespace Muon
 	DirectX::XMFLOAT3 SrgbToLinear3(float r, float g, float b); 
 
 	float LinearChannelToSrgb(float c);
-
 	DirectX::XMFLOAT3 LinearToSrgb3(const DirectX::XMFLOAT3 c);
 	DirectX::XMFLOAT3 LinearToSrgb3(const float c[3]);
 	DirectX::XMFLOAT3 LinearToSrgb3(float r, float g, float b);
+
+	// Credit: https://bottosson.github.io/posts/oklab/
+	DirectX::XMFLOAT3 OkLabToSrgb3(const DirectX::XMFLOAT3 okLab); 
+	DirectX::XMFLOAT3 SrgbToOkLab3(const DirectX::XMFLOAT3 srgb); 
 }
 
 #endif
