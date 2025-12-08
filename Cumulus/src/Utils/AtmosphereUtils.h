@@ -8,6 +8,7 @@ Description : Useful functions for atmospheric rendering calculations
 #define ATMOSPHEREUTILS_H
 
 #include <Core/Camera.h>
+#include <Utils/Utils.h>
 #include <Core/MuonImgui.h>
 #include <Core/CBufferStructs.h>
 #include <DirectXMath.h>
@@ -170,7 +171,7 @@ void UpdateAtmosphere(cbAtmosphere& constants,
     {
         XMFLOAT3 axis = { -sqrt(3.f) * 0.5f, 0.0f, 0.5f};
 
-        XMVECTOR rotation = XMQuaternionRotationAxis(XMVector3Normalize(XMLoadFloat3(&axis)), 0.01 * input.timeScale);
+        XMVECTOR rotation = XMQuaternionRotationAxis(XMVector3Normalize(XMLoadFloat3(&axis)), 0.005 * input.timeScale);
         // NOTE: z and y need to be flipped here because the atmosphere code expects Y up........
         XMFLOAT3 flipped = { input.sunDir.x, input.sunDir.z, input.sunDir.y };
         XMVECTOR currVec = XMLoadFloat3(&flipped);
@@ -198,22 +199,195 @@ void UpdateAtmosphere(cbAtmosphere& constants,
     constants.white_point = XMFLOAT3(1.082414f, 0.967556f, 0.950030f);
 }
 
+struct LightingData
+{
+    // NOTE: ALL COLOR IS IN LINEAR
+    float directExtinctionScale;
+    float directStrength;
+    DirectX::XMFLOAT3 sunColor;
+    float sunIntensity;
+    DirectX::XMFLOAT3 secondaryColor;
+    float secondaryStrength;
+    DirectX::XMFLOAT3 ambientColor;
+    float ambientExtinction;
+    float ambientStrength;
+};
+
+LightingData LerpLighting(const LightingData& from,
+    const LightingData& to,
+    float t)
+{
+    using namespace DirectX;
+    LightingData out{};
+    // start with all the pure floats
+    out.directExtinctionScale = Lerp(from.directExtinctionScale, to.directExtinctionScale, t);
+    out.directStrength = Lerp(from.directStrength, to.directStrength, t);
+    out.sunIntensity = Lerp(from.sunIntensity, to.sunIntensity, t);
+    out.secondaryStrength = Lerp(from.secondaryStrength, to.secondaryStrength, t);
+    out.ambientExtinction = Lerp(from.ambientExtinction, to.ambientExtinction, t);
+    out.ambientStrength = Lerp(from.ambientStrength, to.ambientStrength, t);
+    // then we do the color, which we will assume comes and goes in linear space
+    out.sunColor = OkLabToLinear(LerpOkLab(LinearToOkLab3(from.sunColor), LinearToOkLab3(to.sunColor), t));
+    out.secondaryColor = OkLabToLinear(LerpOkLab(LinearToOkLab3(from.secondaryColor), LinearToOkLab3(to.secondaryColor), t));
+    out.ambientColor = OkLabToLinear(LerpOkLab(LinearToOkLab3(from.ambientColor), LinearToOkLab3(to.ambientColor), t));
+
+    return out;
+}
+
+void SetLightSettings(const LightingData& data, cbCloudLighting& settings)
+{
+    float directExtinctionScale;
+    float directStrength;
+    DirectX::XMFLOAT3 sunColor;
+    float sunIntensity;
+    DirectX::XMFLOAT3 secondaryColor;
+    float secondaryStrength;
+    DirectX::XMFLOAT3 ambientColor;
+    float ambientExtinction;
+    float ambientStrength;
+
+    settings.directExtinctionScale = data.directExtinctionScale;
+    settings.directStrength = data.directStrength;
+    settings.sunColor = data.sunColor;
+    settings.sunIntensity = data.sunIntensity;
+    settings.secondaryColor = data.secondaryColor;
+    settings.secondaryStrength = data.secondaryStrength;
+    settings.ambientColor = data.ambientColor;
+    settings.ambientExtinctionScale = data.ambientExtinction;
+    settings.ambientStrength = data.ambientStrength;
+}
+
 void UpdateLightFromAtmosphere(cbAtmosphere& atmosphere, SceneSettings& settings)
 {
     using namespace DirectX;
+    XMVECTOR sunVec = XMLoadFloat3(&settings.atmosphere.sunDir);
+    XMVECTOR up = { 0.f, 1.f, 0.f };
+    float sun_height = XMVectorGetX(XMVector3Dot(sunVec, up));
+    float nightVal = SmoothStep(0.20, -0.10, sun_height);
 
-    if (settings.atmosphere.sunDir.y > -0.01)
+    // Setting colors
+    // Daytime
+    XMFLOAT3 noonCol (223.f / 255.f, 224.f / 255.f, 230.f / 255.f );
+    XMFLOAT3 noonSecCol(153.f / 255.f, 181.f / 255.f, 207.f / 255.f);
+    XMFLOAT3 noonAmbCol(210.f / 255.f, 222.f / 255.f, 255.f / 255.f);
+    LightingData dayTimeData
     {
-        settings.lighting.dirSun = XMFLOAT3(-1.0 * settings.atmosphere.sunDir.x,
-                                             1.0 * settings.atmosphere.sunDir.y,
-                                            -1.0 * settings.atmosphere.sunDir.z);
+        0.107f,
+        1.021f,
+        SrgbToLinear3(noonCol),
+        200.26f,
+        SrgbToLinear3(noonSecCol),
+        1.562f,
+        SrgbToLinear3(noonAmbCol),
+        0.002f,
+        0.675f
+    };
+    // Nighttime
+    XMFLOAT3 nightCol(48.f / 255.f, 55.f / 255.f, 73.f / 255.f);
+    XMFLOAT3 nightSecCol(255.f / 255.f, 245.f / 255.f, 230.f / 255.f);
+    XMFLOAT3 nightAmbCol(238.f / 255.f, 233.f / 255.f, 253.f / 255.f);
+    LightingData nightLightData
+    {
+        0.07f,
+        0.0f,
+        SrgbToLinear3(nightCol),
+        0.f,
+        SrgbToLinear3(nightSecCol),
+        0.067f,
+        SrgbToLinear3(nightAmbCol),
+        0.01f,
+        0.209f
+    };
+    // SunRise
+    XMFLOAT3 morningCol(255.f / 255.f, 135.f / 255.f, 0.f / 255.f);
+    XMFLOAT3 morningCol2(161.f / 255.f, 194.f / 255.f, 224.f / 255.f);
+    XMFLOAT3 morningCol3(216.f / 255.f, 224.f / 255.f, 247.f / 255.f);
+    LightingData morningLightData
+    {
+        0.069f,
+        0.272f,
+        SrgbToLinear3(morningCol),
+        189.39f,
+        SrgbToLinear3(morningCol2),
+        1.698f,
+        SrgbToLinear3(morningCol3),
+        0.013f,
+        0.947f
+    };
+
+    // SunSet
+    XMFLOAT3 eveningCol(173.f / 255.f, 72.f / 255.f, 25.f / 255.f);
+    XMFLOAT3 eveningCol2(130.f / 255.f, 168.f / 255.f, 195.f / 255.f);
+    XMFLOAT3 eveningCol3(49.f / 255.f, 83.f / 255.f, 106.f / 255.f);
+    LightingData eveningLightData
+    {
+        0.023f,
+        0.884f,
+        SrgbToLinear3(eveningCol),
+        69.27f,
+        SrgbToLinear3(eveningCol2),
+        0.094f,
+        SrgbToLinear3(eveningCol3),
+        0.007f,
+        0.074f
+    };
+
+    // Lerping between different colors
+    // For reference, nightVal = 1 is full night, 0 = full day.
+    // If it is in between then we lerp.
+    // Sunset and Sunrise (aka morning and evening) are different, and we check this with settings.isDay.
+    // isDay is set to true when nightval = 0 and false when nightval = 1
+    // Thus, if it is day and we are in between then we are in the evening state
+    // if it is not day and we are in between then we are in the morning state
+    LightingData lightData{};
+    if (settings.isDay)
+    {
+        if (nightVal <= 0.5)
+        {
+            float t = nightVal * 2.f;
+            lightData = LerpLighting(dayTimeData, eveningLightData, t);
+        }
+        else
+        {
+            float t = (nightVal - 0.5f) * 2.f;
+            lightData = LerpLighting(eveningLightData, nightLightData, t);
+            // switching to night -> NOTE: check if this 0.95 is good
+            settings.isDay = t < 0.95;
+        }
     }
     else
     {
-        settings.lighting.dirSun = XMFLOAT3( 1.0 * settings.atmosphere.sunDir.x,
-                                            -1.0 * settings.atmosphere.sunDir.y,
-                                             1.0 * settings.atmosphere.sunDir.z);
+        if (nightVal <= 0.5)
+        {
+            float t = nightVal * 2.f;
+            lightData = LerpLighting(dayTimeData, morningLightData, t);
+            settings.isDay = t < 0.05;
+        }
+        else
+        {
+            float t = (nightVal - 0.5f) * 2.f;
+            lightData = LerpLighting(morningLightData, nightLightData, t);
+        }
     }
+
+    SetLightSettings(lightData, settings.lighting);
+
+    // Setting sun direction
+    if (nightVal < 0.95)
+    {
+
+        settings.lighting.dirSun = XMFLOAT3(-1.0 * settings.atmosphere.sunDir.x,
+            1.0 * settings.atmosphere.sunDir.y,
+            -1.0 * settings.atmosphere.sunDir.z);
+    }
+    // full nighttime
+    else
+    {
+        settings.lighting.dirSun = XMFLOAT3(1.0 * settings.atmosphere.sunDir.x,
+            -1.0 * settings.atmosphere.sunDir.y,
+            1.0 * settings.atmosphere.sunDir.z);
+    }
+
     settings.updateLighting = true;
 }
 

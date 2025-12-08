@@ -9,6 +9,7 @@ Description : Utility functions
 #include <Core/Core.h>
 #include <Core/CommonTypes.h>
 #include <string>
+#include <algorithm>
 
 namespace Muon
 {
@@ -31,10 +32,28 @@ namespace Muon
 	DirectX::XMFLOAT3 SrgbToLinear3(float r, float g, float b); 
 
 	float LinearChannelToSrgb(float c);
-
 	DirectX::XMFLOAT3 LinearToSrgb3(const DirectX::XMFLOAT3 c);
 	DirectX::XMFLOAT3 LinearToSrgb3(const float c[3]);
 	DirectX::XMFLOAT3 LinearToSrgb3(float r, float g, float b);
+
+	// Credit: https://bottosson.github.io/posts/oklab/
+	DirectX::XMFLOAT3 OkLabToSrgb3(const DirectX::XMFLOAT3 okLab); 
+	DirectX::XMFLOAT3 SrgbToOkLab3(const DirectX::XMFLOAT3 srgb);
+	DirectX::XMFLOAT3 OkLabToLinear(const DirectX::XMFLOAT3 okLab);
+	DirectX::XMFLOAT3 LinearToOkLab3(const DirectX::XMFLOAT3 srgb);
+
+	DirectX::XMFLOAT3 LerpOkLab(const DirectX::XMFLOAT3& from, const DirectX::XMFLOAT3& to, float t);
+
+	inline float SmoothStep(float edge0, float edge1, float x)
+	{
+		float t = std::clamp((x - edge0) / (edge1 - edge0), 0.0f, 1.0f);
+		return t * t * (3.0f - 2.0f * t);
+	}
+
+	inline float Lerp(float from, float to, float t)
+	{
+		return (1 - t) * from + t * to;
+	}
 }
 
 #endif

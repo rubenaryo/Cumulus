@@ -29,7 +29,8 @@ namespace Muon
 		int numClouds = 4;
 		float cloudScale = 1.0;
 		bool updateClouds = false;
-		bool useAtmosphereParams = true;
+		bool useAtmosphereParams = false;
+		bool isDay = true;
 		cbCloudLighting lighting;
 		bool updateLighting = false;
 	};
