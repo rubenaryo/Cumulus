@@ -39,6 +39,7 @@ It extends the architectural principles of Guerrilla Games' **[Nubis 3](https://
   - [Procedural Cloud Generation](#procedural-cloud-generation)
   - [Physically-Based Atmosphere](#physically-based-atmosphere)
   - [DirectX 12 Engine](#muon-a-directx-12-engine)
+- [Performance Analysis](#performance-analysis)
 - [Setup & Development](#setup--development)
   - [Building](#building)
   - [Technical Details](#technical-details)
