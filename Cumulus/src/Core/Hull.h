@@ -17,7 +17,7 @@ namespace Muon
 		DirectX::XMFLOAT4 aabbMin;
 		DirectX::XMFLOAT4 aabbMax;
 	protected:
-		static const int MAX_HULL_LOOPS = 25;
+		static const int MAX_HULL_LOOPS = 50;
 		void BuildHull(const aiVector3D* points, int pointsCount);
 		void ReassignOutsidePoints(
 			std::unordered_map<int, std::vector<int>>& faceToFurthestPoints,

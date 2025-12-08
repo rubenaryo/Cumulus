@@ -55,7 +55,7 @@ float4 main(VertexOut input) : SV_TARGET
 
     // create transformation matrix TBN
     float3x3 TBN = float3x3(input.tangent, input.binormal, input.normal);
-    input.normal = mul(TBN, sampledNormal);
+    input.normal = input.normal;
 
     // Holds the total light for this pixel
     float3 totalLight = 0;
@@ -63,7 +63,7 @@ float4 main(VertexOut input) : SV_TARGET
 
     float3 lightColor = float3(1.0, 1.0, 1.0);
     float3 ambientColor = float3(1.0, 1.0, 1.0);
-    float3 toLight = float3(cos(totalTime), 0.0, sin(totalTime));
+    float3 toLight = float3(0, 1.0, 0);
     float matSpecularity = 64.0;
     toLight = normalize(toLight);
     
@@ -81,8 +81,9 @@ float4 main(VertexOut input) : SV_TARGET
     // Finally, add the ambient color
     const float AMBIENT_INTENSITY = 0.4f;
     totalLight += ambientColor * AMBIENT_INTENSITY;
-    
-    totalLight *= surfaceColor;
+
+    float3 finalC = float3(159.f / 255.f, 237.f / 255.f, 229.f / 255.f);//diffuseTexture.Sample(samplerOptions, input.uv).rgb;
+    totalLight *= finalC;
 
     totalLight = saturate(totalLight);
 

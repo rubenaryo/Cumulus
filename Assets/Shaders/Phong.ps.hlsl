@@ -33,7 +33,7 @@ float4 main(VertexOut input) : SV_TARGET
     float3 normalRGB = input.normal.xyz * 0.5 + 0.5;
 
     // Sample diffuse texture, normal map(unpacked)
-    float3 surfaceColor = diffuseTexture.Sample(samplerOptions, input.uv).rgb;
+    float3 surfaceColor = float3(159.f, 237.f, 229.f);//diffuseTexture.Sample(samplerOptions, input.uv).rgb;
     
     // Normalize normal vector
     input.normal = normalize(input.normal);
@@ -58,5 +58,5 @@ float4 main(VertexOut input) : SV_TARGET
     
     totalLight *= surfaceColor;
     
-    return float4(surfaceColor, 1);
+    return float4(1,1,1,1);
 }

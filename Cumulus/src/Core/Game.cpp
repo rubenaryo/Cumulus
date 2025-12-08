@@ -150,12 +150,20 @@ bool Game::InitFrameResources(UINT width, UINT height)
 
     const Mesh* teapotMesh = codex.GetMesh(GetResourceID(L"teapot.obj"));
     const Mesh* duckyMesh = codex.GetMesh(GetResourceID(L"ducky.obj"));
-    const Mesh* sphereMesh = codex.GetMesh(GetResourceID(L"sphere.obj"));
+    const Mesh* sphereMesh = codex.GetMesh(GetResourceID(L"cube.obj"));
+    const Mesh* axeMesh = codex.GetMesh(GetResourceID(L"taurus.obj"));
 
     cbHulls hulls = {};
     cbHullFaces faces = {};
     int facesOffset = 0;
     int hullOffset = 0;
+    ProjectilePrefab axePrefab = {};
+    axePrefab.hullIdx = hullOffset;
+    axePrefab.resourceID = GetResourceID(L"taurus.obj");
+    axePrefab.textureID = GetResourceID(L"DuckyMat");
+    axePrefab.scale = 400.f;
+    projectilePrefabs.push_back(axePrefab);
+    AddMeshToHullBuffer(axeMesh, hulls, faces, facesOffset, hullOffset);
 
     ProjectilePrefab duckyPrefab = {};
     duckyPrefab.hullIdx = hullOffset;
@@ -176,11 +184,12 @@ bool Game::InitFrameResources(UINT width, UINT height)
 
     ProjectilePrefab spherePrefab = {};
     spherePrefab.hullIdx = hullOffset;
-    spherePrefab.resourceID = GetResourceID(L"sphere.obj");
+    spherePrefab.resourceID = GetResourceID(L"cube.obj");
     spherePrefab.textureID = GetResourceID(L"DuckyMat");
     spherePrefab.scale = 100.f;
     projectilePrefabs.push_back(spherePrefab);
     AddMeshToHullBuffer(sphereMesh, hulls, faces, facesOffset, hullOffset);
+
 
     // Create each frame resource and fill it with static data.
     for (size_t i = 0; i != NUM_FRAMES_IN_FLIGHT; ++i)
@@ -322,7 +331,6 @@ void Game::SpawnProjectile()
     objWorld = XMMatrixScaling(prefab.scale, prefab.scale, prefab.scale) * objWorld;
     XMMATRIX invObjWorld = XMMatrixInverse(nullptr, objWorld);
 
-
     XMStoreFloat4x4(&newProjectile.entityMatrices.world, objWorld);
     XMStoreFloat4x4(&newProjectile.entityMatrices.invWorld, invObjWorld);
 
@@ -331,14 +339,16 @@ void Game::SpawnProjectile()
     XMVECTOR camUp = XMVector3Normalize(objWorld.r[1]);
     XMVECTOR camRight = XMVector3Normalize(objWorld.r[0]);
 
+    std::uniform_real_distribution<float> dist01(0.0f, 1.0f);
+
     // Build projectile velocity
-    float forwardSpeed = 500.f;
-    float upBoost = 30.f;
-    float rightOrbitProtection = 300.f;
+    float forwardSpeed = 400.f + dist01(gen) * 200.f;
+
+    float upBoost = 30.f + dist01(gen) * 150.f;
+    float rightOrbitProtection = 100.f + dist01(gen) * 400.f;
 
     XMVECTOR vel = camForward * forwardSpeed + camUp * upBoost + rightOrbitProtection * CAMERA_SPEED * camRight;
 
-    std::uniform_real_distribution<float> dist01(0.0f, 1.0f);
 
     // random axis
     DirectX::XMVECTOR axis = DirectX::XMVectorSet(dist01(gen), dist01(gen), dist01(gen), 0.0f);
@@ -507,7 +517,7 @@ void Game::Update(Muon::StepTimer const& timer)
     Muon::cbLights lights;
     lights.ambientColor = DirectX::XMFLOAT3A(+1.0f, +0.772f, +0.56f);
     lights.directionalLight.diffuseColor = DirectX::XMFLOAT3A(1.0, 1.0, 1.0);
-    lights.directionalLight.dir = DirectX::XMFLOAT3A(0, 1, 0);
+    lights.directionalLight.dir = settings.atmosphere.sunDir;
     currFrameResources.UpdateLights(lights);
 
     // Updating Time
@@ -837,9 +847,8 @@ void Game::Render()
                 const EntityData& projectile = cpuEntityData[projectileIndices[i]];
                 const Mesh* mesh = codex.GetMesh(projectile.resourceID);
                 const Muon::Material* prefabMat = codex.GetMaterialType(projectile.textureID);
-                const Muon::Material* phongMat = codex.GetMaterialType(phongMatId);
 
-                mOpaquePass.BindMaterial(*phongMat, pCommandList);
+                mOpaquePass.BindMaterial(*prefabMat, pCommandList);
 
                 if (mesh && settings.drawObjects) {
                     static const size_t kEntityCBSize =

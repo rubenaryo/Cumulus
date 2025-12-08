@@ -1149,8 +1149,8 @@ bool MaterialFactory::CreateAllMaterials(ResourceCodex& codex)
     const ResourceID kTest3DTexId = GetResourceID(L"Test_3D");
     const ResourceID kTestDDS = GetResourceID(L"scatter_tex_full.dds");
 
-    const ResourceID duckyBaseColorId = GetResourceID(L"ducky.png");
-    const ResourceID duckyNormal = GetResourceID(L"duckyN.png");
+    const ResourceID duckyBaseColorId = GetResourceID(L"help.jpg");
+    const ResourceID duckyNormal = GetResourceID(L"ducky_N.png");
 
     {
         const wchar_t* kPhongMaterialName = L"Phong";
