@@ -35,9 +35,11 @@ It extends the architectural principles of Guerrilla Games' **[Nubis 3](https://
 - [Overview](#overview)
 - [Features](#features)
   - [Volumetric Cloud Rendering](#volumetric-cloud-rendering)
+  - [Real-Time Volumetric Interactions](#real-time-volumetric-interactions)
   - [Procedural Cloud Generation](#procedural-cloud-generation)
   - [Physically-Based Atmosphere](#physically-based-atmosphere)
   - [DirectX 12 Engine](#muon-a-directx-12-engine)
+- [Performance Analysis](#performance-analysis)
 - [Setup & Development](#setup--development)
   - [Building](#building)
   - [Technical Details](#technical-details)
@@ -134,27 +136,6 @@ The lighting model integrates three components based on the Nubis 3 architecture
 
 To decouple the expensive lighting calculation from the view ray march, the engine implements **Light Ray Caching**. Lighting is pre-computed for each voxel in a separate compute pass before the main render. This prevents the nested loop nightmare of marching toward the sun at every view sample, allowing the primary ray to simply look up the incoming light energy cheaply.
 
-
-## Procedural Cloud Generation
-<p align="center">
-  <img width="95%" alt="image" src="images/procedural/procedural-hero.gif" />
-  <br>
-  <em>Clouds created in real-time in a compute shader</em>
-</p>
-
-### SDF-Based Random Cloud Generation
-<div align="center">
-  <img src="images/procedural/sdfs.png" width="95%" />
-  <br>
-  <em>Visualization of the base SDF shapes</em>
-</div>
-
-<br>
-
-Cloud formation is fully procedural and controllable in real-time via ImGUI (e.g., cloud count, scale multiplier). The generation pipeline operates in two stages:
-1.  **CPU Seeding:** "Seeds" are initialized as world-space coordinates to track cloud position, movement, and formation over time.
-2.  **GPU Shaping:** For each seed, a compute shader generates a base SDF shape using **Inigo Quilez’s** [primitive distance functions](https://iquilezles.org/articles/distfunctions/). The base form is a round cone surrounded by "Vesica Segments" (football-like shapes), where orientation, count, and size are driven by noise and the input scale factor.
-
 ## Real-Time Volumetric Interactions
 <p align="center">
   <img width="95%" alt="image" src="images/collision/outputDemo.gif" />
@@ -179,6 +160,26 @@ Cloud placement is procedurally driven by an "SDF Path" system. An event system 
 </p>
 
 The engine supports real-time volumetric destruction. Interaction is handled by checking **convex hull collisions** against the cloud's density voxels. Those  checks are accelerated via a compute shader. Collision data is packed per mesh instance, rather than entity instance, to minimize memory overhead during the physics pass.
+
+## Procedural Cloud Generation
+<p align="center">
+  <img width="95%" alt="image" src="images/procedural/procedural-hero.gif" />
+  <br>
+  <em>Clouds created in real-time in a compute shader</em>
+</p>
+
+### SDF-Based Random Cloud Generation
+<div align="center">
+  <img src="images/procedural/sdfs.png" width="95%" />
+  <br>
+  <em>Visualization of the base SDF shapes</em>
+</div>
+
+<br>
+
+Cloud formation is fully procedural and controllable in real-time via ImGUI (e.g., cloud count, scale multiplier). The generation pipeline operates in two stages:
+1.  **CPU Seeding:** "Seeds" are initialized as world-space coordinates to track cloud position, movement, and formation over time.
+2.  **GPU Shaping:** For each seed, a compute shader generates a base SDF shape using **Inigo Quilez’s** [primitive distance functions](https://iquilezles.org/articles/distfunctions/). The base form is a round cone surrounded by "Vesica Segments" (football-like shapes), where orientation, count, and size are driven by noise and the input scale factor.
 
 
 ### Noise Baking Optimization
@@ -286,12 +287,36 @@ The scenes tested for the first scenario are:
 </table>
 
 The results comparison of the procedural compute pass in milliseconds:
-| Scene | Offline Texture (ms) | Online Texture (ms) |
-|---------|---------|--------|
-| Four clouds - 1.0 | 6.21 | 6.51 |
-| Four Big Clouds | 7.32 | 9.79 |
-| Eight Clouds | 13.15 | 14.76 |
-| Sixteen Clouds | 24.55 | 24.61 |
+
+<div align="center">
+  <table>
+    <tr>
+      <th>Scene</th>
+      <th>Offline Texture (ms)</th>
+      <th>Online Texture (ms)</th>
+    </tr>
+    <tr>
+      <td>Four clouds - 1.0</td>
+      <td>6.21</td>
+      <td>6.51</td>
+    </tr>
+    <tr>
+      <td>Four Big Clouds</td>
+      <td>7.32</td>
+      <td>9.79</td>
+    </tr>
+    <tr>
+      <td>Eight Clouds</td>
+      <td>13.15</td>
+      <td>14.76</td>
+    </tr>
+    <tr>
+      <td>Sixteen Clouds</td>
+      <td>24.55</td>
+      <td>24.61</td>
+    </tr>
+  </table>
+</div>
 
 
 The scenes tested for the second scenario are:
@@ -323,21 +348,70 @@ The scenes tested for the second scenario are:
 </table>
 
 The result comparison of the lighting cache and the raymarch compute passes in milliseconds:
-| Scene | Light Cache (ms) | Raymarch (ms) |
-|-------|-------------|----------|
-| Far Cloud | 1.62 | 2.1 |
-| Close Cloud | 2.21 | 20.8 |
-| On the Edge | 1.5 | 20.3 |
-| Inside Cloud | 1.77 | 9.62 |
+
+<div align="center">
+  <table>
+    <tr>
+      <th>Scene</th>
+      <th>Light Cache (ms)</th>
+      <th>Raymarch (ms)</th>
+    </tr>
+    <tr>
+      <td>Far Cloud</td>
+      <td>1.62</td>
+      <td>2.1</td>
+    </tr>
+    <tr>
+      <td>Close Cloud</td>
+      <td>2.21</td>
+      <td>20.8</td>
+    </tr>
+    <tr>
+      <td>On the Edge</td>
+      <td>1.5</td>
+      <td>20.3</td>
+    </tr>
+    <tr>
+      <td>Inside Cloud</td>
+      <td>1.77</td>
+      <td>9.62</td>
+    </tr>
+  </table>
+</div>
+<br>
 
 Lastly, we have the convex hull collision checks. We standardized the objects to always be the arm model, our highest polygon obj with ~900 triangles. 
 
-| OBJ Count | Hull (ms) | Naive Triangles (ms) | 
-|-------|-------------|----------|
-| 0 | 2.20 | 2.11 |
-| 5 | 3.31 | 30.8 |
-| 30 | 9.50 | 105.5 |
-| 60 | 20.32 | 180.1 |
+<div align="center">
+  <table>
+    <tr>
+      <th>OBJ Count</th>
+      <th>Hull (ms)</th>
+      <th>Naive Triangles (ms)</th>
+    </tr>
+    <tr>
+      <td>0</td>
+      <td>2.20</td>
+      <td>2.11</td>
+    </tr>
+    <tr>
+      <td>5</td>
+      <td>3.31</td>
+      <td>30.8</td>
+    </tr>
+    <tr>
+      <td>30</td>
+      <td>9.50</td>
+      <td>105.5</td>
+    </tr>
+    <tr>
+      <td>60</td>
+      <td>20.32</td>
+      <td>180.1</td>
+    </tr>
+  </table>
+</div>
+<br>
 
 The performance boosts gained through our largely enhancements are self evident. Collision checks are essentially non functioning for a real time context without an optimized collision structure. Likewise, the light cache provided huge gains in near cloud contexts. Interestingly, there isn't much of a difference between offline and online textures. This points to the true bottle neck: the procedural cloud sdf calculations.
 
@@ -365,6 +439,7 @@ To build the project:
 # Appendices
 ## External Credits
  - [Nubis 3](https://www.guerrilla-games.com/read/nubis-cubed), the presentation behind this whole project
+ - Special thanks to [Di Lu](https://www.linkedin.com/in/di-lu-0503251a2/) for helping us debug our shaders!
  - Stefan Gustavson and Ian MacEwan for making [billowy noise](https://github.com/stegu/psrdnoise/), and Stefan and Ashima Arts for [fast perlin noise](https://github.com/ashima/webgl-noise/tree/master) as well
  - Domenic Portera for the [HLSL port](https://github.com/domportera/hlsl-noise/tree/main) of the billowy noise.
  - [Eric Bruneton's Precomputed Atmospheric Scattering](https://ebruneton.github.io/precomputed_atmospheric_scattering/)
