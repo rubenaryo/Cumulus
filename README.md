@@ -138,16 +138,44 @@ To decouple the expensive lighting calculation from the view ray march, the engi
 
 ## Procedural Cloud Generation
 <p align="center">
-  <img width="80%" alt="image" src="images/CloudControl.gif" />
+  <img width="95%" alt="image" src="images/procedural/procedural-hero.gif" />
   <br>
   <em>Clouds created in real-time in a compute shader</em>
 </p>
 
- - We support procedurally creating cloud NVDF data in a compute shader pass, which can be controlled in an ImGUI tab specifying cloud number and their average scale multiplier.
- - Creation starts by initializing cloud "seeds" on the CPU side, which become world-space coordinates where clouds get initialized. These positions can be updated to show cloud movement and formation.
- - For each seed, we create an SDF (given by [Inigo Quilez's blog](https://iquilezles.org/articles/distfunctions/)) that is a simple round cone with "Vesica Segments" aka football shapes around them. The number of these shapes, their size, and the orientation of all of these is given by noise, scaled by the input scale value.
- - Next, based on this SDF, we use a special "billow noise," which is a modified Perlin noise that gets its cells rotated to give a billowy look, as shown by the noise's authors [here](https://www.shadertoy.com/view/fdfcWs). Importantly, this noise gets the fractal sum treatment to ease out values for a less voxely look. It also gets eased out as we move away from the sdf boundaries for the same reason.
- - Finally, detail type and density scale get calculated, which give the clouds their upscaled features. Detail type comes from the same billowy noise at a different scale and gets more intense the farther up we go, to mimic how clouds are more whispy lower down, and density scale is quite uniform for us within the cloud's profile.
+### SDF-Based Random Cloud Generation
+<div align="center">
+  <img src="images/procedural/sdfs.png" width="95%" />
+  <br>
+  <em>Visualization of the base SDF shapes</em>
+</div>
+
+<br>
+
+Cloud formation is fully procedural and controllable in real-time via ImGUI (e.g., cloud count, scale multiplier). The generation pipeline operates in two stages:
+1.  **CPU Seeding:** "Seeds" are initialized as world-space coordinates to track cloud position, movement, and formation over time.
+2.  **GPU Shaping:** For each seed, a compute shader generates a base SDF shape using **Inigo Quilez’s** [primitive distance functions](https://iquilezles.org/articles/distfunctions/). The base form is a round cone surrounded by "Vesica Segments" (football-like shapes), where orientation, count, and size are driven by noise and the input scale factor.
+
+### Noise Baking Optimization
+<table align="center" width="80%">
+  <tr>
+    <td align="center">
+      <img src="images/procedural/dimensionalProfileNoise.jpg" width="100%" />
+      <br>
+      <em>Baked Noise: Dimensional Profile</em>
+    </td>
+    <td align="center">
+      <img src="images/procedural/detailTypeNoise.jpg" width="100%" />
+      <br>
+      <em>Baked Noise: Detail Type</em>
+    </td>
+  </tr>
+</table>
+
+To ensure runtime performance, complex noise functions are **pre-baked** into static 3D textures rather than calculated per-frame:
+-   **Billow Noise:** Based on the **[psrdnoise](https://github.com/stegu/psrdnoise/)** implementation by Stefan Gustavson and Ian MacEwan, this modified Perlin noise uses rotated cells to create the characteristic "puffiness" of cumulus clouds.
+-   **Fractal Sum & Easing:** Noise values are eased out near SDF boundaries and accumulated using fractal sums to eliminate voxel-like artifacts.
+-   **Detail & Density:** High-frequency detail is driven by scaled billow noise that intensifies with altitude (mimicking wispy cloud tops), while density scale remains relatively uniform across the profile.
 
 ## Muon: A DirectX 12 Engine
 <table align="center">
