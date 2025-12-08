@@ -51,17 +51,91 @@ It extends the architectural principles of Guerrilla Games' **[Nubis 3](https://
 # Features
 ## Volumetric Cloud Rendering
 <p align="center">
-  <img width="80%" alt="image" src="images/beauty.png" />
+  <img width="100%" alt="image" src="images/rendering-readme/beauty.png" />
   <br>
-  <em>A nice cloud in our engine</em>
+  <em> A Good Morning Type of Cloud</em>
 </p>
 
-### Rendering
+### Voxel-Based Ray Marching & Data Structures
+<table align="center">
+  <tr>
+    <td align="center">
+      <img src="images/rendering-readme/nvdfs/sdf.jpg" width="200" />
+      <br>
+      <em>SDF Field</em>
+    </td>
+    <td align="center">
+      <img src="images/rendering-readme/nvdfs/nvdfr.jpg" width="200" />
+      <br>
+      <em>NVDF: Density</em>
+    </td>
+    <td align="center">
+      <img src="images/rendering-readme/nvdfs/nvdfg.jpg" width="200" />
+      <br>
+      <em>NVDF: Detail Type</em>
+    </td>
+    <td align="center">
+      <img src="images/rendering-readme/nvdfs/nvdfb.jpg" width="200" />
+      <br>
+      <em>NVDF: Scale</em>
+    </td>
+  </tr>
+</table>
 
- - Ray-marched rendering — integrates density with Beer–Lambert absorption/compositing
- - SDF-guided stepping — signed-distance field cached in 3D textures to skip empty space
- - Noise-based Details — Additional details at 0.5m scale using Alligator and "Curly-Alligator" noise
- - Cloud Lighting - interactive lighting using atmosphere, as well as multiple scattering and ambient light
+Based on Guerrilla Games' **Nubis 3**, the renderer uses a dual-texture approach to decouple macro shapes from micro details while maximizing performance:
+
+*   **NVDF (Noise-Voxel Density Field):** A 3D texture defining local material properties:
+    *   **Density:** Base shape and opacity.
+    *   **Detail Type:** Noise pattern selector (e.g., billow vs. wispy).
+    *   **Scale:** Feature size control (e.g., fluffy tops vs. flat bottoms).
+*   **SDF (Signed Distance Field):** A low-res distance map used for **empty-space skipping**. Rays take large steps through empty air and switch to fine integration only when the SDF indicates proximity to the cloud surface.
+
+### Lighting Components 
+<table align="center">
+  <tr>
+    <td align="center">
+      <img src="images/rendering-readme/directional.png" width="100%" />
+      <br>
+      <em>Direct Light</em>
+    </td>
+    <td align="center">
+      <img src="images/rendering-readme/secondary.png" width="100%" />
+      <br>
+      <em>Multi-Scattering</em>
+    </td>
+  </tr>
+  <tr>
+    <td align="center">
+      <img src="images/rendering-readme/ambient.png" width="100%" />
+      <br>
+      <em>Ambient</em>
+    </td>
+    <td align="center">
+      <img src="images/rendering-readme/beauty.png" width="100%" />
+      <br>
+      <em>Combined Beauty</em>
+    </td>
+  </tr>
+</table>
+
+
+The lighting model integrates three components based on the Nubis 3 architecture:
+1.  **Direct Lighting:** Uses Beer’s Law for transmittance and a dual-lobe **Henyey-Greenstein** phase function to create intense forward scattering ("silver lining").
+2.  **Multi-Scattering:** Approximates internal light diffusion and the "powder effect" (dark edges) using a probability function rather than expensive path tracing.
+3.  **Ambient Lighting:** Applies a height-based gradient that blends sky color at the top with ground albedo at the bottom to ground the volume in the scene.
+
+### Light Caching Optimization 
+
+<div align="center">
+  <img src="images/rendering-readme/cache.png" width="90%" />
+  <br>
+  <em>Visualizing the cached light volume</em>
+</div>
+<bR>
+
+To decouple the expensive lighting calculation from the view ray march, the engine implements **Light Ray Caching**. Lighting is pre-computed for each voxel in a separate compute pass before the main render. This prevents the nested loop nightmare of marching toward the sun at every view sample, allowing the primary ray to simply look up the incoming light energy cheaply.
+
+
 ## Procedural Cloud Generation
 <p align="center">
   <img width="80%" alt="image" src="images/CloudControl.gif" />
