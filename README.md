@@ -20,7 +20,7 @@
 
   <br>
 
-  <img width="100%" alt="Real-time Flythrough" src="images/fly_in.gif" />
+  <img width="100%" alt="Real-time Flythrough" src="images/rendering-readme/hero.gif" />
   <br>
   <em>Real-time volumetric fly-through</em>
 
@@ -156,12 +156,29 @@ Cloud formation is fully procedural and controllable in real-time via ImGUI (e.g
 1.  **CPU Seeding:** "Seeds" are initialized as world-space coordinates to track cloud position, movement, and formation over time.
 2.  **GPU Shaping:** For each seed, a compute shader generates a base SDF shape using **Inigo Quilez’s** [primitive distance functions](https://iquilezles.org/articles/distfunctions/). The base form is a round cone surrounded by "Vesica Segments" (football-like shapes), where orientation, count, and size are driven by noise and the input scale factor.
 
-## Procedural Cloud Generation
+## Real-Time Volumetric Interactions
+<p align="center">
+  <img width="95%" alt="image" src="images/collision/outputDemo.gif" />
+  <br>
+  <em>Real-time object collision</em>
+</p>
 
 ### Script-Directed Cloud Instantiation
+<p align="center">
+  <img width="95%" alt="image" src="images/collision/outputJet.gif" />
+  <br>
+  <em>Jet-trails!</em>
+</p>
+
 Cloud placement is procedurally driven by an "SDF Path" system. An event system instantiates clouds along guided paths defined by Signed Distance Fields. Each cloud instance maintains unique parameters for **density decay** and **detail type**, allowing for art-directable variations within a procedurally generated sky.
 
 ### Novel Cloud Destruction
+<p align="center">
+  <img width="95%" alt="image" src="images/collision/outputHull.gif" />
+  <br>
+  <em>Convex-hull Visualization</em>
+</p>
+
 The engine supports real-time volumetric destruction. Interaction is handled by checking **convex hull collisions** against the cloud's density voxels. Those  checks are accelerated via a compute shader. Collision data is packed per mesh instance, rather than entity instance, to minimize memory overhead during the physics pass.
 
 
