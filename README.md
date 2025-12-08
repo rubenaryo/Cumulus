@@ -240,9 +240,9 @@ Add this back later once more complete
  -->
 
 # Performance Analysis
-To test some of our performance, we camptured a few different setups on an NVIDIA 4070 (Laptop).
+To test some of our performance, we captured a few different setups on an NVIDIA 4070 (Laptop).
 
-We compare two different things. One, how prebaking the procedural noise textures affects performance with a varying number or scale of clouds. And two, how the distance to a cloud affects our performance due to ray marching.
+We evaluated three different performance techniques we implemented. One, how prebaking the procedural noise textures affects performance with a varying number or scale of clouds. Two, how the distance to a cloud affects our performance due to ray marching. And third, how the convex hull algorithm compared to a naive triangle intersection check.
 
 The scenes tested for the first scenario are:
 <table align="center">
@@ -273,7 +273,7 @@ The scenes tested for the first scenario are:
 </table>
 
 The results comparison of the procedural compute pass in milliseconds:
-| Scene | Offline Texture | Online Texture |
+| Scene | Offline Texture (ms) | Online Texture (ms) |
 |---------|---------|--------|
 | Four clouds - 1.0 | 6.21 | 6.51 |
 | Four Big Clouds | 7.32 | 9.79 |
@@ -309,13 +309,24 @@ The scenes tested for the second scenario are:
   </tr>
 </table>
 
-The result comparison of the lighitng cache and the raymarch compute passes in milliseconds:
-| Scene | Light Cache | Raymarch |
+The result comparison of the lighting cache and the raymarch compute passes in milliseconds:
+| Scene | Light Cache (ms) | Raymarch (ms) |
 |-------|-------------|----------|
 | Far Cloud | 1.62 | 2.1 |
 | Close Cloud | 2.21 | 20.8 |
 | On the Edge | 1.5 | 20.3 |
 | Inside Cloud | 1.77 | 9.62 |
+
+Lastly, we have the convex hull collision checks. We standardized the objects to always be the arm model, our highest polygon obj with ~900 triangles. 
+
+| OBJ Count | Hull (ms) | Naive Triangles (ms) | 
+|-------|-------------|----------|
+| 0 | 2.20 | 2.11 |
+| 5 | 3.31 | 30.8 |
+| 30 | 9.50 | 105.5 |
+| 60 | 20.32 | 180.1 |
+
+The performance boosts gained through our largely enhancements are self evident. Collision checks are essentially non functioning for a real time context without an optimized collision structure. Likewise, the light cache provided huge gains in near cloud contexts. Interestingly, there isn't much of a difference between offline and online textures. This points to the true bottle neck: the procedural cloud sdf calculations.
 
 # Setup & Development 
 ## Building
