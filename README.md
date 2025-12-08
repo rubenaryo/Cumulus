@@ -20,7 +20,7 @@
 
   <br>
 
-  <img width="100%" alt="Real-time Flythrough" src="images/fly_in.gif" />
+  <img width="100%" alt="Real-time Flythrough" src="images/rendering-readme/hero.gif" />
   <br>
   <em>Real-time volumetric fly-through</em>
 
@@ -156,12 +156,29 @@ Cloud formation is fully procedural and controllable in real-time via ImGUI (e.g
 1.  **CPU Seeding:** "Seeds" are initialized as world-space coordinates to track cloud position, movement, and formation over time.
 2.  **GPU Shaping:** For each seed, a compute shader generates a base SDF shape using **Inigo Quilez’s** [primitive distance functions](https://iquilezles.org/articles/distfunctions/). The base form is a round cone surrounded by "Vesica Segments" (football-like shapes), where orientation, count, and size are driven by noise and the input scale factor.
 
-## Procedural Cloud Generation
+## Real-Time Volumetric Interactions
+<p align="center">
+  <img width="95%" alt="image" src="images/collision/outputDemo.gif" />
+  <br>
+  <em>Real-time object collision</em>
+</p>
 
 ### Script-Directed Cloud Instantiation
+<p align="center">
+  <img width="95%" alt="image" src="images/collision/outputJet.gif" />
+  <br>
+  <em>Jet-trails!</em>
+</p>
+
 Cloud placement is procedurally driven by an "SDF Path" system. An event system instantiates clouds along guided paths defined by Signed Distance Fields. Each cloud instance maintains unique parameters for **density decay** and **detail type**, allowing for art-directable variations within a procedurally generated sky.
 
 ### Novel Cloud Destruction
+<p align="center">
+  <img width="95%" alt="image" src="images/collision/outputHull.gif" />
+  <br>
+  <em>Convex-hull Visualization</em>
+</p>
+
 The engine supports real-time volumetric destruction. Interaction is handled by checking **convex hull collisions** against the cloud's density voxels. Those  checks are accelerated via a compute shader. Collision data is packed per mesh instance, rather than entity instance, to minimize memory overhead during the physics pass.
 
 
@@ -238,21 +255,24 @@ Add this back later once more complete
 
 # Setup & Development 
 ## Building
-This project uses the Premake 5 build system, which is bundled with the application and the executable can be found under ./external/
+This project uses the **Premake 5** build system (bundled in `./external/`) to automate project configuration.
 
-To generate a Visual Studio solution, simply run generate_vs2022.bat on Windows. This will: 
-- Generate a "Cumulus.sln" solution file
-- Generate and configure the VS projects specified under ./premake5.lua
-- Any Source/Header Files in the specified folder will be automatically added to the corresponding project. It is not necessary to modify the lua build script if adding a new file. 
+To build the project:
+1.  Run `generate_vs2022.bat` on Windows.
+2.  Open the generated `Cumulus.sln` in Visual Studio 2022.
+3.  Build and run.
 
-## Technical Details
-This project is built using MSVC with the Visual Studio 2022 toolset (v143) for the C++17 standard.
+*Note: The Premake script (`premake5.lua`) automatically detects and adds new source/header files in the source directories, so manual project updates are not required when adding files.*
+
+## Requirements
+*   **OS:** Windows 10/11
+*   **IDE:** Visual Studio 2022 (MSVC v143 toolset)
+*   **Language:** C++17
+*   **GPU:** DirectX 12 compatible hardware
 
 ## Dependencies
-* [DirectX Tex](https://github.com/microsoft/DirectXTex/)
-  * Reading image files for texture generation
-* [Assimp 3.0.0](http://www.assimp.org/)
-  * Loading 3D Models
+* [DirectX Tex](https://github.com/microsoft/DirectXTex/): Reading image files for texture generation
+* [Assimp 3.0.0](http://www.assimp.org/): Loading 3D Models
 
 # Appendices
 ## External Credits

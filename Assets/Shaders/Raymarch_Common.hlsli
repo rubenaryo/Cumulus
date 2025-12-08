@@ -9,7 +9,7 @@ Description : Common Raymarching Structures for Collision and Noise for Cloud Da
 
 
 #define JET_MODE  0   // Extra near-camera detail
-#define GPU_CLOUD 1
+#define GPU_CLOUD 0
 
 // Constants 
 static const float PI = 3.14159265359;
