@@ -11,7 +11,7 @@ cbuffer cbCloudGenBuffer : register(b6)
 
 cbuffer cbJetBuffer : register(b7)
 {
-    float4 positions[10];
+    float4 positions[12];
 }
 
 cbuffer Time : register(b8)
@@ -145,7 +145,7 @@ void main(int3 dispatchThreadID : SV_DispatchThreadID)
     float scale = 0;    // keeping track of average scale of clouds
     // making numSeeds number of clouds at their input locations and scales as passed by the CPU
     float jetSpeed = 0;
-    if (demoMode == 0 || demoMode == 1)
+    if (demoMode == 0)
     {
         for (uint i = 0; i < numSeeds; ++i)
         {
@@ -159,7 +159,7 @@ void main(int3 dispatchThreadID : SV_DispatchThreadID)
     
     if (demoMode == 1)
     {
-        uint numTrails = 5;
+        uint numTrails = 6;
 
         float3 jetStartOffset1 = float3(15.0, -5.0, 5.0);
         float3 jetStartOffset2 = float3(15.0, -5.0, -5.0);
@@ -188,7 +188,7 @@ void main(int3 dispatchThreadID : SV_DispatchThreadID)
 
             //if inside jet trail
             if (curr < 0.f) {
-                gMultiplier = lerp(0.01, 1.0, currentDensityMultiplier);
+              //  gMultiplier = lerp(0.01, 1.0, currentDensityMultiplier);
             }
         }
         scale /= numTrails;

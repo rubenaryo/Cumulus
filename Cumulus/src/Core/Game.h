@@ -79,6 +79,7 @@ private:
     Muon::cbJetTrailPositions jetTrailPos;
 
     static const DirectX::XMFLOAT3 jetDir;
+    static const DirectX::XMFLOAT3 lastJetDir;
 
     std::vector<int> projectileIndices;
 

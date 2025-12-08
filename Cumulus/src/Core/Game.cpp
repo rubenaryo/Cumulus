@@ -36,6 +36,7 @@ Game::Game() :
 }
 
 const DirectX::XMFLOAT3 Game::jetDir = { -5.f, 0.f, 0.f };
+const DirectX::XMFLOAT3 Game::lastJetDir = { -0.f, 0.f, 5.f };
 
 bool Game::Init(HWND window, int width, int height)
 {
@@ -243,8 +244,8 @@ void Game::InitEntities()
             EntityData jetEntity;
 
             // ---- 1. Setup initial orientation using flightDir ----------------------
-
-            XMVECTOR forward = XMVector3Normalize(XMLoadFloat3(&jetDir));
+			bool isLastJet = (i == JET_COUNT - 1);
+            XMVECTOR forward = isLastJet ? XMVector3Normalize(XMLoadFloat3(&lastJetDir))  :  XMVector3Normalize(XMLoadFloat3(&jetDir));
             XMVECTOR up = XMVectorSet(0.f, 1.f, 0.f, 0.f);
 
             // If forward is nearly parallel to up, pick a different up
@@ -255,11 +256,18 @@ void Game::InitEntities()
             up = XMVector3Normalize(XMVector3Cross(forward, right));
 
             // ---- 1b. Set initial world position -----------------------------------
-            float intervalZ = 200.0f;
-            int middle = JET_COUNT / 2;
-            int diffFromMiddle = std::abs(i - middle);
+            XMVECTOR jetStartPos;
+            if (!isLastJet) {
+                float intervalZ = 200.0f;
+                int formationCount = JET_COUNT - 1;
+                int middle = formationCount / 2;
+                int diffFromMiddle = std::abs(i - middle);
 
-            XMVECTOR jetStartPos = XMVectorSet(500.0, 50.0, (-intervalZ * (JET_COUNT - 1)/2 + intervalZ * i), 1.f) - XMLoadFloat3(&jetDir) * 4000.f - XMLoadFloat3(&jetDir) * diffFromMiddle * 250.f;
+                jetStartPos = XMVectorSet(500.0, 250.0, (-intervalZ * (formationCount - 1) / 2 + intervalZ * i), 1.f) - XMLoadFloat3(&jetDir) * 4000.f - XMLoadFloat3(&jetDir) * diffFromMiddle * 250.f;
+            }
+            else {
+				jetStartPos = XMVectorSet(1000.f, 125.f, -500.f, 1.f) - XMLoadFloat3(&lastJetDir) * 9000.f;
+            }
             XMStoreFloat4(&jetTrailPos.positions[2*i], jetStartPos);
 
             // Build world matrix correctly
@@ -346,7 +354,9 @@ void Game::UpdateEntities(Muon::FrameResources& currFrameResources, const Muon::
 
     if (jetIdx >= 0 && mCloudData.demoMode == 1) {
         for (int i = 0; i < Muon::JET_COUNT; ++i) {
-            float jetSpeed = 5555.f * time.deltaTime;
+			bool isLastJet = (i == Muon::JET_COUNT - 1);
+
+            float jetSpeed = 7777.f * time.deltaTime;
 
             Muon::EntityData& jet = cpuEntityData[jetIdx[i]];
 
@@ -367,7 +377,9 @@ void Game::UpdateEntities(Muon::FrameResources& currFrameResources, const Muon::
             DirectX::XMVECTOR jetPos = world.r[3];
             DirectX::XMStoreFloat4(&jetTrailPos.positions[2 * i + 1], jetPos);
 
-            float initialScale = 15.f;
+            float initialScale = 25.f;
+            if(isLastJet)
+				initialScale = 111.f;
             float finalScale = 80.f;
             float radGrowthTime = 100.f;
             float t = std::clamp(time.totalTime / radGrowthTime, 0.f, 1.f);
