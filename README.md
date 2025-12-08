@@ -214,22 +214,19 @@ The sky is rendered in a raycasting pre-pass that seamlessly blends Polar and Ca
   </tr>
 </table>
 
-### Core
- - Atmosphere rendering pass
- - Compute Shader pipeline for ray-marching
- - Compute Shader for collisions and cloud data generation
- - Post-processing pipeline
- - Automated loading of models/textures from files
- - 3D Texture construction: NVDF / SDF / Noise
-### Extra Features
- - String-based, shader-driven resource binding for easy user experience
-    - Driven by ID3D12ShaderReflection
- - Rendering is abstracted into a “Pass” framework, 
-    - Automatically generates Root Signatures and Pipeline States (shader-driven)
- - User-friendly abstractions for D3D12 objects: Texture, Upload Buffer, FrameResource
- - Automatic lifetime reporting for catching memory leaks in Debug mode
- - Diligent error detection and logging
- - ImGUI integration
+### Rendering Pipeline
+-   **Volumetric Ray-Marching:** Compute-driven pipeline for handling density integration, light caching, and SDF stepping.
+-   **Atmospheric Scattering:** Dedicated pre-pass for sky, sun, and moon rendering based on precomputed LUTs.
+-   **Simulation & Physics:** Compute shaders for procedural cloud generation and convex hull collision detection.
+-   **Post-Processing:** Full-screen pass system for tone mapping and final compositing.
+-   **Asset Management:** Automated loading of 3D models (Assimp) and texture construction (DirectXTex) for NVDF, SDF, and Noise volumes.
+
+### Architecture & Tooling
+-   **Shader-Driven Reflection:** Resource binding is automated via `ID3D12ShaderReflection`, allowing for string-based parameter setting without manual root signature matching.
+-   **"Pass" Framework:** A high-level abstraction that automatically generates Root Signatures and Pipeline State Objects (PSOs) based on shader requirements.
+-   **D3D12 Abstractions:** User-friendly wrappers for complex DirectX 12 objects including `Texture`, `UploadBuffer` (staging), and `FrameResource` management.
+-   **Diagnostics:** Integrated ImGUI for runtime controls, plus automatic lifetime reporting and strict error logging to catch memory leaks in Debug mode.
+
 
 <!-- 
 Add this back later once more complete  
