@@ -30,15 +30,15 @@
 # Overview
 **Cumulus** is a real-time, volumetric cloud rendering engine built from scratch in DirectX 12. 
 
-It extends the architectural principles of Guerrilla Games' **[Nubis 3](https://www.guerrilla-games.com/read/nubis-cubed)** technology by introducing a fully procedural, **GPU-driven generation pipeline**. Unlike static implementations, Cumulus supports dynamic object interaction (collisions), real-time weather transitions, and variable density modeling without offline pre-computation.
+It extends the architectural principles of Guerrilla Games' **[Nubis 3](https://www.guerrilla-games.com/read/nubis-cubed)** technology by introducing a fully procedural, **GPU-driven generation pipeline**. Unlike static implementations, Cumulus supports dynamic object interaction (collisions), time-of-day transitions, and variable density modeling without offline pre-computation.
 
 # Table of Contents
 - [Overview](#overview)
 - [Features](#features)
   - [Volumetric Cloud Rendering](#volumetric-cloud-rendering)
   - [Procedural Cloud Generation](#procedural-cloud-generation)
-  - [DirectX 12 Engine](#muon-a-directx-12-engine)
   - [Physically-Based Atmosphere](#physically-based-atmosphere)
+  - [DirectX 12 Engine](#muon-a-directx-12-engine)
 - [Setup & Development](#setup--development)
   - [Building](#building)
   - [Technical Details](#technical-details)
@@ -156,6 +156,15 @@ Cloud formation is fully procedural and controllable in real-time via ImGUI (e.g
 1.  **CPU Seeding:** "Seeds" are initialized as world-space coordinates to track cloud position, movement, and formation over time.
 2.  **GPU Shaping:** For each seed, a compute shader generates a base SDF shape using **Inigo Quilez’s** [primitive distance functions](https://iquilezles.org/articles/distfunctions/). The base form is a round cone surrounded by "Vesica Segments" (football-like shapes), where orientation, count, and size are driven by noise and the input scale factor.
 
+## Procedural Cloud Generation
+
+### Script-Directed Cloud Instantiation
+Cloud placement is procedurally driven by an "SDF Path" system. An event system instantiates clouds along guided paths defined by Signed Distance Fields. Each cloud instance maintains unique parameters for **density decay** and **detail type**, allowing for art-directable variations within a procedurally generated sky.
+
+### Novel Cloud Destruction
+The engine supports real-time volumetric destruction. Interaction is handled by checking **convex hull collisions** against the cloud's density voxels. Those  checks are accelerated via a compute shader. Collision data is packed per mesh instance, rather than entity instance, to minimize memory overhead during the physics pass.
+
+
 ### Noise Baking Optimization
 <table align="center" width="80%">
   <tr>
@@ -176,6 +185,18 @@ To ensure runtime performance, complex noise functions are **pre-baked** into st
 -   **Billow Noise:** Based on the **[psrdnoise](https://github.com/stegu/psrdnoise/)** implementation by Stefan Gustavson and Ian MacEwan, this modified Perlin noise uses rotated cells to create the characteristic "puffiness" of cumulus clouds.
 -   **Fractal Sum & Easing:** Noise values are eased out near SDF boundaries and accumulated using fractal sums to eliminate voxel-like artifacts.
 -   **Detail & Density:** High-frequency detail is driven by scaled billow noise that intensifies with altitude (mimicking wispy cloud tops), while density scale remains relatively uniform across the profile.
+
+## Physically-Based Atmosphere
+
+<p align="center">
+  <img width="90%" alt="image" src="images/gifAtmosphere.gif" />
+  <br>
+  <em>Sunrise, daytime, sunset, night time, with the ImGUI controls</em>
+</p>
+
+The atmospheric rendering system implements Eric Bruneton's **[Precomputed Atmospheric Scattering](https://ebruneton.github.io/precomputed_atmospheric_scattering/)** model. To maximize performance, the engine bypasses runtime initialization by loading pre-baked Irradiance, Scattering, and Transmission textures. 
+
+The sky is rendered in a raycasting pre-pass that seamlessly blends Polar and Cartesian camera models to support a fully dynamic day/night cycle, complete with UI-controllable sun positioning and a custom moon and night sky implementation.
 
 ## Muon: A DirectX 12 Engine
 <table align="center">
@@ -218,21 +239,6 @@ Add this back later once more complete
 ![output](https://github.com/user-attachments/assets/de29dfd9-aaee-43ab-8449-aa158530d611)
  -->
 
-
-## Physically-Based Atmosphere
-<p align="center">
-  <img width="80%" alt="image" src="images/atmosphere.png" />
-  <br>
-  <em>Sunrise, daytime, sunset, night time, with the ImGUI controls</em>
-</p>
-
- - Based on [Eric Bruneton's Precomputed Atmospheric Scattering](https://ebruneton.github.io/precomputed_atmospheric_scattering/)
-  - Skips precompute to read from offline Irradiance, Scattering, and Transmission textures
-  - Blends Polar and Cartesian camera models
-  - Day and night cycle with selectable time of day
-  - Fully calculated in a pre-pass with raycasting
-  - Added moon and night time sky.
-  - Daytime can be modified in the UI to set sun position.
 # Setup & Development 
 ## Building
 This project uses the Premake 5 build system, which is bundled with the application and the executable can be found under ./external/
