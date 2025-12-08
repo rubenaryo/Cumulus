@@ -14,7 +14,7 @@
 #define USE_MULTIPLE_SCATTERING  1  // Approx. multiple scattering
 
 // === Debug / Visualization ===
-#define DEBUG_AABB_INTERSECT     0   // Visualize volume/hull hits
+#define DEBUG_AABB_INTERSECT     1   // Visualize volume/hull hits
 #define DEBUG_STEP_COUNT         0   // Step-count gradient debug
 
 Texture2D gInput : register(t0);

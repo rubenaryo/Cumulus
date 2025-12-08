@@ -151,7 +151,7 @@ bool Game::InitFrameResources(UINT width, UINT height)
     const Mesh* teapotMesh = codex.GetMesh(GetResourceID(L"teapot.obj"));
     const Mesh* duckyMesh = codex.GetMesh(GetResourceID(L"ducky.obj"));
     const Mesh* sphereMesh = codex.GetMesh(GetResourceID(L"cube.obj"));
-    const Mesh* axeMesh = codex.GetMesh(GetResourceID(L"taurus.obj"));
+    const Mesh* axeMesh = codex.GetMesh(GetResourceID(L"arm.obj"));
 
     cbHulls hulls = {};
     cbHullFaces faces = {};
@@ -159,9 +159,9 @@ bool Game::InitFrameResources(UINT width, UINT height)
     int hullOffset = 0;
     ProjectilePrefab axePrefab = {};
     axePrefab.hullIdx = hullOffset;
-    axePrefab.resourceID = GetResourceID(L"taurus.obj");
+    axePrefab.resourceID = GetResourceID(L"arm.obj");
     axePrefab.textureID = GetResourceID(L"DuckyMat");
-    axePrefab.scale = 400.f;
+    axePrefab.scale = 2.f;
     projectilePrefabs.push_back(axePrefab);
     AddMeshToHullBuffer(axeMesh, hulls, faces, facesOffset, hullOffset);
 
@@ -182,13 +182,13 @@ bool Game::InitFrameResources(UINT width, UINT height)
     projectilePrefabs.push_back(teapotPrefab);
     AddMeshToHullBuffer(teapotMesh, hulls, faces, facesOffset, hullOffset);
 
-    ProjectilePrefab spherePrefab = {};
-    spherePrefab.hullIdx = hullOffset;
-    spherePrefab.resourceID = GetResourceID(L"cube.obj");
-    spherePrefab.textureID = GetResourceID(L"DuckyMat");
-    spherePrefab.scale = 100.f;
-    projectilePrefabs.push_back(spherePrefab);
-    AddMeshToHullBuffer(sphereMesh, hulls, faces, facesOffset, hullOffset);
+    //ProjectilePrefab spherePrefab = {};
+    //spherePrefab.hullIdx = hullOffset;
+    //spherePrefab.resourceID = GetResourceID(L"cube.obj");
+    //spherePrefab.textureID = GetResourceID(L"DuckyMat");
+    //spherePrefab.scale = 30.f;
+    //projectilePrefabs.push_back(spherePrefab);
+    //AddMeshToHullBuffer(sphereMesh, hulls, faces, facesOffset, hullOffset);
 
 
     // Create each frame resource and fill it with static data.

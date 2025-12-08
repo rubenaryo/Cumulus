@@ -79,11 +79,13 @@ float4 main(VertexOut input) : SV_TARGET
     totalLight += diffuseLighting;
 
     // Finally, add the ambient color
-    const float AMBIENT_INTENSITY = 0.4f;
+    const float AMBIENT_INTENSITY = 1.0f;
     totalLight += ambientColor * AMBIENT_INTENSITY;
 
-    float3 finalC = float3(159.f / 255.f, 237.f / 255.f, 229.f / 255.f);//diffuseTexture.Sample(samplerOptions, input.uv).rgb;
+    float3 finalC = float3(0.346704, 0.846873, 0.783538); //diffuseTexture.Sample(samplerOptions, input.uv).rgb;
     totalLight *= finalC;
+    
+    totalLight = totalLight / (1.0 + totalLight);
 
     totalLight = saturate(totalLight);
 
