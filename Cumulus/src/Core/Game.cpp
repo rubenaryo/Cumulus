@@ -58,7 +58,7 @@ bool Game::Init(HWND window, int width, int height)
 
     ResourceCodex& codex = ResourceCodex::GetSingleton();
 
-    mCamera.Init(DirectX::XMFLOAT3(700.0, -25.0, 0.0), width / (float)height, 0.01f, 4000.0f);
+    mCamera.Init(DirectX::XMFLOAT3(700.0, -600.0, 0.0), width / (float)height, 0.01f, 4000.0f);
 
     // Assemble opaque render pass
     {

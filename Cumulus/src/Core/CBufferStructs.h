@@ -139,31 +139,31 @@ struct alignas(16) cbCloudLighting
     float clPad0 = 0.0f; 
 
     // === Sun / primary lighting ===
-    DirectX::XMFLOAT3 dirSun = { 0.0f, 1.0f, 0.0f };
-    float             directExtinctionScale = 0.02f;
+    DirectX::XMFLOAT3 dirSun = { -1.0f, 1.0f, 0.0f };
+    float             directExtinctionScale = 0.122f;
 
-    float             directStrength = 1.0f; 
-    DirectX::XMFLOAT3 sunColor = { 0.86f, 0.94f, 0.98};
+    float             directStrength = 0.0f; 
+    DirectX::XMFLOAT3 sunColor = SrgbToLinear3(249.f/255.f, 241.f / 255.f,  202.f / 255.f);
 
-    float             sunIntensity = 255.f;
+    float             sunIntensity = 22.13;
     float clPad1 = 0.0f;
     float clPad2 = 0.0f;
     float clPad3 = 0.0f;
 
     // === Secondary ===
-    DirectX::XMFLOAT3 secondaryColor = SrgbToLinear3( 1.0f, 0.96f, 0.9f );
-    float             secondaryStrength = 2.0f;
+    DirectX::XMFLOAT3 secondaryColor = SrgbToLinear3( 161.f / 255.f, 194.f/ 255.f, 224.f / 255.f);
+    float             secondaryStrength = 0.0f; 
 
-    float secondaryExtinctionScale = 0.02f;
+    float secondaryExtinctionScale = 0.122f;
     float clPad4 = 0.0f;
     float clPad5 = 0.0f;
     float clPad6 = 0.0f;
 
     // === Ambient ===
-    DirectX::XMFLOAT3 ambientColor = SrgbToLinear3( 1.0f, 0.96f, 0.9f );
-    float             ambientExtinctionScale = 0.05f;
+    DirectX::XMFLOAT3 ambientColor = SrgbToLinear3( 216.f / 255.f, 224.f / 255.f, 247.f / 255.f);
+    float             ambientExtinctionScale = 0.013f;
 
-    float ambientStrength = 1.0f;
+    float ambientStrength = 0.0f;
     float clPad7 = 0.0f;
     float clPad8 = 0.0f;
     float clPad9 = 0.0f;
