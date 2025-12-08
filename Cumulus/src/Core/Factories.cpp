@@ -1143,11 +1143,15 @@ void TextureFactory::CreateRaymarchCacheTexture(ID3D12Device* pDevice, ID3D12Gra
 
 bool MaterialFactory::CreateAllMaterials(ResourceCodex& codex)
 {
-    const ResourceID kPhongDiffuseId = GetResourceID(L"Bark_T.png");
+    const ResourceID kPhongDiffuseId = GetResourceID(L"Rock_T.png");
     const ResourceID kPhongNormalId = GetResourceID (L"Bark_N.png");
     const ResourceID kTestNVDFId = GetResourceID(L"StormbirdCloud_NVDF");
     const ResourceID kTest3DTexId = GetResourceID(L"Test_3D");
     const ResourceID kTestDDS = GetResourceID(L"scatter_tex_full.dds");
+
+    const ResourceID duckyBaseColorId = GetResourceID(L"ducky.png");
+    const ResourceID duckyNormal = GetResourceID(L"duckyN.png");
+
     {
         const wchar_t* kPhongMaterialName = L"Phong";
         Material* pPhongMaterial = codex.InsertMaterialType(kPhongMaterialName);
@@ -1171,6 +1175,32 @@ bool MaterialFactory::CreateAllMaterials(ResourceCodex& codex)
         pPhongMaterial->SetTextureParam("diffuseTexture", kPhongDiffuseId);
         pPhongMaterial->SetTextureParam("normalMap",      kPhongNormalId);
         pPhongMaterial->SetTextureParam("test3d", kTestDDS);
+    }
+
+
+    {
+        const wchar_t* kDuckyMaterialName = L"DuckyMat";
+        Material* duckyMaterial = codex.InsertMaterialType(kDuckyMaterialName);
+        if (!duckyMaterial)
+        {
+            Muon::Printf(L"Warning: %s Material failed to be inserted into codex!", kDuckyMaterialName);
+            return false;
+        }
+
+        cbMaterialParams duckyMaterialParams;
+        duckyMaterialParams.colorTint = DirectX::XMFLOAT4(1, 1, 1, 1);
+        duckyMaterialParams.specularExp = 32.0f;
+
+        Muon::ResetCommandList(nullptr);
+
+        duckyMaterial->PopulateMaterialParams(codex.GetMatParamsStagingBuffer(), Muon::GetCommandList());
+
+        Muon::CloseCommandList();
+        Muon::ExecuteCommandList();
+
+        duckyMaterial->SetTextureParam("diffuseTexture", duckyBaseColorId);
+        duckyMaterial->SetTextureParam("normalMap", duckyNormal);
+        duckyMaterial->SetTextureParam("test3d", kTestDDS);
     }
 
     return true;

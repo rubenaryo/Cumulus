@@ -197,6 +197,8 @@ struct EntityData {
     cbPerEntity entityMatrices;
     int hullIdx;
     Muon::ResourceID resourceID;
+    Muon::ResourceID textureID;
+
     DirectX::XMFLOAT4 vel;
     DirectX::XMFLOAT4 rot;
 };

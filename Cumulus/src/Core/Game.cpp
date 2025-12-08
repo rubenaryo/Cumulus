@@ -160,6 +160,7 @@ bool Game::InitFrameResources(UINT width, UINT height)
     ProjectilePrefab duckyPrefab = {};
     duckyPrefab.hullIdx = hullOffset;
     duckyPrefab.resourceID = GetResourceID(L"ducky.obj");
+    duckyPrefab.textureID = GetResourceID(L"DuckyMat");
     duckyPrefab.scale = 100.f;
     projectilePrefabs.push_back(duckyPrefab);
     AddMeshToHullBuffer(duckyMesh, hulls, faces, facesOffset, hullOffset);
@@ -167,6 +168,8 @@ bool Game::InitFrameResources(UINT width, UINT height)
     ProjectilePrefab teapotPrefab = {};
     teapotPrefab.hullIdx = hullOffset;
     teapotPrefab.resourceID = GetResourceID(L"teapot.obj");
+    teapotPrefab.textureID = GetResourceID(L"DuckyMat");
+
     teapotPrefab.scale = 4.f;
     projectilePrefabs.push_back(teapotPrefab);
     AddMeshToHullBuffer(teapotMesh, hulls, faces, facesOffset, hullOffset);
@@ -174,6 +177,7 @@ bool Game::InitFrameResources(UINT width, UINT height)
     ProjectilePrefab spherePrefab = {};
     spherePrefab.hullIdx = hullOffset;
     spherePrefab.resourceID = GetResourceID(L"sphere.obj");
+    spherePrefab.textureID = GetResourceID(L"DuckyMat");
     spherePrefab.scale = 100.f;
     projectilePrefabs.push_back(spherePrefab);
     AddMeshToHullBuffer(sphereMesh, hulls, faces, facesOffset, hullOffset);
@@ -309,6 +313,7 @@ void Game::SpawnProjectile()
 
     EntityData newProjectile{};
     newProjectile.resourceID = prefab.resourceID;
+    newProjectile.textureID = prefab.textureID;
     newProjectile.hullIdx = prefab.hullIdx;
 
     // Store world & invWorld
@@ -790,7 +795,6 @@ void Game::Render()
     if (mOpaquePass.Bind(pCommandList))
     {
         // Bind's the materials parameter buffer and textures.
-        mOpaquePass.BindMaterial(*pPhongMaterial, pCommandList);
 
         // Bind the Camera's Upload Buffer to the root index known by the material
         int32_t cameraRootIdx = mOpaquePass.GetResourceRootIndex("VSCamera");
@@ -832,9 +836,15 @@ void Game::Render()
             for (int i = 0; i < projectileIndices.size(); ++i) {
                 const EntityData& projectile = cpuEntityData[projectileIndices[i]];
                 const Mesh* mesh = codex.GetMesh(projectile.resourceID);
+                const Muon::Material* prefabMat = codex.GetMaterialType(projectile.textureID);
+                const Muon::Material* phongMat = codex.GetMaterialType(phongMatId);
+
+                mOpaquePass.BindMaterial(*phongMat, pCommandList);
+
                 if (mesh && settings.drawObjects) {
                     static const size_t kEntityCBSize =
                         (sizeof(cbPerEntity) + 255) & ~255;
+                    
                     pCommandList->SetGraphicsRootConstantBufferView(entityMatrix, currFrameResources.mEntitiesBuffer.GetGPUVirtualAddress() + projectileIndices[i] * kEntityCBSize);
 
                     currFrameResources.UpdateWorldMatrix(projectile.entityMatrices);

@@ -58,5 +58,5 @@ float4 main(VertexOut input) : SV_TARGET
     
     totalLight *= surfaceColor;
     
-    return float4(totalLight, 1);
+    return float4(surfaceColor, 1);
 }
