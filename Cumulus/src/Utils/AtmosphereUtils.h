@@ -304,15 +304,15 @@ void UpdateLightFromAtmosphere(cbAtmosphere& atmosphere, SceneSettings& settings
     XMFLOAT3 morningCol3(216.f / 255.f, 224.f / 255.f, 247.f / 255.f);
     LightingData morningLightData
     {
-        0.069f,
-        0.272f,
+        0.053f,
+        0.783f,
         SrgbToLinear3(morningCol),
-        189.39f,
+        73.51f,
         SrgbToLinear3(morningCol2),
-        1.698f,
+        0.498f,
         SrgbToLinear3(morningCol3),
-        0.013f,
-        0.947f
+        0.050f,
+        0.445f
     };
 
     // SunSet
@@ -321,15 +321,15 @@ void UpdateLightFromAtmosphere(cbAtmosphere& atmosphere, SceneSettings& settings
     XMFLOAT3 eveningCol3(49.f / 255.f, 83.f / 255.f, 106.f / 255.f);
     LightingData eveningLightData
     {
-        0.023f,
-        0.884f,
+        0.063f,
+        0.984f,
         SrgbToLinear3(eveningCol),
-        69.27f,
+        73.51f,
         SrgbToLinear3(eveningCol2),
-        0.094f,
+        0.333f,
         SrgbToLinear3(eveningCol3),
-        0.007f,
-        0.074f
+        0.050f,
+        0.097f
     };
 
     // Lerping between different colors
