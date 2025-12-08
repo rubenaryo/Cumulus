@@ -239,6 +239,84 @@ Add this back later once more complete
 ![output](https://github.com/user-attachments/assets/de29dfd9-aaee-43ab-8449-aa158530d611)
  -->
 
+# Performance Analysis
+To test some of our performance, we camptured a few different setups on an NVIDIA 4070 (Laptop).
+
+We compare two different things. One, how prebaking the procedural noise textures affects performance with a varying number or scale of clouds. And two, how the distance to a cloud affects our performance due to ray marching.
+
+The scenes tested for the first scenario are:
+<table align="center">
+  <tr>
+    <td align="center">
+      <img src="images/Performance/P1-FourClouds1.0Scale.png"  width = "100%"/>
+      <br>
+      <em>Four Clouds at 1.0 Scale</em>
+    </td>
+    <td align="center">
+      <img src="images/Performance/P2-FourBig.png"  width = "100%"/>
+      <br>
+      <em>Four Big Clouds</em>
+    </td>
+    </tr>
+    <tr>
+        <td align="center">
+      <img src="images/Performance/P3-EightEight.png"  width = "100%"/>
+      <br>
+      <em>Eight Clouds at 8.0 Scale</em>
+    </td>
+        <td align="center">
+      <img src="images/Performance/P4-maxmax.png"  width = "100%"/>
+      <br>
+      <em>Sixteen Clouds at Maximum Scale</em>
+    </td>
+  </tr>
+</table>
+
+The results comparison of the procedural compute pass in milliseconds:
+| Scene | Offline Texture | Online Texture |
+|---------|---------|--------|
+| Four clouds - 1.0 | 6.21 | 6.51 |
+| Four Big Clouds | 7.32 | 9.79 |
+| Eight Clouds | 13.15 | 14.76 |
+| Sixteen Clouds | 24.55 | 24.61 |
+
+
+The scenes tested for the second scenario are:
+<table align="center">
+  <tr>
+    <td align="center">
+      <img src="images/Performance/Dist.png"  width = "100%"/>
+      <br>
+      <em>A cloud at a distance</em>
+    </td>
+    <td align="center">
+      <img src="images/Performance/FillScreen.png"  width = "100%"/>
+      <br>
+      <em>A cloud up close</em>
+    </td>
+    </tr>
+    <tr>
+        <td align="center">
+      <img src="images/Performance/OnEdge.png"  width = "100%"/>
+      <br>
+      <em>On the edge of a cloud</em>
+    </td>
+        <td align="center">
+      <img src="images/Performance/Inside.png"  width = "100%"/>
+      <br>
+      <em>Inside a cloud</em>
+    </td>
+  </tr>
+</table>
+
+The result comparison of the lighitng cache and the raymarch compute passes in milliseconds:
+| Scene | Light Cache | Raymarch |
+|-------|-------------|----------|
+| Far Cloud | 1.62 | 2.1 |
+| Close Cloud | 2.21 | 20.8 |
+| On the Edge | 1.5 | 20.3 |
+| Inside Cloud | 1.77 | 9.62 |
+
 # Setup & Development 
 ## Building
 This project uses the Premake 5 build system, which is bundled with the application and the executable can be found under ./external/
