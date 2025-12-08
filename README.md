@@ -20,9 +20,8 @@
 
   <br>
 
-  <img width="100%" alt="Real-time Flythrough" src="images/rendering-readme/hero.gif" />
+  <img width="100%" alt="Real-time Flythrough" src="images/rendering-readme/team2.gif" />
   <br>
-  <em>Real-time volumetric fly-through</em>
 
 </div>
 <br>
