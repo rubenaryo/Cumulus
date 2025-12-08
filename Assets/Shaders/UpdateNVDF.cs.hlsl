@@ -1,4 +1,4 @@
-#define USE_BAKED_NOISE_TEX 0
+#define USE_BAKED_NOISE_TEX 1
 
 RWTexture3D<float4> gOutput : register(u0);
 
