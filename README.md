@@ -252,6 +252,95 @@ Add this back later once more complete
 ![output](https://github.com/user-attachments/assets/de29dfd9-aaee-43ab-8449-aa158530d611)
  -->
 
+# Performance Analysis
+To test some of our performance, we captured a few different setups on an NVIDIA 4070 (Laptop).
+
+We evaluated three different performance techniques we implemented. One, how prebaking the procedural noise textures affects performance with a varying number or scale of clouds. Two, how the distance to a cloud affects our performance due to ray marching. And third, how the convex hull algorithm compared to a naive triangle intersection check.
+
+The scenes tested for the first scenario are:
+<table align="center">
+  <tr>
+    <td align="center">
+      <img src="images/Performance/P1-FourClouds1.0Scale.png"  width = "100%"/>
+      <br>
+      <em>Four Clouds at 1.0 Scale</em>
+    </td>
+    <td align="center">
+      <img src="images/Performance/P2-FourBig.png"  width = "100%"/>
+      <br>
+      <em>Four Big Clouds</em>
+    </td>
+    </tr>
+    <tr>
+        <td align="center">
+      <img src="images/Performance/P3-EightEight.png"  width = "100%"/>
+      <br>
+      <em>Eight Clouds at 8.0 Scale</em>
+    </td>
+        <td align="center">
+      <img src="images/Performance/P4-maxmax.png"  width = "100%"/>
+      <br>
+      <em>Sixteen Clouds at Maximum Scale</em>
+    </td>
+  </tr>
+</table>
+
+The results comparison of the procedural compute pass in milliseconds:
+| Scene | Offline Texture (ms) | Online Texture (ms) |
+|---------|---------|--------|
+| Four clouds - 1.0 | 6.21 | 6.51 |
+| Four Big Clouds | 7.32 | 9.79 |
+| Eight Clouds | 13.15 | 14.76 |
+| Sixteen Clouds | 24.55 | 24.61 |
+
+
+The scenes tested for the second scenario are:
+<table align="center">
+  <tr>
+    <td align="center">
+      <img src="images/Performance/Dist.png"  width = "100%"/>
+      <br>
+      <em>A cloud at a distance</em>
+    </td>
+    <td align="center">
+      <img src="images/Performance/FillScreen.png"  width = "100%"/>
+      <br>
+      <em>A cloud up close</em>
+    </td>
+    </tr>
+    <tr>
+        <td align="center">
+      <img src="images/Performance/OnEdge.png"  width = "100%"/>
+      <br>
+      <em>On the edge of a cloud</em>
+    </td>
+        <td align="center">
+      <img src="images/Performance/Inside.png"  width = "100%"/>
+      <br>
+      <em>Inside a cloud</em>
+    </td>
+  </tr>
+</table>
+
+The result comparison of the lighting cache and the raymarch compute passes in milliseconds:
+| Scene | Light Cache (ms) | Raymarch (ms) |
+|-------|-------------|----------|
+| Far Cloud | 1.62 | 2.1 |
+| Close Cloud | 2.21 | 20.8 |
+| On the Edge | 1.5 | 20.3 |
+| Inside Cloud | 1.77 | 9.62 |
+
+Lastly, we have the convex hull collision checks. We standardized the objects to always be the arm model, our highest polygon obj with ~900 triangles. 
+
+| OBJ Count | Hull (ms) | Naive Triangles (ms) | 
+|-------|-------------|----------|
+| 0 | 2.20 | 2.11 |
+| 5 | 3.31 | 30.8 |
+| 30 | 9.50 | 105.5 |
+| 60 | 20.32 | 180.1 |
+
+The performance boosts gained through our largely enhancements are self evident. Collision checks are essentially non functioning for a real time context without an optimized collision structure. Likewise, the light cache provided huge gains in near cloud contexts. Interestingly, there isn't much of a difference between offline and online textures. This points to the true bottle neck: the procedural cloud sdf calculations.
+
 # Setup & Development 
 ## Building
 This project uses the **Premake 5** build system (bundled in `./external/`) to automate project configuration.
